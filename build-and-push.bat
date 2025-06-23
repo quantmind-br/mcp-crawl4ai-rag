@@ -3,12 +3,39 @@ echo ===============================================
 echo MCP Crawl4AI RAG - Build and Push to Docker Hub
 echo ===============================================
 echo.
-echo Target image: drnit29/mcp-crawl4ai-rag:latest
 echo Registry: Docker Hub
+echo.
+
+echo Choose build option:
+echo 1. MCP Server only (without Ollama)
+echo 2. MCP Server + Ollama (full stack)
+echo.
+set /p BUILD_CHOICE="Enter your choice (1 or 2): "
+
+if "%BUILD_CHOICE%"=="1" (
+    echo Selected: MCP Server only
+    set TARGET_IMAGE=drnit29/mcp-crawl4ai-rag:latest
+    set COMPOSE_FILE=docker-compose.yml
+    set BUILD_TAG=mcp-only
+) else if "%BUILD_CHOICE%"=="2" (
+    echo Selected: MCP Server + Ollama
+    set TARGET_IMAGE=drnit29/mcp-crawl4ai-rag:with-ollama
+    set COMPOSE_FILE=docker-compose.with-ollama.yml
+    set BUILD_TAG=with-ollama
+) else (
+    echo Invalid choice. Exiting...
+    exit /b 1
+)
+
+echo.
+echo Target image: %TARGET_IMAGE%
+echo Using compose file: %COMPOSE_FILE%
 echo.
 
 echo [1/8] Stopping existing containers...
 docker-compose down
+docker-compose -f docker-compose.with-ollama.yml down
+docker-compose -f docker-compose.published.yml down
 if %ERRORLEVEL% NEQ 0 (
     echo Warning: Error stopping containers, continuing...
 )
@@ -16,7 +43,7 @@ echo.
 
 echo [2/8] Building MCP server container with custom tag...
 echo This may take several minutes due to dependencies...
-docker build -t drnit29/mcp-crawl4ai-rag:latest --build-arg PORT=8051 .
+docker build -t %TARGET_IMAGE% --build-arg PORT=8051 .
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to build MCP server container
     pause
@@ -38,11 +65,12 @@ echo.
 echo [4/8] Starting container with built image for testing...
 echo Stopping any existing containers first...
 docker-compose down >nul 2>&1
+docker-compose -f docker-compose.with-ollama.yml down >nul 2>&1
 docker-compose -f docker-compose.published.yml down >nul 2>&1
 
 echo.
 echo Starting services using new built image...
-docker-compose -f docker-compose.published.yml up -d
+docker-compose -f %COMPOSE_FILE% up -d
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to start services with built image
     echo.
