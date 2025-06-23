@@ -16,6 +16,8 @@ import random
 from functools import wraps
 from datetime import datetime, timedelta
 
+from .config import config
+
 # Global client cache and rate limiting
 _client_cache = {}
 _client_cache_lock = threading.Lock()
@@ -784,16 +786,17 @@ def add_documents_to_supabase(
     unique_urls = list(set(urls))
     
     # Delete existing records for these URLs in a single operation
+    crawled_pages_table = config.TABLE_CRAWLED_PAGES
     try:
         if unique_urls:
             # Use the .in_() filter to delete all records with matching URLs
-            client.table("crawled_pages").delete().in_("url", unique_urls).execute()
+            client.table(crawled_pages_table).delete().in_("url", unique_urls).execute()
     except Exception as e:
         print(f"Batch delete failed: {e}. Trying one-by-one deletion as fallback.")
         # Fallback: delete records one by one
         for url in unique_urls:
             try:
-                client.table("crawled_pages").delete().eq("url", url).execute()
+                client.table(crawled_pages_table).delete().eq("url", url).execute()
             except Exception as inner_e:
                 print(f"Error deleting record for URL {url}: {inner_e}")
                 # Continue with the next URL even if one fails
@@ -884,7 +887,7 @@ def add_documents_to_supabase(
         
         for retry in range(max_retries):
             try:
-                client.table("crawled_pages").insert(batch_data).execute()
+                client.table(crawled_pages_table).insert(batch_data).execute()
                 # Success - break out of retry loop
                 break
             except Exception as e:
@@ -901,7 +904,7 @@ def add_documents_to_supabase(
                     successful_inserts = 0
                     for record in batch_data:
                         try:
-                            client.table("crawled_pages").insert(record).execute()
+                            client.table(crawled_pages_table).insert(record).execute()
                             successful_inserts += 1
                         except Exception as individual_error:
                             print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
@@ -1091,10 +1094,11 @@ def add_code_examples_to_supabase(
         return
         
     # Delete existing records for these URLs
+    code_examples_table = config.TABLE_CODE_EXAMPLES
     unique_urls = list(set(urls))
     for url in unique_urls:
         try:
-            client.table('code_examples').delete().eq('url', url).execute()
+            client.table(code_examples_table).delete().eq('url', url).execute()
         except Exception as e:
             print(f"Error deleting existing code examples for {url}: {e}")
     
@@ -1148,7 +1152,7 @@ def add_code_examples_to_supabase(
         
         for retry in range(max_retries):
             try:
-                client.table('code_examples').insert(batch_data).execute()
+                client.table(code_examples_table).insert(batch_data).execute()
                 # Success - break out of retry loop
                 break
             except Exception as e:
@@ -1165,7 +1169,7 @@ def add_code_examples_to_supabase(
                     successful_inserts = 0
                     for record in batch_data:
                         try:
-                            client.table('code_examples').insert(record).execute()
+                            client.table(code_examples_table).insert(record).execute()
                             successful_inserts += 1
                         except Exception as individual_error:
                             print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
@@ -1187,7 +1191,8 @@ def update_source_info(client: Client, source_id: str, summary: str, word_count:
     """
     try:
         # Try to update existing source
-        result = client.table('sources').update({
+        sources_table = config.TABLE_SOURCES
+        result = client.table(sources_table).update({
             'summary': summary,
             'total_word_count': word_count,
             'updated_at': 'now()'
@@ -1195,7 +1200,7 @@ def update_source_info(client: Client, source_id: str, summary: str, word_count:
         
         # If no rows were updated, insert new source
         if not result.data:
-            client.table('sources').insert({
+            client.table(sources_table).insert({
                 'source_id': source_id,
                 'summary': summary,
                 'total_word_count': word_count

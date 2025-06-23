@@ -422,3 +422,213 @@ class TestHardcodedRemoval:
         assert host1 == 'first-host'
         assert host2 == 'second-host'
         assert host1 != host2
+
+    def test_new_content_processing_values_configurable(self):
+        """Test that new content processing values are configurable (were hardcoded)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom content processing values
+        os.environ['SOURCE_SUMMARY_MAX_LENGTH'] = '1000'
+        os.environ['CONTENT_TRUNCATION_LIMIT'] = '50000'
+        os.environ['CHUNK_BREAK_THRESHOLD'] = '0.5'
+        os.environ['LANGUAGE_SPECIFIER_MAX_LENGTH'] = '30'
+        
+        config = Config()
+        
+        # Should use custom values, not hardcoded defaults
+        assert config.SOURCE_SUMMARY_MAX_LENGTH == 1000
+        assert config.CONTENT_TRUNCATION_LIMIT == 50000
+        assert config.CHUNK_BREAK_THRESHOLD == 0.5
+        assert config.LANGUAGE_SPECIFIER_MAX_LENGTH == 30
+
+    def test_new_content_processing_defaults(self):
+        """Test that new content processing values use correct defaults."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system defaults (previously hardcoded values)
+        assert config.SOURCE_SUMMARY_MAX_LENGTH == 500
+        assert config.CONTENT_TRUNCATION_LIMIT == 25000
+        assert config.CHUNK_BREAK_THRESHOLD == 0.3
+        assert config.LANGUAGE_SPECIFIER_MAX_LENGTH == 20
+
+    def test_database_table_names_configurable(self):
+        """Test that database table names are configurable (were hardcoded)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom table names
+        os.environ['TABLE_SOURCES'] = 'custom_sources'
+        os.environ['TABLE_CRAWLED_PAGES'] = 'custom_pages'
+        os.environ['TABLE_CODE_EXAMPLES'] = 'custom_examples'
+        
+        config = Config()
+        
+        # Should use custom names, not hardcoded defaults
+        assert config.TABLE_SOURCES == 'custom_sources'
+        assert config.TABLE_CRAWLED_PAGES == 'custom_pages'
+        assert config.TABLE_CODE_EXAMPLES == 'custom_examples'
+
+    def test_database_table_names_defaults(self):
+        """Test that database table names use correct defaults."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system defaults (previously hardcoded values)
+        assert config.TABLE_SOURCES == 'sources'
+        assert config.TABLE_CRAWLED_PAGES == 'crawled_pages'
+        assert config.TABLE_CODE_EXAMPLES == 'code_examples'
+
+    def test_retry_configuration_configurable(self):
+        """Test that retry configuration values are configurable (were hardcoded)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom retry values
+        os.environ['CHAT_MAX_RETRIES'] = '5'
+        os.environ['EMBEDDING_MAX_RETRIES'] = '7'
+        os.environ['RETRY_BASE_DELAY'] = '2.0'
+        os.environ['RETRY_MAX_DELAY'] = '30.0'
+        
+        config = Config()
+        
+        # Should use custom values, not hardcoded defaults
+        assert config.CHAT_MAX_RETRIES == 5
+        assert config.EMBEDDING_MAX_RETRIES == 7
+        assert config.RETRY_BASE_DELAY == 2.0
+        assert config.RETRY_MAX_DELAY == 30.0
+
+    def test_retry_configuration_defaults(self):
+        """Test that retry configuration values use correct defaults."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system defaults (previously hardcoded values)
+        assert config.CHAT_MAX_RETRIES == 3
+        assert config.EMBEDDING_MAX_RETRIES == 3
+        assert config.RETRY_BASE_DELAY == 1.0
+        assert config.RETRY_MAX_DELAY == 15.0
+
+    def test_search_configuration_configurable(self):
+        """Test that search configuration values are configurable (were hardcoded)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom search values
+        os.environ['HYBRID_SEARCH_MULTIPLIER'] = '3'
+        
+        config = Config()
+        
+        # Should use custom values, not hardcoded defaults
+        assert config.HYBRID_SEARCH_MULTIPLIER == 3
+
+    def test_search_configuration_defaults(self):
+        """Test that search configuration values use correct defaults."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system defaults (previously hardcoded values)
+        assert config.HYBRID_SEARCH_MULTIPLIER == 2
+
+    def test_circuit_breaker_timeout_configurable(self):
+        """Test that circuit breaker timeout is configurable (was hardcoded as 5 minutes)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom timeout
+        os.environ['CIRCUIT_BREAKER_TIMEOUT_MINUTES'] = '10'
+        
+        config = Config()
+        
+        # Should use custom value, not hardcoded default
+        assert config.CIRCUIT_BREAKER_TIMEOUT_MINUTES == 10
+
+    def test_circuit_breaker_timeout_default(self):
+        """Test that circuit breaker timeout uses correct default."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system default (previously hardcoded value)
+        assert config.CIRCUIT_BREAKER_TIMEOUT_MINUTES == 5
+
+    def test_application_metadata_configurable(self):
+        """Test that application metadata is configurable (was hardcoded)."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Test custom metadata
+        os.environ['APPLICATION_VERSION'] = '2.0.0'
+        os.environ['APPLICATION_NAME'] = 'custom-mcp-server'
+        
+        config = Config()
+        
+        # Should use custom values, not hardcoded defaults
+        assert config.APPLICATION_VERSION == '2.0.0'
+        assert config.APPLICATION_NAME == 'custom-mcp-server'
+
+    def test_application_metadata_defaults(self):
+        """Test that application metadata uses correct defaults."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        config = Config()
+        
+        # Should use system defaults (previously hardcoded values)
+        assert config.APPLICATION_VERSION == '1.0.0'
+        assert config.APPLICATION_NAME == 'mcp-crawl4ai-rag'
+
+    def test_all_new_hardcoded_values_replaceable(self):
+        """Test that all new previously hardcoded values can be overridden."""
+        os.environ.clear()
+        os.environ['NO_DOTENV'] = 'true'
+        
+        # Override ALL new previously hardcoded values
+        new_config = {
+            'SOURCE_SUMMARY_MAX_LENGTH': '1000',
+            'CONTENT_TRUNCATION_LIMIT': '50000',
+            'CHUNK_BREAK_THRESHOLD': '0.5',
+            'LANGUAGE_SPECIFIER_MAX_LENGTH': '30',
+            'TABLE_SOURCES': 'custom_sources',
+            'TABLE_CRAWLED_PAGES': 'custom_pages',
+            'TABLE_CODE_EXAMPLES': 'custom_examples',
+            'CHAT_MAX_RETRIES': '5',
+            'EMBEDDING_MAX_RETRIES': '7',
+            'RETRY_BASE_DELAY': '2.0',
+            'RETRY_MAX_DELAY': '30.0',
+            'HYBRID_SEARCH_MULTIPLIER': '3',
+            'CIRCUIT_BREAKER_TIMEOUT_MINUTES': '10',
+            'APPLICATION_VERSION': '2.0.0',
+            'APPLICATION_NAME': 'custom-mcp-server',
+        }
+        
+        os.environ.update(new_config)
+        
+        config = Config()
+        
+        # Verify ALL new values can be customized
+        assert config.SOURCE_SUMMARY_MAX_LENGTH == 1000
+        assert config.CONTENT_TRUNCATION_LIMIT == 50000
+        assert config.CHUNK_BREAK_THRESHOLD == 0.5
+        assert config.LANGUAGE_SPECIFIER_MAX_LENGTH == 30
+        assert config.TABLE_SOURCES == 'custom_sources'
+        assert config.TABLE_CRAWLED_PAGES == 'custom_pages'
+        assert config.TABLE_CODE_EXAMPLES == 'custom_examples'
+        assert config.CHAT_MAX_RETRIES == 5
+        assert config.EMBEDDING_MAX_RETRIES == 7
+        assert config.RETRY_BASE_DELAY == 2.0
+        assert config.RETRY_MAX_DELAY == 30.0
+        assert config.HYBRID_SEARCH_MULTIPLIER == 3
+        assert config.CIRCUIT_BREAKER_TIMEOUT_MINUTES == 10
+        assert config.APPLICATION_VERSION == '2.0.0'
+        assert config.APPLICATION_NAME == 'custom-mcp-server'

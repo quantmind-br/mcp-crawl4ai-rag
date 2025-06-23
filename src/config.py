@@ -217,6 +217,92 @@ class Config:
     def EMBEDDING_MODEL_API_BASE(self) -> Optional[str]:
         """Embedding model API base URL."""
         return os.getenv("EMBEDDING_MODEL_API_BASE")
+    
+    # Content Processing Configuration
+    @property
+    def SOURCE_SUMMARY_MAX_LENGTH(self) -> int:
+        """Maximum length for source summaries."""
+        return int(os.getenv("SOURCE_SUMMARY_MAX_LENGTH", "500"))
+    
+    @property
+    def CONTENT_TRUNCATION_LIMIT(self) -> int:
+        """Maximum content length before truncation."""
+        return int(os.getenv("CONTENT_TRUNCATION_LIMIT", "25000"))
+    
+    @property
+    def CHUNK_BREAK_THRESHOLD(self) -> float:
+        """Threshold percentage for chunk breaking."""
+        return float(os.getenv("CHUNK_BREAK_THRESHOLD", "0.3"))
+    
+    @property
+    def LANGUAGE_SPECIFIER_MAX_LENGTH(self) -> int:
+        """Maximum length for language specifiers in code blocks."""
+        return int(os.getenv("LANGUAGE_SPECIFIER_MAX_LENGTH", "20"))
+    
+    # Database Table Names
+    @property
+    def TABLE_SOURCES(self) -> str:
+        """Sources table name."""
+        return os.getenv("TABLE_SOURCES", "sources")
+    
+    @property
+    def TABLE_CRAWLED_PAGES(self) -> str:
+        """Crawled pages table name."""
+        return os.getenv("TABLE_CRAWLED_PAGES", "crawled_pages")
+    
+    @property
+    def TABLE_CODE_EXAMPLES(self) -> str:
+        """Code examples table name."""
+        return os.getenv("TABLE_CODE_EXAMPLES", "code_examples")
+    
+    # Retry Configuration
+    @property
+    def CHAT_MAX_RETRIES(self) -> int:
+        """Maximum retry attempts for chat completion."""
+        return int(os.getenv("CHAT_MAX_RETRIES", "3"))
+    
+    @property
+    def EMBEDDING_MAX_RETRIES(self) -> int:
+        """Maximum retry attempts for embedding creation."""
+        return int(os.getenv("EMBEDDING_MAX_RETRIES", "3"))
+    
+    @property
+    def RETRY_BASE_DELAY(self) -> float:
+        """Base delay for exponential backoff."""
+        return float(os.getenv("RETRY_BASE_DELAY", "1.0"))
+    
+    @property
+    def RETRY_MAX_DELAY(self) -> float:
+        """Maximum delay for exponential backoff."""
+        return float(os.getenv("RETRY_MAX_DELAY", "15.0"))
+    
+    # Search Configuration
+    @property
+    def HYBRID_SEARCH_MULTIPLIER(self) -> int:
+        """Multiplier for hybrid search result count."""
+        return int(os.getenv("HYBRID_SEARCH_MULTIPLIER", "2"))
+    
+    # Circuit Breaker Configuration
+    @property
+    def CIRCUIT_BREAKER_TIMEOUT_MINUTES(self) -> int:
+        """Circuit breaker timeout in minutes."""
+        return int(os.getenv("CIRCUIT_BREAKER_TIMEOUT_MINUTES", "5"))
+    
+    # Application Metadata
+    @property
+    def APPLICATION_VERSION(self) -> str:
+        """Application version."""
+        return os.getenv("APPLICATION_VERSION", "1.0.0")
+    
+    @property
+    def APPLICATION_NAME(self) -> str:
+        """Application name."""
+        return os.getenv("APPLICATION_NAME", "mcp-crawl4ai-rag")
+    
+    @property
+    def USE_CONTEXTUAL_EMBEDDINGS(self) -> bool:
+        """Enable contextual embeddings enhancement."""
+        return os.getenv("USE_CONTEXTUAL_EMBEDDINGS", "false").lower() == "true"
 
 
 # Global configuration instance
