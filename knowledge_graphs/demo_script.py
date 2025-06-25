@@ -25,15 +25,13 @@ class GraphitiDependencies:
 # ========== Helper function to get model configuration ==========
 def get_model():
     """Configure and return the LLM model to use."""
-    chat_model = os.getenv('CHAT_MODEL', 'gpt-4.1-mini')
-    api_key = os.getenv('CHAT_MODEL_API_KEY') or os.getenv('OPENAI_API_KEY', 'no-api-key-provided')
-    base_url = os.getenv('CHAT_MODEL_API_BASE')
+    model_choice = os.getenv('MODEL_CHOICE')
+    api_key = os.getenv('OPENAI_API_KEY')
 
-    provider_kwargs = {'api_key': api_key}
-    if base_url:
-        provider_kwargs['base_url'] = base_url
+    if not model_choice or not api_key:
+        raise ValueError("MODEL_CHOICE and OPENAI_API_KEY must be set in environment variables")
 
-    return OpenAIModel(chat_model, provider=OpenAIProvider(**provider_kwargs))
+    return OpenAIModel(model_choice, provider=OpenAIProvider(api_key=api_key))
 
 # ========== Create the Graphiti agent ==========
 graphiti_agent = Agent(
@@ -102,11 +100,16 @@ async def main():
     print("Enter 'exit' to quit the program.")
 
     # Neo4j connection parameters
-    neo4j_uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
-    neo4j_user = os.environ.get('NEO4J_USER', 'neo4j')
-    neo4j_password = os.environ.get('NEO4J_PASSWORD', 'password')
+    neo4j_uri = os.environ.get('NEO4J_URI')
+    neo4j_user = os.environ.get('NEO4J_USER')
+    neo4j_password = os.environ.get('NEO4J_PASSWORD')
     
     # Initialize Graphiti with Neo4j connection
+    if not all([neo4j_uri, neo4j_user, neo4j_password]):
+        print("Error: Neo4j connection details are missing.")
+        print("Please set NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD in your .env file.")
+        return
+        
     graphiti_client = Graphiti(neo4j_uri, neo4j_user, neo4j_password)
     
     # Initialize the graph database with graphiti's indices if needed

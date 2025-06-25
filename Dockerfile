@@ -4,14 +4,6 @@ ARG PORT=8051
 
 WORKDIR /app
 
-# Install system dependencies
-# - curl: for health checks
-# - git: for parse_github_repository functionality
-RUN apt-get update && \
-    apt-get install -y curl git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install uv
 RUN pip install uv
 
@@ -25,5 +17,5 @@ RUN uv pip install --system -e . && \
 
 EXPOSE ${PORT}
 
-# Command to run the MCP server as a module
-CMD ["python", "-m", "src.crawl4ai_mcp"]
+# Command to run the MCP server
+CMD ["python", "src/crawl4ai_mcp.py"]

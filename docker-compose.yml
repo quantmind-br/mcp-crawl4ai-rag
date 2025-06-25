@@ -1,29 +1,54 @@
+version: '3.8'
+
 services:
-  # MCP Crawl4AI RAG Server
-  mcp-server:
-    build: 
+  crawl4ai-mcp:
+    build:
       context: .
       dockerfile: Dockerfile
       args:
-        - PORT=8051
+        PORT: ${PORT:-8051}
+    image: drnit29/mcp-crawl4ai-rag:latest
+    container_name: mcp-crawl4ai-rag
     ports:
-      - "8051:8051"
+      - "${PORT:-8051}:${PORT:-8051}"
     env_file:
       - .env
     environment:
-      - HOST=0.0.0.0
-      - PORT=8051
-      - TRANSPORT=sse
-    networks:
-      - mcp-network
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8051}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8051/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8051}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 40s
+    networks:
+      - mcp-network
 
 networks:
   mcp-network:
     driver: bridge
+
+# Opcional: Para usar com Neo4j local (descomente se necessário)
+# volumes:
+#   neo4j_data:
+#   neo4j_logs:
+
+# services:
+#   neo4j:
+#     image: neo4j:5.15-community
+#     container_name: neo4j-mcp
+#     ports:
+#       - "7474:7474"
+#       - "7687:7687"
+#     environment:
+#       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
+#       - NEO4J_PLUGINS=["apoc"]
+#       - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+#       - NEO4J_dbms_security_procedures_allowlist=apoc.*
+#     volumes:
+#       - neo4j_data:/data
+#       - neo4j_logs:/logs
+#     networks:
+#       - mcp-network

@@ -10,370 +10,42 @@ from urllib.parse import urlparse
 import openai
 import re
 import time
-import asyncio
-import threading
-import random
-from functools import wraps
-from datetime import datetime, timedelta
-
-from .config import config
-
-# Global client cache and rate limiting
-_client_cache = {}
-_client_cache_lock = threading.Lock()
-_request_semaphore = None
-_last_request_time = {}
-_consecutive_errors = {}
-_circuit_breaker_until = {}
-
-# Configuration
-MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "5"))
-REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
-RATE_LIMIT_DELAY = float(os.getenv("RATE_LIMIT_DELAY", "0.5"))
-CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("CIRCUIT_BREAKER_THRESHOLD", "3"))
-CLIENT_CACHE_TTL = int(os.getenv("CLIENT_CACHE_TTL", "3600"))  # 1 hour
-SUPABASE_BATCH_SIZE = int(os.getenv("SUPABASE_BATCH_SIZE", "20"))
-SUPABASE_MAX_RETRIES = int(os.getenv("SUPABASE_MAX_RETRIES", "3"))
-
-def get_global_semaphore():
-    """Get or create global request semaphore."""
-    global _request_semaphore
-    if _request_semaphore is None:
-        _request_semaphore = threading.Semaphore(MAX_CONCURRENT_REQUESTS)
-    return _request_semaphore
-
-def rate_limit_delay(endpoint_key: str):
-    """Implement rate limiting with minimum delay between requests."""
-    global _last_request_time
-    
-    current_time = time.time()
-    last_time = _last_request_time.get(endpoint_key, 0)
-    
-    time_diff = current_time - last_time
-    if time_diff < RATE_LIMIT_DELAY:
-        delay = RATE_LIMIT_DELAY - time_diff
-        print(f"⏱️  Rate limiting: sleeping {delay:.2f}s for {endpoint_key}")
-        time.sleep(delay)
-    
-    _last_request_time[endpoint_key] = time.time()
-
-def is_circuit_breaker_open(endpoint_key: str) -> bool:
-    """Check if circuit breaker is open for given endpoint."""
-    global _circuit_breaker_until
-    
-    if endpoint_key in _circuit_breaker_until:
-        if datetime.now() < _circuit_breaker_until[endpoint_key]:
-            return True
-        else:
-            # Circuit breaker timeout expired, reset
-            del _circuit_breaker_until[endpoint_key]
-            _consecutive_errors[endpoint_key] = 0
-    
-    return False
-
-def record_error(endpoint_key: str, error: Exception):
-    """Record error and potentially trigger circuit breaker."""
-    global _consecutive_errors, _circuit_breaker_until
-    
-    if is_retryable_error(error):
-        _consecutive_errors[endpoint_key] = _consecutive_errors.get(endpoint_key, 0) + 1
-        
-        if _consecutive_errors[endpoint_key] >= CIRCUIT_BREAKER_THRESHOLD:
-            # Open circuit breaker for 5 minutes
-            _circuit_breaker_until[endpoint_key] = datetime.now() + timedelta(minutes=5)
-            print(f"🚨 Circuit breaker opened for {endpoint_key} after {_consecutive_errors[endpoint_key]} consecutive errors")
-
-def record_success(endpoint_key: str):
-    """Record successful request and reset error counter."""
-    global _consecutive_errors
-    _consecutive_errors[endpoint_key] = 0
-
-def get_cached_client(client_key: str, create_func) -> any:
-    """Get or create cached client with TTL."""
-    global _client_cache
-    
-    with _client_cache_lock:
-        current_time = time.time()
-        
-        # Check if we have a valid cached client
-        if client_key in _client_cache:
-            client_data = _client_cache[client_key]
-            if current_time - client_data['created_at'] < CLIENT_CACHE_TTL:
-                print(f"♻️  Using cached client for {client_key}")
-                return client_data['client']
-            else:
-                print(f"⏰ Cache expired for {client_key}, creating new client")
-                del _client_cache[client_key]
-        
-        # Create new client
-        print(f"🔧 Creating new client for {client_key}")
-        client = create_func()
-        _client_cache[client_key] = {
-            'client': client,
-            'created_at': current_time
-        }
-        
-        return client
-
-def get_chat_client_with_fallback() -> Tuple[openai.OpenAI, str, bool]:
+ 
+def _call_chat_completion_with_fallback(**kwargs):
     """
-    Get a chat client with automatic fallback support using cached clients.
-    
-    Uses singleton pattern with TTL cache to reuse OpenAI client instances
-    and reduce connection overhead that causes 503 errors.
-    
-    Returns:
-        Tuple containing:
-        - OpenAI client instance (cached)
-        - Model name being used
-        - Boolean indicating if fallback was used (True = fallback, False = primary)
+    Calls the OpenAI Chat Completion API with retry and fallback logic.
     """
-    # Primary model configuration
-    primary_model = os.getenv("CHAT_MODEL")
-    primary_api_base = os.getenv("CHAT_MODEL_API_BASE")
-    primary_api_key = os.getenv("CHAT_MODEL_API_KEY")
-    
-    # Fallback model configuration
+    # --- Primary Model Configuration ---
+    primary_model = os.getenv("CHAT_MODEL") or os.getenv("MODEL_CHOICE", "gpt-4-turbo")
+    primary_api_key = os.getenv("CHAT_MODEL_API_KEY") or os.getenv("OPENAI_API_KEY")
+    primary_base_url = os.getenv("CHAT_MODEL_BASE_URL")
+    max_retries = int(os.getenv("CHAT_MODEL_RETRIES", "2"))
+
+    # --- Fallback Model Configuration ---
     fallback_model = os.getenv("CHAT_MODEL_FALLBACK")
-    fallback_api_base = os.getenv("CHAT_MODEL_FALLBACK_API_BASE")
     fallback_api_key = os.getenv("CHAT_MODEL_FALLBACK_API_KEY")
-    
-    # Validate primary configuration
-    if not primary_model or not primary_api_key:
-        raise ValueError("CHAT_MODEL and CHAT_MODEL_API_KEY must be set")
-    
-    # Try primary model first (with caching)
-    primary_key = f"chat_primary_{primary_model}_{primary_api_base or 'default'}"
-    
-    def create_primary_client():
-        print(f"Attempting to use primary chat model: {primary_model}")
-        client_args = {"api_key": primary_api_key, "timeout": REQUEST_TIMEOUT}
-        if primary_api_base:
-            client_args["base_url"] = primary_api_base
-        return openai.OpenAI(**client_args)
-    
-    try:
-        client = get_cached_client(primary_key, create_primary_client)
-        print(f"✅ Primary chat model {primary_model} client ready")
-        return client, primary_model, False
-        
-    except Exception as e:
-        print(f"❌ Primary chat model client creation failed: {e}")
-        record_error(primary_key, e)
-    
-    # Primary model failed, try fallback
-    if fallback_model and fallback_api_key:
-        fallback_key = f"chat_fallback_{fallback_model}_{fallback_api_base or 'default'}"
-        
-        def create_fallback_client():
-            print(f"🔄 Attempting fallback to: {fallback_model}")
-            client_args = {"api_key": fallback_api_key, "timeout": REQUEST_TIMEOUT}
-            if fallback_api_base:
-                client_args["base_url"] = fallback_api_base
-            return openai.OpenAI(**client_args)
-        
-        try:
-            client = get_cached_client(fallback_key, create_fallback_client)
-            print(f"✅ Fallback chat model {fallback_model} client ready")
-            return client, fallback_model, True
-            
-        except Exception as e:
-            print(f"❌ Fallback chat model client creation failed: {e}")
-            record_error(fallback_key, e)
-    else:
-        print("⚠️  No fallback chat model configured")
-    
-    # Both primary and fallback failed
-    raise Exception(f"Both primary ({primary_model}) and fallback ({fallback_model}) chat models failed")
+    fallback_base_url = os.getenv("CHAT_MODEL_FALLBACK_BASE_URL")
 
-
-def is_retryable_error(error: Exception) -> bool:
-    """
-    Determine if an error is retryable (temporary) or should trigger fallback.
-    
-    Args:
-        error: Exception that occurred during API call
-        
-    Returns:
-        True if error is retryable, False if should trigger fallback
-    """
-    error_str = str(error).lower()
-    
-    # HTTP status codes that indicate temporary server issues
-    retryable_codes = ['503', '429', '500', '502', '504']
-    retryable_messages = [
-        'service unavailable',
-        'rate limit',
-        'timeout',
-        'connection error',
-        'no available server',
-        'server error'
-    ]
-    
-    # Check for specific HTTP status codes
-    for code in retryable_codes:
-        if code in error_str:
-            return True
-    
-    # Check for specific error messages
-    for message in retryable_messages:
-        if message in error_str:
-            return True
-    
-    return False
-
-
-def make_chat_completion_with_fallback(messages: list, **kwargs) -> any:
-    """
-    Make a chat completion with automatic fallback, rate limiting, and circuit breaker.
-    
-    This function implements a robust system that:
-    1. Uses cached clients to reduce connection overhead
-    2. Implements rate limiting to prevent API overload
-    3. Circuit breaker to avoid repeated failures
-    4. Exponential backoff with jitter for retries
-    5. Seamless fallback on API failures
-    
-    Args:
-        messages: List of message dictionaries for chat completion
-        **kwargs: Additional arguments to pass to chat completion (temperature, max_tokens, etc.)
-        
-    Returns:
-        OpenAI chat completion response
-        
-    Raises:
-        Exception: If both primary and fallback models fail completely
-    """
-    import time
-    import random
-    from openai import OpenAI
-    # Get semaphore for concurrency control
-    semaphore = get_global_semaphore()
-    
-    # Configuration  
-    use_fallback = os.getenv("USE_CHAT_MODEL_FALLBACK", "false").lower() == "true"
-    max_retries = 3
-    base_delay = 1.0
-    max_delay = 15.0
-    primary_error = None
-    
-    # Primary model configuration
-    primary_model = os.getenv("CHAT_MODEL")
-    primary_api_base = os.getenv("CHAT_MODEL_API_BASE")
-    primary_key = f"chat_primary_{primary_model}_{primary_api_base or 'default'}"
-    
-    # Check circuit breaker for primary
-    if is_circuit_breaker_open(primary_key):
-        print(f"🚨 Circuit breaker open for primary model {primary_model}, forcing fallback")
-        primary_error = Exception("Circuit breaker open")
-    else:
-        # Try primary model with rate limiting
-        with semaphore:
+    # --- Attempt with Primary Model ---
+    if primary_api_key and primary_model:
+        client = openai.OpenAI(api_key=primary_api_key, base_url=primary_base_url)
+        for attempt in range(max_retries):
             try:
-                rate_limit_delay(primary_key)
-                client, model_name, is_fallback = get_chat_client_with_fallback()
-                
-                if not is_fallback:
-                    # Attempt primary model with improved retry logic
-                    for attempt in range(max_retries):
-                        try:
-                            response = client.chat.completions.create(
-                                model=model_name,
-                                messages=messages,
-                                **kwargs
-                            )
-                            record_success(primary_key)
-                            if attempt > 0:
-                                print(f"✅ Primary model {model_name} succeeded on attempt {attempt + 1}")
-                            return response
-                            
-                        except Exception as e:
-                            if is_retryable_error(e) and attempt < max_retries - 1:
-                                # Exponential backoff with jitter
-                                jitter = random.uniform(0.5, 1.5)
-                                delay = min(base_delay * (2 ** attempt) * jitter, max_delay)
-                                print(f"⚠️  Primary model {model_name} failed (attempt {attempt + 1}/{max_retries}): {e}")
-                                print(f"🔄 Retrying in {delay:.1f}s...")
-                                time.sleep(delay)
-                                continue
-                            else:
-                                print(f"❌ Primary model {model_name} failed definitively: {e}")
-                                record_error(primary_key, e)
-                                primary_error = e
-                                break
-                                
+                return client.chat.completions.create(model=primary_model, **kwargs)
             except Exception as e:
-                print(f"❌ Primary model client failed: {e}")
-                record_error(primary_key, e)
-                primary_error = e
-    
-    # Try fallback if enabled and primary failed
-    if use_fallback and primary_error:
-        fallback_model = os.getenv("CHAT_MODEL_FALLBACK")
-        fallback_api_base = os.getenv("CHAT_MODEL_FALLBACK_API_BASE")
-        fallback_key = f"chat_fallback_{fallback_model}_{fallback_api_base or 'default'}"
-        
-        if is_circuit_breaker_open(fallback_key):
-            print(f"🚨 Circuit breaker open for fallback model {fallback_model}")
-            raise Exception(f"Both primary and fallback models have circuit breakers open")
-        
-        # Try fallback with rate limiting
-        with semaphore:
-            try:
-                rate_limit_delay(fallback_key)
-                
-                # Get fallback client using cache
-                def create_fallback_client():
-                    fallback_api_key = os.getenv("CHAT_MODEL_FALLBACK_API_KEY")
-                    if not fallback_model or not fallback_api_key:
-                        raise Exception("Fallback model not configured")
-                    
-                    client_args = {"api_key": fallback_api_key, "timeout": REQUEST_TIMEOUT}
-                    if fallback_api_base:
-                        client_args["base_url"] = fallback_api_base
-                    return openai.OpenAI(**client_args)
-                
-                fallback_client = get_cached_client(fallback_key, create_fallback_client)
-                print(f"🔄 Using fallback model: {fallback_model}")
-                
-                # Attempt fallback with retry logic
-                for attempt in range(max_retries):
-                    try:
-                        response = fallback_client.chat.completions.create(
-                            model=fallback_model,
-                            messages=messages,
-                            **kwargs
-                        )
-                        record_success(fallback_key)
-                        print(f"✅ Fallback model {fallback_model} succeeded" + (f" on attempt {attempt + 1}" if attempt > 0 else ""))
-                        return response
-                        
-                    except Exception as e:
-                        if is_retryable_error(e) and attempt < max_retries - 1:
-                            jitter = random.uniform(0.5, 1.5)
-                            delay = min(base_delay * (2 ** attempt) * jitter, max_delay)
-                            print(f"⚠️  Fallback model {fallback_model} failed (attempt {attempt + 1}/{max_retries}): {e}")
-                            print(f"🔄 Retrying fallback in {delay:.1f}s...")
-                            time.sleep(delay)
-                            continue
-                        else:
-                            print(f"❌ Fallback model {fallback_model} failed definitively: {e}")
-                            record_error(fallback_key, e)
-                            raise e
-                            
-            except Exception as fallback_error:
-                record_error(fallback_key, fallback_error)
-                print(f"❌ Fallback model also failed: {fallback_error}")
-                raise Exception(f"Both primary and fallback chat models failed. Primary: {primary_error}. Fallback: {fallback_error}")
-    
-    # No fallback available
-    if not use_fallback:
-        print("⚠️  Chat model fallback is disabled (USE_CHAT_MODEL_FALLBACK=false)")
-    
-    if primary_error:
-        raise primary_error
-    
-    raise Exception("Unexpected error in chat completion system")
+                print(f"Primary chat model '{primary_model}' failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1.0 * (attempt + 1))
+                else:
+                    print("Exhausted retries for primary chat model.")
+
+    # --- Attempt with Fallback Model ---
+    if fallback_api_key and fallback_model:
+        print(f"Switching to fallback chat model '{fallback_model}'.")
+        client = openai.OpenAI(api_key=fallback_api_key, base_url=fallback_base_url)
+        return client.chat.completions.create(model=fallback_model, **kwargs)
+
+    raise Exception("Both primary and fallback chat models failed or are not configured.")
 
 def get_supabase_client() -> Client:
     """
@@ -392,298 +64,71 @@ def get_supabase_client() -> Client:
 
 def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """
-    Create embeddings for multiple texts in a single API call.
-    
-    This function now uses the robust fallback system that can switch to a 
-    fallback embedding model if the primary fails.
-    
+    Create embeddings for multiple texts, with retry and fallback logic.
+
     Args:
         texts: List of texts to create embeddings for
-        
+
     Returns:
         List of embeddings (each embedding is a list of floats)
     """
     if not texts:
         return []
-    
-    # Use the new fallback system
-    try:
-        return create_embeddings_with_fallback(texts)
-    except Exception as e:
-        print(f"Both primary and fallback embedding models failed: {e}")
-        # Final fallback: return zero embeddings
-        embedding_dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
-        print(f"⚠️  Returning zero embeddings as final fallback")
-        return [[0.0] * embedding_dims] * len(texts)
 
-
-def get_embedding_client_with_fallback() -> Tuple[openai.OpenAI, str, int, bool]:
-    """
-    Get an embedding client with automatic fallback support using cached clients.
-    
-    Uses singleton pattern with TTL cache to reuse OpenAI client instances
-    and reduce connection overhead that causes 503 errors.
-    
-    Returns:
-        Tuple containing:
-        - OpenAI client instance (cached)
-        - Model name being used
-        - Embedding dimensions
-        - Boolean indicating if fallback was used (True = fallback, False = primary)
-    """
-    # Primary model configuration
+    # --- Primary Model Configuration ---
     primary_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-    primary_api_base = os.getenv("EMBEDDING_MODEL_API_BASE")
-    primary_api_key = os.getenv("EMBEDDING_MODEL_API_KEY")
-    primary_dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
-    
-    # Fallback model configuration
+    primary_api_key = os.getenv("EMBEDDING_MODEL_API_KEY") or os.getenv("OPENAI_API_KEY")
+    primary_base_url = os.getenv("EMBEDDING_MODEL_BASE_URL")
+    max_retries = int(os.getenv("EMBEDDING_MODEL_RETRIES", "2"))
+
+    # --- Fallback Model Configuration ---
     fallback_model = os.getenv("EMBEDDING_MODEL_FALLBACK")
-    fallback_api_base = os.getenv("EMBEDDING_MODEL_FALLBACK_API_BASE")
     fallback_api_key = os.getenv("EMBEDDING_MODEL_FALLBACK_API_KEY")
-    fallback_dims = int(os.getenv("EMBEDDING_DIMENSIONS_FALLBACK", "1536"))
-    
-    # Validate primary configuration
-    if not primary_api_key:
-        raise ValueError("EMBEDDING_MODEL_API_KEY must be set")
-    
-    # Try primary model first (with caching)
-    primary_key = f"embedding_primary_{primary_model}_{primary_api_base or 'default'}"
-    
-    def create_primary_embedding_client():
-        print(f"Attempting to use primary embedding model: {primary_model}")
-        client_args = {"api_key": primary_api_key, "timeout": REQUEST_TIMEOUT}
-        if primary_api_base:
-            client_args["base_url"] = primary_api_base
-        return openai.OpenAI(**client_args)
-    
-    try:
-        client = get_cached_client(primary_key, create_primary_embedding_client)
-        print(f"✅ Primary embedding model {primary_model} client ready")
-        return client, primary_model, primary_dims, False
-        
-    except Exception as e:
-        print(f"❌ Primary embedding model client creation failed: {e}")
-        record_error(primary_key, e)
-    
-    # Primary model failed, try fallback
-    if fallback_model and fallback_api_key:
-        fallback_key = f"embedding_fallback_{fallback_model}_{fallback_api_base or 'default'}"
-        
-        def create_fallback_embedding_client():
-            print(f"🔄 Attempting embedding fallback to: {fallback_model}")
-            client_args = {"api_key": fallback_api_key, "timeout": REQUEST_TIMEOUT}
-            if fallback_api_base:
-                client_args["base_url"] = fallback_api_base
-            return openai.OpenAI(**client_args)
-        
-        try:
-            client = get_cached_client(fallback_key, create_fallback_embedding_client)
-            print(f"✅ Fallback embedding model {fallback_model} client ready")
-            return client, fallback_model, fallback_dims, True
-            
-        except Exception as e:
-            print(f"❌ Fallback embedding model client creation failed: {e}")
-            record_error(fallback_key, e)
-    else:
-        print("⚠️  No fallback embedding model configured")
-    
-    # Both primary and fallback failed
-    raise Exception(f"Both primary ({primary_model}) and fallback ({fallback_model}) embedding models failed")
+    fallback_base_url = os.getenv("EMBEDDING_MODEL_FALLBACK_BASE_URL")
 
-
-def handle_dimension_mismatch(embeddings: List[List[float]], target_dims: int) -> List[List[float]]:
-    """
-    Handle dimension mismatches between different embedding models.
-    
-    Args:
-        embeddings: List of embedding vectors
-        target_dims: Target dimension count
-        
-    Returns:
-        List of embeddings adjusted to target dimensions
-    """
-    if not embeddings or not embeddings[0]:
-        return embeddings
-    
-    current_dims = len(embeddings[0])
-    
-    if current_dims == target_dims:
-        return embeddings
-    elif current_dims > target_dims:
-        # Truncate to target dimensions (keep most informative dimensions)
-        print(f"📏 Truncating embeddings: {current_dims}D → {target_dims}D")
-        return [embedding[:target_dims] for embedding in embeddings]
-    else:
-        # Pad with zeros to reach target dimensions
-        print(f"📏 Padding embeddings: {current_dims}D → {target_dims}D")
-        padding_size = target_dims - current_dims
-        return [embedding + [0.0] * padding_size for embedding in embeddings]
-
-
-def create_embeddings_with_fallback(texts: List[str]) -> List[List[float]]:
-    """
-    Create embeddings with rate limiting, circuit breaker, and automatic fallback.
-    
-    This function implements a robust system that:
-    1. Uses cached clients to reduce connection overhead
-    2. Implements rate limiting to prevent API overload
-    3. Circuit breaker to avoid repeated failures
-    4. Handles dimension mismatches between models
-    5. Exponential backoff with jitter for retries
-    
-    Args:
-        texts: List of texts to create embeddings for
-        
-    Returns:
-        List of embeddings (each embedding is a list of floats)
-    """
-    if not texts:
-        return []
-    
-    # Get semaphore for concurrency control
-    semaphore = get_global_semaphore()
-    
-    # Configuration
-    use_fallback = os.getenv("USE_EMBEDDING_MODEL_FALLBACK", "false").lower() == "true"
-    max_retries = 3
-    base_delay = 1.0
-    max_delay = 15.0
-    target_dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
-    primary_error = None
-    
-    # Primary model configuration
-    primary_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-    primary_api_base = os.getenv("EMBEDDING_MODEL_API_BASE")
-    primary_key = f"embedding_primary_{primary_model}_{primary_api_base or 'default'}"
-    
-    # Check circuit breaker for primary
-    if is_circuit_breaker_open(primary_key):
-        print(f"🚨 Circuit breaker open for primary embedding model {primary_model}, forcing fallback")
-        primary_error = Exception("Circuit breaker open")
-    else:
-        # Try primary model with rate limiting
-        with semaphore:
+    # --- Attempt with Primary Model ---
+    if primary_api_key and primary_model:
+        client = openai.OpenAI(api_key=primary_api_key, base_url=primary_base_url)
+        for attempt in range(max_retries):
             try:
-                rate_limit_delay(primary_key)
-                client, model_name, model_dims, is_fallback = get_embedding_client_with_fallback()
-                
-                if not is_fallback:
-                    # Attempt primary model with improved retry logic
-                    for attempt in range(max_retries):
-                        try:
-                            # Process texts for Qwen3-Embedding compatibility
-                            processed_texts = texts
-                            is_ollama = primary_api_base and "11434" in primary_api_base
-                            if is_ollama and "qwen3-embedding" in model_name.lower():
-                                processed_texts = [text + "<|endoftext|>" for text in texts]
-                                print(f"Added <|endoftext|> token to {len(texts)} texts for Qwen3-Embedding compatibility")
-                            
-                            # Create embedding request
-                            response = client.embeddings.create(
-                                model=model_name,
-                                input=processed_texts
-                            )
-                            
-                            embeddings = [item.embedding for item in response.data]
-                            embeddings = handle_dimension_mismatch(embeddings, target_dims)
-                            
-                            record_success(primary_key)
-                            if attempt > 0:
-                                print(f"✅ Primary embedding model {model_name} succeeded on attempt {attempt + 1}")
-                            return embeddings
-                            
-                        except Exception as e:
-                            if is_retryable_error(e) and attempt < max_retries - 1:
-                                # Exponential backoff with jitter
-                                jitter = random.uniform(0.5, 1.5)
-                                delay = min(base_delay * (2 ** attempt) * jitter, max_delay)
-                                print(f"⚠️  Primary embedding model {model_name} failed (attempt {attempt + 1}/{max_retries}): {e}")
-                                print(f"🔄 Retrying in {delay:.1f}s...")
-                                time.sleep(delay)
-                                continue
-                            else:
-                                print(f"❌ Primary embedding model {model_name} failed definitively: {e}")
-                                record_error(primary_key, e)
-                                primary_error = e
-                                break
-                                
+                response = client.embeddings.create(model=primary_model, input=texts)
+                return [item.embedding for item in response.data]
             except Exception as e:
-                print(f"❌ Primary embedding model client failed: {e}")
-                record_error(primary_key, e)
-                primary_error = e
-    
-    # Try fallback if enabled and primary failed
-    if use_fallback and primary_error:
-        fallback_model = os.getenv("EMBEDDING_MODEL_FALLBACK")
-        fallback_api_base = os.getenv("EMBEDDING_MODEL_FALLBACK_API_BASE")
-        fallback_key = f"embedding_fallback_{fallback_model}_{fallback_api_base or 'default'}"
-        
-        if is_circuit_breaker_open(fallback_key):
-            print(f"🚨 Circuit breaker open for fallback embedding model {fallback_model}")
-            raise Exception(f"Both primary and fallback embedding models have circuit breakers open")
-        
-        # Try fallback with rate limiting
-        with semaphore:
-            try:
-                rate_limit_delay(fallback_key)
-                
-                # Get fallback client using cache
-                def create_fallback_embedding_client():
-                    fallback_api_key = os.getenv("EMBEDDING_MODEL_FALLBACK_API_KEY")
-                    if not fallback_model or not fallback_api_key:
-                        raise Exception("Fallback embedding model not configured")
-                    
-                    client_args = {"api_key": fallback_api_key, "timeout": REQUEST_TIMEOUT}
-                    if fallback_api_base:
-                        client_args["base_url"] = fallback_api_base
-                    return openai.OpenAI(**client_args)
-                
-                fallback_client = get_cached_client(fallback_key, create_fallback_embedding_client)
-                print(f"🔄 Using fallback embedding model: {fallback_model}")
-                
-                # Attempt fallback with retry logic
-                for attempt in range(max_retries):
-                    try:
-                        response = fallback_client.embeddings.create(
-                            model=fallback_model,
-                            input=texts
-                        )
-                        
-                        embeddings = [item.embedding for item in response.data]
-                        embeddings = handle_dimension_mismatch(embeddings, target_dims)
-                        
-                        record_success(fallback_key)
-                        print(f"✅ Fallback embedding model {fallback_model} succeeded" + (f" on attempt {attempt + 1}" if attempt > 0 else ""))
-                        return embeddings
-                        
-                    except Exception as e:
-                        if is_retryable_error(e) and attempt < max_retries - 1:
-                            jitter = random.uniform(0.5, 1.5)
-                            delay = min(base_delay * (2 ** attempt) * jitter, max_delay)
-                            print(f"⚠️  Fallback embedding model {fallback_model} failed (attempt {attempt + 1}/{max_retries}): {e}")
-                            print(f"🔄 Retrying fallback in {delay:.1f}s...")
-                            time.sleep(delay)
-                            continue
-                        else:
-                            print(f"❌ Fallback embedding model {fallback_model} failed definitively: {e}")
-                            record_error(fallback_key, e)
-                            raise e
-                            
-            except Exception as fallback_error:
-                record_error(fallback_key, fallback_error)
-                print(f"❌ Fallback embedding model also failed: {fallback_error}")
-                raise Exception(f"Both primary and fallback embedding models failed. Primary: {primary_error}. Fallback: {fallback_error}")
-    
-    # No fallback available
-    if not use_fallback:
-        print("⚠️  Embedding model fallback is disabled (USE_EMBEDDING_MODEL_FALLBACK=false)")
-    
-    if primary_error:
-        raise primary_error
-        
-    raise Exception("Unexpected error in embedding fallback system")
+                print(f"Primary embedding model '{primary_model}' failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1.0 * (attempt + 1))
+                else:
+                    print("Exhausted retries for primary embedding model.")
 
+    # --- Attempt with Fallback Model ---
+    if fallback_api_key and fallback_model:
+        print(f"Switching to fallback embedding model '{fallback_model}'.")
+        client = openai.OpenAI(api_key=fallback_api_key, base_url=fallback_base_url)
+        try:
+            response = client.embeddings.create(model=fallback_model, input=texts)
+            return [item.embedding for item in response.data]
+        except Exception as e:
+            print(f"Fallback embedding model '{fallback_model}' also failed: {e}")
+
+    # --- Final Fallback: Individual Embeddings with Primary Client ---
+    print("All batch attempts failed. Trying to create embeddings individually with primary model.")
+    if primary_api_key and primary_model:
+        client = openai.OpenAI(api_key=primary_api_key, base_url=primary_base_url)
+        embeddings = []
+        embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
+        for text in texts:
+            try:
+                response = client.embeddings.create(model=primary_model, input=[text])
+                embeddings.append(response.data[0].embedding)
+            except Exception as individual_error:
+                print(f"Failed to create individual embedding: {individual_error}")
+                embeddings.append([0.0] * embedding_dimension)
+        return embeddings
+
+    # If everything fails, return zero vectors
+    print("All embedding strategies failed.")
+    embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
+    return [[0.0] * embedding_dimension for _ in texts]
 
 def create_embedding(text: str) -> List[float]:
     """
@@ -695,14 +140,14 @@ def create_embedding(text: str) -> List[float]:
     Returns:
         List of floats representing the embedding
     """
-    embedding_dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+    embedding_dimension = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
     try:
         embeddings = create_embeddings_batch([text])
-        return embeddings[0] if embeddings else [0.0] * embedding_dims
+        return embeddings[0] if embeddings else [0.0] * embedding_dimension
     except Exception as e:
         print(f"Error creating embedding: {e}")
         # Return empty embedding if there's an error
-        return [0.0] * embedding_dims
+        return [0.0] * embedding_dimension
 
 def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, bool]:
     """
@@ -717,16 +162,26 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         - The contextual text that situates the chunk within the document
         - Boolean indicating if contextual embedding was performed
     """
+    
     try:
         # Create the prompt for generating contextual information
-        prompt = f"""<document>\n{full_document}\n</document>\n<chunk>\n{chunk}\n</chunk> \nPlease give a short succinct context to situate this chunk within the whole document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
+        prompt = f"""<document> 
+{full_document[:25000]} 
+</document>
+Here is the chunk we want to situate within the whole document 
+<chunk> 
+{chunk}
+</chunk> 
+Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
 
-        # Use robust chat completion with automatic fallback
-        response = make_chat_completion_with_fallback(
+        # Call the OpenAI API to generate contextual information
+        response = _call_chat_completion_with_fallback(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise contextual information."},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            temperature=0.3,
+            max_tokens=200
         )
         
         # Extract the generated context
@@ -764,7 +219,7 @@ def add_documents_to_supabase(
     contents: List[str], 
     metadatas: List[Dict[str, Any]],
     url_to_full_document: Dict[str, str],
-    batch_size: int = None
+    batch_size: Optional[int] = None
 ) -> None:
     """
     Add documents to the Supabase crawled_pages table in batches.
@@ -780,28 +235,27 @@ def add_documents_to_supabase(
         batch_size: Size of each batch for insertion
     """
     if batch_size is None:
-        batch_size = SUPABASE_BATCH_SIZE
-    
+        batch_size = int(os.getenv("SUPABASE_BATCH_SIZE", "20"))
+        
     # Get unique URLs to delete existing records
     unique_urls = list(set(urls))
     
     # Delete existing records for these URLs in a single operation
-    crawled_pages_table = config.TABLE_CRAWLED_PAGES
     try:
         if unique_urls:
             # Use the .in_() filter to delete all records with matching URLs
-            client.table(crawled_pages_table).delete().in_("url", unique_urls).execute()
+            client.table("crawled_pages").delete().in_("url", unique_urls).execute()
     except Exception as e:
         print(f"Batch delete failed: {e}. Trying one-by-one deletion as fallback.")
         # Fallback: delete records one by one
         for url in unique_urls:
             try:
-                client.table(crawled_pages_table).delete().eq("url", url).execute()
+                client.table("crawled_pages").delete().eq("url", url).execute()
             except Exception as inner_e:
                 print(f"Error deleting record for URL {url}: {inner_e}")
                 # Continue with the next URL even if one fails
     
-    # Check if contextual embeddings are enabled
+    # Check if MODEL_CHOICE is set for contextual embeddings
     use_contextual_embeddings = os.getenv("USE_CONTEXTUAL_EMBEDDINGS", "false") == "true"
     print(f"\n\nUse contextual embeddings: {use_contextual_embeddings}\n\n")
     
@@ -815,7 +269,7 @@ def add_documents_to_supabase(
         batch_contents = contents[i:batch_end]
         batch_metadatas = metadatas[i:batch_end]
         
-        # Apply contextual embedding to each chunk if enabled
+        # Apply contextual embedding to each chunk if MODEL_CHOICE is set
         if use_contextual_embeddings:
             # Prepare arguments for parallel processing
             process_args = []
@@ -824,10 +278,10 @@ def add_documents_to_supabase(
                 full_document = url_to_full_document.get(url, "")
                 process_args.append((url, content, full_document))
             
-            # Process in parallel using ThreadPoolExecutor with conservative worker count
+            # Process in parallel using ThreadPoolExecutor
+            max_workers = int(os.getenv("MAX_WORKERS", "10"))
             contextual_contents = []
-            max_context_workers = int(os.getenv("MAX_WORKERS_CONTEXT", "1"))
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_context_workers) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks and collect results
                 future_to_idx = {executor.submit(process_chunk_with_context, arg): idx 
                                 for idx, arg in enumerate(process_args)}
@@ -882,12 +336,12 @@ def add_documents_to_supabase(
             batch_data.append(data)
         
         # Insert batch into Supabase with retry logic
-        max_retries = SUPABASE_MAX_RETRIES
+        max_retries = 3
         retry_delay = 1.0  # Start with 1 second delay
         
         for retry in range(max_retries):
             try:
-                client.table(crawled_pages_table).insert(batch_data).execute()
+                client.table("crawled_pages").insert(batch_data).execute()
                 # Success - break out of retry loop
                 break
             except Exception as e:
@@ -904,7 +358,7 @@ def add_documents_to_supabase(
                     successful_inserts = 0
                     for record in batch_data:
                         try:
-                            client.table(crawled_pages_table).insert(record).execute()
+                            client.table("crawled_pages").insert(record).execute()
                             successful_inserts += 1
                         except Exception as individual_error:
                             print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
@@ -953,17 +407,17 @@ def search_documents(
         return []
 
 
-def extract_code_blocks(markdown_content: str) -> List[Dict[str, Any]]:
+def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[Dict[str, Any]]:
     """
     Extract code blocks from markdown content along with context.
     
     Args:
         markdown_content: The markdown content to extract code blocks from
+        min_length: Minimum length of code blocks to extract (default: 1000 characters)
         
     Returns:
         List of dictionaries containing code blocks and their context
     """
-    min_length = int(os.getenv("MIN_CODE_BLOCK_LENGTH", "1000"))
     code_blocks = []
     
     # Skip if content starts with triple backticks (edge case for files wrapped in backticks)
@@ -1047,16 +501,31 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     Returns:
         A summary of what the code example demonstrates
     """
+    
     # Create the prompt
-    prompt = f"""<context_before>\n{context_before}\n</context_before>\n<code_example>\n{code}\n</code_example>\n<context_after>\n{context_after}\n</context_after>\n\nPlease provide a concise summary of what this code example demonstrates.\n"""
+    prompt = f"""<context_before>
+{context_before[-500:] if len(context_before) > 500 else context_before}
+</context_before>
+
+<code_example>
+{code[:1500] if len(code) > 1500 else code}
+</code_example>
+
+<context_after>
+{context_after[:500] if len(context_after) > 500 else context_after}
+</context_after>
+
+Based on the code example and its surrounding context, provide a concise summary (2-3 sentences) that describes what this code example demonstrates and its purpose. Focus on the practical application and key concepts illustrated.
+"""
     
     try:
-        # Use the new fallback system
-        response = make_chat_completion_with_fallback(
+        response = _call_chat_completion_with_fallback(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise code example summaries."},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            temperature=0.3,
+            max_tokens=100
         )
         
         return response.choices[0].message.content.strip()
@@ -1073,7 +542,7 @@ def add_code_examples_to_supabase(
     code_examples: List[str],
     summaries: List[str],
     metadatas: List[Dict[str, Any]],
-    batch_size: int = None
+    batch_size: Optional[int] = None
 ):
     """
     Add code examples to the Supabase code_examples table in batches.
@@ -1087,20 +556,18 @@ def add_code_examples_to_supabase(
         metadatas: List of metadata dictionaries
         batch_size: Size of each batch for insertion
     """
-    if batch_size is None:
-        batch_size = SUPABASE_BATCH_SIZE
-    
     if not urls:
         return
         
+    if batch_size is None:
+        batch_size = int(os.getenv("SUPABASE_BATCH_SIZE", "20"))
+        
     # Delete existing records for these URLs
-    code_examples_table = config.TABLE_CODE_EXAMPLES
-    unique_urls = list(set(urls))
-    for url in unique_urls:
+    if unique_urls := list(set(urls)):
         try:
-            client.table(code_examples_table).delete().eq('url', url).execute()
+            client.table('code_examples').delete().in_('url', unique_urls).execute()
         except Exception as e:
-            print(f"Error deleting existing code examples for {url}: {e}")
+            print(f"Error deleting existing code examples for {unique_urls}: {e}")
     
     # Process in batches
     total_items = len(urls)
@@ -1147,12 +614,12 @@ def add_code_examples_to_supabase(
             })
         
         # Insert batch into Supabase with retry logic
-        max_retries = SUPABASE_MAX_RETRIES
+        max_retries = 3
         retry_delay = 1.0  # Start with 1 second delay
         
         for retry in range(max_retries):
             try:
-                client.table(code_examples_table).insert(batch_data).execute()
+                client.table('code_examples').insert(batch_data).execute()
                 # Success - break out of retry loop
                 break
             except Exception as e:
@@ -1169,7 +636,7 @@ def add_code_examples_to_supabase(
                     successful_inserts = 0
                     for record in batch_data:
                         try:
-                            client.table(code_examples_table).insert(record).execute()
+                            client.table('code_examples').insert(record).execute()
                             successful_inserts += 1
                         except Exception as individual_error:
                             print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
@@ -1191,8 +658,7 @@ def update_source_info(client: Client, source_id: str, summary: str, word_count:
     """
     try:
         # Try to update existing source
-        sources_table = config.TABLE_SOURCES
-        result = client.table(sources_table).update({
+        result = client.table('sources').update({
             'summary': summary,
             'total_word_count': word_count,
             'updated_at': 'now()'
@@ -1200,7 +666,7 @@ def update_source_info(client: Client, source_id: str, summary: str, word_count:
         
         # If no rows were updated, insert new source
         if not result.data:
-            client.table(sources_table).insert({
+            client.table('sources').insert({
                 'source_id': source_id,
                 'summary': summary,
                 'total_word_count': word_count
@@ -1233,18 +699,28 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     if not content or len(content.strip()) == 0:
         return default_summary
     
+    # Get the model choice from environment variables
+    
     # Limit content length to avoid token limits
     truncated_content = content[:25000] if len(content) > 25000 else content
     
-    prompt = f"""<library_or_tool_content>\n{truncated_content}\n</library_or_tool_content>\n\nPlease provide a concise summary of the above library, tool, or framework.\n"""
+    # Create the prompt for generating the summary
+    prompt = f"""<source_content>
+{truncated_content}
+</source_content>
+
+The above content is from the documentation for '{source_id}'. Please provide a concise summary (3-5 sentences) that describes what this library/tool/framework is about. The summary should help understand what the library/tool/framework accomplishes and the purpose.
+"""
     
     try:
-        # Use robust chat completion with automatic fallback
-        response = make_chat_completion_with_fallback(
+        # Call the OpenAI API to generate the summary
+        response = _call_chat_completion_with_fallback(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise library/tool/framework summaries."},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            temperature=0.3,
+            max_tokens=150
         )
         
         # Extract the generated summary

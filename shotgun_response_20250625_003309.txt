@@ -1,0 +1,188 @@
+# Refactoring Plan: Migrate Vector Database from Supabase to Qdrant
+
+## 1. Executive Summary & Goals
+This document outlines a comprehensive plan to refactor the `mcp-crawl4ai-rag` application, replacing the Supabase (pgvector) backend with Qdrant for all vector storage and search operations. The primary objective is to leverage a purpose-built vector database to enhance performance, simplify the architecture, and enable more advanced search capabilities in the future.
+
+**Key Goals:**
+1.  **Full Qdrant Integration:** Modify the application to use Qdrant for all vector-related tasks, including ingestion and querying, while completely removing the Supabase dependency.
+2.  **Functionality Preservation:** Ensure all existing MCP tools (`crawl_single_page`, `smart_crawl_url`, `perform_rag_query`, `search_code_examples`, `get_available_sources`) operate without any loss of functionality.
+3.  **Architectural Improvement:** Streamline the data layer by replacing SQL-based logic with the Qdrant Python client, and update the local development environment to use a Qdrant Docker container.
+
+## 2. Current Situation Analysis
+The current system uses Supabase, a PostgreSQL-based platform with the `pgvector` extension, as its vector database.
+
+-   **Core Logic:** The main application (`src/crawl4ai_mcp.py`) defines MCP tools that delegate data operations to helper functions in `src/utils.py`.
+-   **Data Storage:** `src/utils.py` contains functions that interact directly with a Supabase client to perform CRUD and search operations.
+-   **Schema Definition:** The database schema is defined in `crawled_pages.sql`. It consists of three main tables:
+    -   `crawled_pages`: Stores chunked text content with vector embeddings.
+    -   `code_examples`: Stores extracted code blocks with summaries and vector embeddings.
+    -   `sources`: A relational table storing metadata about crawled domains.
+-   **Search Functionality:** Vector search is performed using custom PostgreSQL functions (`match_crawled_pages`, `match_code_examples`). Hybrid search is implemented by combining vector search results with SQL `ILIKE` keyword search results at the application level.
+
+**Pain Points & Limitations:**
+-   Using a general-purpose database for specialized vector search can lead to performance bottlenecks at scale.
+-   The hybrid search implementation is manual and less efficient than native solutions offered by dedicated vector databases.
+-   The dependency on SQL functions and schema files adds complexity to setup and maintenance.
+
+## 3. Proposed Solution / Refactoring Strategy
+The proposed strategy is to replace all Supabase vector database interactions with the Qdrant client. This involves refactoring the data access layer (`utils.py`), updating the application's lifecycle and tool logic (`crawl4ai_mcp.py`), and modifying the project's configuration and documentation.
+
+### 3.1. High-Level Design / Architectural Overview
+The target architecture will replace the Supabase component with Qdrant. The application's core logic will remain the same, but its data persistence layer will be entirely re-routed to Qdrant.
+
+**Current Architecture:**
+```mermaid
+graph TD
+    A[MCP Client] --> B(FastMCP Server);
+    B --> C{crawl4ai_mcp.py Tools};
+    C --> D[utils.py];
+    D --> E[(Supabase / pgvector)];
+```
+
+**Proposed Architecture:**
+```mermaid
+graph TD
+    A[MCP Client] --> B(FastMCP Server);
+    B --> C{crawl4ai_mcp.py Tools};
+    C --> D_New[utils.py (Qdrant Logic)];
+    D_New --> F[(Qdrant)];
+```
+
+We will create two collections in Qdrant to mirror the existing Supabase tables:
+1.  `crawled_pages`
+2.  `code_examples`
+
+The `sources` table will be deprecated, and its functionality will be replicated by querying metadata stored within the Qdrant collections.
+
+### 3.2. Key Components / Modules
+-   **`src/utils.py` (Major Refactor):** This file will be the primary focus. All Supabase-specific functions will be replaced with Qdrant-equivalents.
+-   **`src/crawl4ai_mcp.py` (Moderate Changes):** The application lifecycle (`crawl4ai_lifespan`) will be updated to manage the Qdrant client. Tool implementations will be updated to call the new utility functions.
+-   **`pyproject.toml` (Minor Change):** Dependencies will be updated to include `qdrant-client` and remove `supabase`.
+-   **`docker-compose.yml` (Enhancement):** A Qdrant service will be added to facilitate a seamless local development experience.
+-   **`README.md` (Major Update):** All database setup and configuration instructions will be rewritten for Qdrant.
+-   **`crawled_pages.sql`, `crawled_pages_1024.sql` (Deletion):** These files will be removed as they are no longer needed.
+
+### 3.3. Detailed Action Plan / Phases
+
+#### Phase 1: Environment and Configuration Setup
+-   **Objective(s):** Prepare the project environment for Qdrant integration.
+-   **Priority:** High
+
+-   **Task 1.1: Update Dependencies**
+    -   **Description:** Modify `pyproject.toml` to remove `supabase` and add `qdrant-client`. Regenerate the `uv.lock` file.
+    -   **Rationale/Goal:** Ensure the correct libraries are installed for development and deployment.
+    -   **Estimated Effort:** S
+    -   **Deliverable/Criteria for Completion:** `pyproject.toml` and `uv.lock` are updated. `uv pip install .` runs successfully.
+
+-   **Task 1.2: Update Environment Configuration**
+    -   **Description:** Modify the `README.md` and create a `.env.example` file to reflect Qdrant configuration variables (`QDRANT_URL`, `QDRANT_API_KEY`) and remove Supabase variables.
+    -   **Rationale/Goal:** Provide clear configuration instructions for the new setup.
+    -   **Estimated Effort:** S
+    -   **Deliverable/Criteria for Completion:** Configuration documentation is updated and accurate for Qdrant.
+
+-   **Task 1.3: Enhance Local Development Environment**
+    -   **Description:** Add a Qdrant service definition to `docker-compose.yml`. This allows developers to start the entire stack, including the vector database, with a single `docker-compose up` command.
+    -   **Rationale/Goal:** Simplify the local development setup and ensure consistency.
+    -   **Estimated Effort:** M
+    -   **Deliverable/Criteria for Completion:** `docker-compose up` successfully starts the MCP server and a Qdrant instance.
+
+#### Phase 2: Data Abstraction Layer Refactoring (`utils.py`)
+-   **Objective(s):** Replace all Supabase data access logic with Qdrant-native logic.
+-   **Priority:** High
+
+-   **Task 2.1: Implement Qdrant Client and Collection Management**
+    -   **Description:** Create `get_qdrant_client()` to initialize the `QdrantClient`. Create a `create_collections_if_not_exist()` function that, on startup, ensures the `crawled_pages` and `code_examples` collections exist with the correct vector parameters (size, distance metric).
+    -   **Rationale/Goal:** Establish a connection to Qdrant and manage the required collections programmatically.
+    -   **Estimated Effort:** M
+    -   **Deliverable/Criteria for Completion:** The application can connect to Qdrant and create its collections on startup.
+
+-   **Task 2.2: Refactor Data Ingestion Functions**
+    -   **Description:** Replace `add_documents_to_supabase` and `add_code_examples_to_supabase` with `add_points_to_qdrant`. This new function will take a collection name and a list of `PointStruct` objects to be upserted.
+    -   **Rationale/Goal:** Migrate the data writing operations from Supabase to Qdrant.
+    -   **Estimated Effort:** L
+    -   **Deliverable/Criteria for Completion:** Crawled data and code examples can be successfully written to their respective Qdrant collections.
+
+-   **Task 2.3: Refactor Data Search Functions**
+    -   **Description:** Replace `search_documents` and `search_code_examples` with a generic `search_qdrant` function. This function will use `client.search()` and support filtering by `source_id` via Qdrant's `Filter` model.
+    -   **Rationale/Goal:** Migrate data querying from Supabase RPC calls to the Qdrant client.
+    -   **Estimated Effort:** L
+    -   **Deliverable/Criteria for Completion:** RAG and code search queries return relevant results from Qdrant.
+
+-   **Task 2.4: Re-implement `get_available_sources`**
+    -   **Description:** Create a new function `get_available_sources_from_qdrant` that queries the `crawled_pages` collection to retrieve all unique `source_id` values from the point payloads.
+    -   **Rationale/Goal:** Replicate the functionality of the deprecated `sources` table.
+    -   **Estimated Effort:** M
+    -   **Deliverable/Criteria for Completion:** The function returns a list of all unique source IDs present in the database.
+
+#### Phase 3: Application and Documentation Integration
+-   **Objective(s):** Integrate the new Qdrant data layer into the main application and update all relevant documentation.
+-   **Priority:** Medium
+
+-   **Task 3.1: Update Application Lifespan**
+    -   **Description:** In `src/crawl4ai_mcp.py`, modify the `crawl4ai_lifespan` context manager to initialize the Qdrant client and call `create_collections_if_not_exist()`.
+    -   **Rationale/Goal:** Ensure the Qdrant client is available to all tool functions throughout the application's life.
+    -   **Estimated Effort:** S
+    -   **Deliverable/Criteria for Completion:** The server starts without errors and the Qdrant client is correctly initialized.
+
+-   **Task 3.2: Update MCP Tool Implementations**
+    -   **Description:** Go through each `@mcp.tool` in `src/crawl4ai_mcp.py` and replace the calls to old Supabase utility functions with their new Qdrant counterparts.
+    -   **Rationale/Goal:** Complete the migration at the application logic level.
+    -   **Estimated Effort:** M
+    -   **Deliverable/Criteria for Completion:** All MCP tools use the new Qdrant-based data access layer.
+
+-   **Task 3.3: Update Documentation**
+    -   **Description:** Thoroughly revise `README.md` and `CLAUDE.md` to remove all references to Supabase and replace them with instructions for setting up and configuring Qdrant.
+    -   **Rationale/Goal:** Ensure documentation is accurate and helpful for new developers.
+    -   **Estimated Effort:** L
+    -   **Deliverable/Criteria for Completion:** Documentation accurately reflects the new Qdrant-based architecture.
+
+-   **Task 3.4: Cleanup Old Files**
+    -   **Description:** Delete `crawled_pages.sql` and `crawled_pages_1024.sql`.
+    -   **Rationale/Goal:** Remove obsolete files from the project.
+    -   **Estimated Effort:** S
+    -   **Deliverable/Criteria for Completion:** The specified SQL files are removed from the repository.
+
+### 3.4. Data Model Changes
+The migration will move from a relational model with vector extensions to a document-oriented model native to vector databases.
+
+-   **Supabase `crawled_pages` table** will be mapped to a **Qdrant `crawled_pages` collection**.
+    -   The SQL columns (`url`, `chunk_number`, `content`, `metadata`, `source_id`) will become fields in the `payload` of each Qdrant point.
+    -   The `embedding` column will be the `vector` of each Qdrant point.
+-   **Supabase `code_examples` table** will be mapped to a **Qdrant `code_examples` collection** similarly.
+    -   The `payload` will contain `url`, `chunk_number`, `content`, `summary`, `metadata`, and `source_id`.
+-   **Supabase `sources` table** will be **deprecated**. Its functionality is replaced by querying the indexed `source_id` field within the point payloads of the other collections.
+
+### 3.5. API Design / Interface Changes
+There will be **no changes** to the external-facing MCP tool APIs. The function signatures for `crawl_single_page`, `smart_crawl_url`, `perform_rag_query`, etc., will remain identical to ensure backward compatibility with any existing clients. All changes are internal to the server's implementation.
+
+## 4. Key Considerations & Risk Mitigation
+### 4.1. Technical Risks & Challenges
+-   **Hybrid Search Logic:** The current hybrid search relies on a SQL `ILIKE` query, which is not available in Qdrant.
+    -   **Mitigation:** For the initial migration, the hybrid search can be implemented by first performing a vector search in Qdrant, then filtering the results in Python based on keyword presence. A follow-up task should be created to implement a more robust solution using sparse vectors (e.g., SPLADE) for true hybrid search in Qdrant.
+-   **`get_available_sources` Performance:** Querying for all unique values of a payload field across millions of points could be slow if not implemented carefully.
+    -   **Mitigation:** We will create a payload index on the `source_id` field in Qdrant. The implementation will use Qdrant's `scroll` API with a small `limit` and payload selection to efficiently retrieve unique source IDs.
+
+### 4.2. Dependencies
+-   **Internal:** The phases are designed to be sequential. Phase 2 (`utils.py` refactoring) must be completed before Phase 3 (application integration).
+-   **External:** The plan requires access to a Qdrant instance for development and testing. The inclusion of a Qdrant service in `docker-compose.yml` mitigates this dependency for local development.
+
+### 4.3. Non-Functional Requirements (NFRs) Addressed
+-   **Performance:** Migrating to Qdrant, a database optimized for vector search, is expected to improve query latency for RAG operations, especially as the dataset grows.
+-   **Maintainability:** The architecture will be simplified by removing the SQL schema and custom PostgreSQL functions. Data access logic will be consolidated into the Python application, making it easier to manage and evolve.
+-   **Scalability:** Qdrant is designed for horizontal scaling, providing a clear path for future growth that would be more complex to achieve with the current pgvector setup.
+
+## 5. Success Metrics / Validation Criteria
+-   **Functional Equivalence:** All MCP tools produce results that are functionally identical or superior to the previous implementation.
+-   **Test Coverage:** All existing unit and integration tests are updated to work with the new Qdrant backend and continue to pass.
+-   **Performance Benchmark:** A simple benchmark comparing the `perform_rag_query` response times before and after the migration shows equal or improved performance.
+-   **Developer Experience:** The local development setup via `docker-compose up` is functional and provides a complete, working environment.
+
+## 6. Assumptions Made
+-   The project will use the official `qdrant-client` for Python.
+-   The environment will have Docker and Docker Compose available for local development.
+-   The embedding model and dimension (`EMBEDDING_DIMENSION=1536`) will remain the same during the migration.
+-   The "no data migration" rule means we can start with a fresh, empty Qdrant database.
+
+## 7. Open Questions / Areas for Further Investigation
+-   **Hybrid Search Strategy:** Should the initial migration implement a simple Python-based keyword filter on vector search results, or should it scope in the implementation of sparse vectors for a true hybrid search from the start? The current plan defers this for simplicity.
+-   **Qdrant Cloud vs. Self-Hosted:** For production deployment, a decision will need to be made between using Qdrant Cloud or self-hosting a Qdrant cluster. This plan focuses on making the application compatible with either option.

@@ -1,0 +1,765 @@
+TITLE: Inserting Vectors into a Collection
+DESCRIPTION: This code snippet inserts vectors into a Qdrant collection named "my_collection". It generates random vectors using NumPy, creates PointStruct objects with IDs, vectors, and payload, and then uses the `upsert` method to insert the points.  It's important to split large datasets into chunks to avoid payload size limits.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_12
+
+LANGUAGE: Python
+CODE:
+```
+import numpy as np
+
+from qdrant_client.models import PointStruct
+
+vectors = np.random.rand(100, 100)
+# NOTE: consider splitting the data into chunks to avoid hitting the server's payload size limit
+# or use `upload_collection` or `upload_points` methods which handle this for you
+# WARNING: uploading points one-by-one is not recommended due to requests overhead
+client.upsert(
+    collection_name="my_collection",
+    points=[
+        PointStruct(
+            id=idx,
+            vector=vector.tolist(),
+            payload={"color": "red", "rand_number": idx % 10}
+        )
+        for idx, vector in enumerate(vectors)
+    ]
+)
+```
+
+----------------------------------------
+
+TITLE: Using FastEmbed with Qdrant Client
+DESCRIPTION: This example demonstrates how to use FastEmbed with the Qdrant client to create embeddings and upload them to Qdrant. It initializes the client, prepares documents, metadata, and IDs, and then uses the `add` method to add the data to a collection. Finally, it performs a query and prints the results. Requires qdrant-client and fastembed to be installed.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_4
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+# Initialize the client
+client = QdrantClient(":memory:")  # or QdrantClient(path="path/to/db")
+
+# Prepare your documents, metadata, and IDs
+docs = ["Qdrant has Langchain integrations", "Qdrant also has Llama Index integrations"]
+metadata = [
+    {"source": "Langchain-docs"},
+    {"source": "Linkedin-docs"},
+]
+ids = [42, 2]
+
+# Use the new add method
+client.add(
+    collection_name="demo_collection",
+    documents=docs,
+    metadata=metadata,
+    ids=ids
+)
+
+search_result = client.query(
+    collection_name="demo_collection",
+    query_text="This is a query document"
+)
+print(search_result)
+```
+
+----------------------------------------
+
+TITLE: Adding documents using FastEmbed
+DESCRIPTION: Adds documents to a Qdrant collection using the `add` method. The `add` method leverages FastEmbed for text embedding.  It automatically creates the vector embeddings from the provided text documents.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_2
+
+LANGUAGE: python
+CODE:
+```
+# Prepare your documents, metadata, and IDs
+docs = ["Qdrant has Langchain integrations", "Qdrant also has Llama Index integrations"]
+
+client.add(
+    collection_name="demo_collection",
+    documents=docs,
+)
+```
+
+----------------------------------------
+
+TITLE: Searching with a Filter and Vector
+DESCRIPTION: Searches a Qdrant collection using a query vector and a filter.  This combines vector similarity search with filtering based on metadata.  The example demonstrates filtering by a specific city.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_8
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+search_result = client.search(
+    collection_name="test_collection",
+    query_vector=[0.2, 0.1, 0.9, 0.7], 
+    query_filter=Filter(
+        must=[
+            FieldCondition(
+                key="city",
+                match=MatchValue(value="London")
+            )
+        ]
+    ),
+    limit=1
+)
+print(search_result)
+```
+
+----------------------------------------
+
+TITLE: Searching for Similar Vectors
+DESCRIPTION: This code snippet searches for similar vectors in the "my_collection" collection. It generates a random query vector using NumPy and then uses the `query_points` method to search for the 5 closest points. The result is stored in the `hits` variable.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_13
+
+LANGUAGE: Python
+CODE:
+```
+query_vector = np.random.rand(100)
+hits = client.query_points(
+    collection_name="my_collection",
+    query=query_vector,
+    limit=5  # Return 5 closest points
+)
+```
+
+----------------------------------------
+
+TITLE: Querying with text using FastEmbed
+DESCRIPTION: Queries a Qdrant collection using the `query` method with text input.  The `query` method leverages FastEmbed for text embedding, converting the query text into a vector for searching.  It returns the nearest neighbors based on the embedded query.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+search_result = client.query(
+    collection_name="demo_collection",
+    query_text="This is a query document",
+    limit=1
+)
+print(search_result)
+```
+
+----------------------------------------
+
+TITLE: Inserting Vectors into Qdrant
+DESCRIPTION: This code shows how to insert vectors into a Qdrant collection using the `upsert` method. It creates a list of PointStruct objects, each containing an ID, a vector, and optional payload data. Requires the numpy library.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+import numpy as np
+from qdrant_client.models import PointStruct
+
+vectors = np.random.rand(100, 100)
+client.upsert(
+   collection_name="my_collection",
+   points=[
+      PointStruct(
+            id=idx,
+            vector=vector.tolist(),
+            payload={"color": "red", "rand_number": idx % 10}
+      )
+      for idx, vector in enumerate(vectors)
+   ]
+)
+```
+
+----------------------------------------
+
+TITLE: Searching Similar Vectors in Qdrant
+DESCRIPTION: This code snippet demonstrates how to search for similar vectors in a Qdrant collection using a query vector and a limit on the number of results. It uses the `search` method to find the closest points to the query vector.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+query_vector = np.random.rand(100)
+hits = client.search(
+   collection_name="my_collection",
+   query_vector=query_vector,
+   limit=5  # Return 5 closest points
+)
+```
+
+----------------------------------------
+
+TITLE: Creating a Collection
+DESCRIPTION: This code creates a new collection named "my_collection" in Qdrant with vectors of size 100 and cosine distance. Requires qdrant_client and models to be imported. The VectorParams specify the vector size and distance metric.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_11
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client.models import Distance, VectorParams
+
+client.create_collection(
+    collection_name="my_collection",
+    vectors_config=VectorParams(size=100, distance=Distance.COSINE),
+)
+```
+
+----------------------------------------
+
+TITLE: Upserting Points into a Collection
+DESCRIPTION: Upserts points into a Qdrant collection.  This inserts new points or updates existing ones based on their IDs.  The example demonstrates creating `PointStruct` instances with vector data and associated payloads.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client.http.models import PointStruct
+
+operation_info = client.upsert(
+    collection_name="test_collection",
+    wait=True,
+    points=[
+        PointStruct(id=1, vector=[0.05, 0.61, 0.76, 0.74], payload={"city": "Berlin"}),
+        PointStruct(id=2, vector=[0.19, 0.81, 0.75, 0.11], payload={"city": "London"}),
+        PointStruct(id=3, vector=[0.36, 0.55, 0.47, 0.94], payload={"city": "Moscow"}),
+        PointStruct(id=4, vector=[0.18, 0.01, 0.85, 0.80], payload={"city": "New York"}),
+        PointStruct(id=5, vector=[0.24, 0.18, 0.22, 0.44], payload={"city": "Beijing"}),
+        PointStruct(id=6, vector=[0.35, 0.08, 0.11, 0.44], payload={"city": "Mumbai"}),
+    ]
+)
+print(operation_info)
+```
+
+----------------------------------------
+
+TITLE: Searching for Similar Vectors with Filtering
+DESCRIPTION: This code snippet searches for similar vectors in the "my_collection" collection with a filtering condition. It generates a random query vector using NumPy and then uses the `query_points` method to search for the 5 closest points that satisfy the filter. The filter requires the `rand_number` field to be greater than or equal to 3. Requires qdrant_client.models to be imported.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_14
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client.models import Filter, FieldCondition, Range
+
+hits = client.query_points(
+    collection_name="my_collection",
+    query=query_vector,
+    query_filter=Filter(
+        must=[  # These conditions are required for search results
+            FieldCondition(
+                key='rand_number',  # Condition based on values of `rand_number` field.
+                range=Range(
+                    gte=3  # Select only those results where `rand_number` >= 3
+                )
+            )
+        ]
+    ),
+    limit=5  # Return 5 closest points
+)
+```
+
+----------------------------------------
+
+TITLE: Searching with Filtering Conditions
+DESCRIPTION: This code shows how to search for similar vectors with filtering conditions. It creates a Filter object with a FieldCondition to only return vectors where the `rand_number` field is greater than or equal to 3.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_5
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client.models import Filter, FieldCondition, Range
+
+hits = client.search(
+   collection_name="my_collection",
+   query_vector=query_vector,
+   query_filter=Filter(
+      must=[  # These conditions are required for search results
+            FieldCondition(
+               key='rand_number',  # Condition based on values of `rand_number` field.
+               range=Range(
+                  gte=3  # Select only those results where `rand_number` >= 3
+               )
+            )
+      ]
+   ),
+   limit=5  # Return 5 closest points
+)
+```
+
+----------------------------------------
+
+TITLE: Searching with a Vector
+DESCRIPTION: Searches a Qdrant collection using a query vector.  This finds the nearest neighbors to the query vector within the collection.  The example demonstrates a simple vector search with a specified limit.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_7
+
+LANGUAGE: python
+CODE:
+```
+search_result = client.search(
+    collection_name="test_collection",
+    query_vector=[0.18, 0.81, 0.75, 0.12], 
+    limit=1
+)
+print(search_result)
+```
+
+----------------------------------------
+
+TITLE: Adding documents with metadata and IDs using FastEmbed
+DESCRIPTION: Adds documents, metadata, and IDs to a Qdrant collection using the `add` method with metadata. It allows associating metadata with each document, providing context for querying and filtering.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+# Prepare your documents, metadata, and IDs
+docs = ["Qdrant has Langchain integrations", "Qdrant also has Llama Index integrations"]
+metadata = [
+    {"source": "Langchain-docs"},
+    {"source": "Linkedin-docs"},
+]
+ids = [42, 2]
+
+# Use the new add method
+client.add(
+    collection_name="demo_collection",
+    documents=docs,
+    metadata=metadata,
+    ids=ids
+)
+```
+
+----------------------------------------
+
+TITLE: Initializing Qdrant Client in Local Mode (Memory)
+DESCRIPTION: This code snippet initializes a QdrantClient in local mode, using an in-memory database.  This is useful for development, prototyping, and testing without needing a running Qdrant server.  No persistent storage is used.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_1
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(":memory:")
+```
+
+----------------------------------------
+
+TITLE: Creating a Collection
+DESCRIPTION: Creates a Qdrant collection with a specified vector size and distance metric.  This defines the structure for storing and searching vectors within the collection.  The code checks if the collection exists before attempting to create it.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_5
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client.http.models import Distance, VectorParams
+
+if not client.collection_exists("test_collection"):
+	client.create_collection(
+		collection_name="test_collection",
+		vectors_config=VectorParams(size=4, distance=Distance.DOT),
+	)
+```
+
+----------------------------------------
+
+TITLE: Creating a Qdrant Collection
+DESCRIPTION: This example demonstrates how to create a new collection in Qdrant with a specified vector configuration. It checks if the collection already exists before creating it, and defines the vector size and distance metric.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_2
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client.models import VectorParams, Distance
+
+if not client.collection_exists("my_collection"):
+   client.create_collection(
+      collection_name="my_collection",
+      vectors_config=VectorParams(size=100, distance=Distance.COSINE),
+   )
+```
+
+----------------------------------------
+
+TITLE: Connecting to Qdrant Server with Host and Port
+DESCRIPTION: This code snippet shows how to connect to a Qdrant server by specifying the host and port.  Replace "localhost" and 6333 with the actual host and port of your Qdrant server.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_7
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(host="localhost", port=6333)
+```
+
+----------------------------------------
+
+TITLE: Initializing Qdrant Client in Local Mode (Disk)
+DESCRIPTION: This code snippet initializes a QdrantClient in local mode, persisting data to disk.  This is useful for development, prototyping, and testing, allowing data to be preserved across sessions.  Specify the path where the database should be stored.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_2
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(path="path/to/db")  # Persists changes to disk
+```
+
+----------------------------------------
+
+TITLE: Connecting to Qdrant Server with URL
+DESCRIPTION: This code snippet demonstrates how to connect to a Qdrant server using a URL.  Replace "http://localhost:6333" with the actual URL of your Qdrant server.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_8
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(url="http://localhost:6333")
+```
+
+----------------------------------------
+
+TITLE: Initializing Qdrant Client
+DESCRIPTION: Initializes the Qdrant client.  This example showcases creating a client instance that operates in in-memory mode. It also comments out an example of how to connect to a persistent database on disk.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+# client = QdrantClient(path="path/to/db")  # Persists changes to disk
+# or
+client = QdrantClient(":memory:")
+```
+
+----------------------------------------
+
+TITLE: Installing Qdrant Client with FastEmbed
+DESCRIPTION: Installs the Qdrant client with the FastEmbed dependency. FastEmbed provides text embedding functionality. This allows for simpler text vectorization.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/quickstart.ipynb#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+!pip install 'qdrant-client[fastembed]' --quiet
+```
+
+----------------------------------------
+
+TITLE: Setting Embedding Model with CUDA Provider
+DESCRIPTION: This example shows how to set the embedding model for the Qdrant client to use CUDAExecutionProvider for GPU acceleration and CPUExecutionProvider as fallback.  Requires qdrant-client and fastembed-gpu to be installed.  The `DEFAULT_EMBEDDING_MODEL` constant represents the default embedding model.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_6
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+# Initialize the client
+client = QdrantClient(":memory:")  # or QdrantClient(path="path/to/db")
+client.set_model(client.DEFAULT_EMBEDDING_MODEL, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+```
+
+----------------------------------------
+
+TITLE: Initializing Async Qdrant Client
+DESCRIPTION: This code snippet shows how to instantiate an AsyncQdrantClient to connect to a Qdrant instance asynchronously. It requires the `asyncio` package to run an async event loop.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client import AsyncQdrantClient, models
+import numpy as np
+import asyncio
+
+async def main():
+   # Your async code using QdrantClient might be put here
+   client = AsyncQdrantClient(url="http://localhost:6333")
+
+   if not await client.collection_exists("my_collection"):
+      await client.create_collection(
+         collection_name="my_collection",
+         vectors_config=models.VectorParams(size=10, distance=models.Distance.COSINE),
+      )
+
+   await client.upsert(
+      collection_name="my_collection",
+      points=[
+            models.PointStruct(
+               id=i,
+               vector=np.random.rand(10).tolist(),
+            )
+            for i in range(100)
+      ],
+   )
+
+   res = await client.search(
+      collection_name="my_collection",
+      query_vector=np.random.rand(10).tolist(),  # type: ignore
+      limit=10,
+   )
+
+   print(res)
+
+asyncio.run(main())
+```
+
+----------------------------------------
+
+TITLE: Using Async Qdrant Client
+DESCRIPTION: This code snippet demonstrates how to use the AsyncQdrantClient for asynchronous operations with Qdrant. It creates a collection, inserts points, and queries points using asynchronous methods. Requires asyncio and numpy to be installed.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_16
+
+LANGUAGE: Python
+CODE:
+```
+import asyncio
+
+import numpy as np
+
+from qdrant_client import AsyncQdrantClient, models
+
+
+async def main():
+    # Your async code using QdrantClient might be put here
+    client = AsyncQdrantClient(url="http://localhost:6333")
+
+    await client.create_collection(
+        collection_name="my_collection",
+        vectors_config=models.VectorParams(size=10, distance=models.Distance.COSINE),
+    )
+
+    await client.upsert(
+        collection_name="my_collection",
+        points=[
+            models.PointStruct(
+                id=i,
+                vector=np.random.rand(10).tolist(),
+            )
+            for i in range(100)
+        ],
+    )
+
+    res = await client.query_points(
+        collection_name="my_collection",
+        query=np.random.rand(10).tolist(),  # type: ignore
+        limit=10,
+    )
+
+    print(res)
+
+asyncio.run(main())
+```
+
+----------------------------------------
+
+TITLE: Connecting to Qdrant Cloud
+DESCRIPTION: This code snippet demonstrates how to connect to a Qdrant Cloud cluster using the cluster URL and API key. Replace the placeholder URL and API key with your actual cluster URL and API key obtained from Qdrant Cloud.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_10
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+qdrant_client = QdrantClient(
+    url="https://xxxxxx-xxxxx-xxxxx-xxxx-xxxxxxxxx.us-east.aws.cloud.qdrant.io:6333",
+    api_key="<your-api-key>",
+)
+```
+
+----------------------------------------
+
+TITLE: Installing Qdrant Client with FastEmbed GPU
+DESCRIPTION: This command installs the qdrant-client package with the fastembed-gpu extra dependency using pip.  Enables GPU support for faster embeddings with FastEmbed.  Ensure you have Python, pip, and the necessary GPU drivers installed before running this command.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_5
+
+LANGUAGE: Bash
+CODE:
+```
+pip install 'qdrant-client[fastembed-gpu]'
+```
+
+----------------------------------------
+
+TITLE: Installing Qdrant Client with FastEmbed
+DESCRIPTION: This command installs the qdrant-client package with the fastembed extra dependency using pip. FastEmbed provides fast vector embeddings on CPU. Ensure you have Python and pip installed before running this command.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_3
+
+LANGUAGE: Bash
+CODE:
+```
+pip install qdrant-client[fastembed]
+```
+
+----------------------------------------
+
+TITLE: Initializing Qdrant Client with gRPC
+DESCRIPTION: This code initializes a QdrantClient with gRPC enabled for potentially faster collection uploads. It specifies the host, gRPC port, and sets `prefer_grpc` to True.  Replace "localhost" and 6334 with the appropriate host and port.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_15
+
+LANGUAGE: Python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(host="localhost", grpc_port=6334, prefer_grpc=True)
+```
+
+----------------------------------------
+
+TITLE: Running Qdrant Server with Docker
+DESCRIPTION: This command runs a Qdrant server using Docker. It maps port 6333 on the host machine to port 6333 on the container. This allows you to access the Qdrant server from your host machine. Requires Docker to be installed.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_9
+
+LANGUAGE: Bash
+CODE:
+```
+docker run -p 6333:6333 qdrant/qdrant:latest
+```
+
+----------------------------------------
+
+TITLE: Installing Qdrant Client with pip
+DESCRIPTION: This command installs the qdrant-client package using pip, allowing you to use the Qdrant Python client library in your projects. It fetches the package from PyPI and installs it along with its dependencies. Ensure you have Python and pip installed before running this command.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_0
+
+LANGUAGE: Bash
+CODE:
+```
+pip install qdrant-client
+```
+
+----------------------------------------
+
+TITLE: Installing Qdrant Client
+DESCRIPTION: This command installs the `qdrant-client` package using pip. This is the first step to use the Qdrant client library.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+pip install qdrant-client
+```
+
+----------------------------------------
+
+TITLE: Initializing Qdrant Client
+DESCRIPTION: This code snippet shows how to instantiate a QdrantClient to connect to a Qdrant instance. It sets the host and port for the connection.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/docs/source/index.rst#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+from qdrant_client import QdrantClient
+
+client = QdrantClient(host="localhost", port=6333)
+```
+
+----------------------------------------
+
+TITLE: Installing Pre-commit Hooks
+DESCRIPTION: This command installs pre-commit hooks for code formatting. Pre-commit is a tool for managing and running pre-commit hooks. These hooks automatically format code before commits. Requires pre-commit to be installed.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_17
+
+LANGUAGE: Bash
+CODE:
+```
+pip3 install pre-commit
+```
+
+----------------------------------------
+
+TITLE: Setting up Pre-commit Hooks
+DESCRIPTION: This command sets up pre-commit hooks in the current Git repository. After running this command, pre-commit hooks will be automatically run before each commit. Requires pre-commit to be installed and set up.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/README.md#_snippet_18
+
+LANGUAGE: Bash
+CODE:
+```
+pre-commit install
+```
+
+----------------------------------------
+
+TITLE: Setting up Python Virtual Environment with pyenv
+DESCRIPTION: This snippet provides commands to set up a Python virtual environment using pyenv. It includes installing pyenv, its dependencies, a specific Python version (3.10.10), setting the local Python version, and installing essential packages like grpcio, grpcio-tools, virtualenv, and poetry.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_1
+
+LANGUAGE: bash
+CODE:
+```
+pyenv install 3.10.10
+pyenv local 3.10.10
+pip install grpcio==1.59.3
+pip install grpcio-tools==1.59.3
+pip install virtualenv
+virtualenv venv
+source venv/bin/activate
+pip install poetry
+poetry install
+```
+
+----------------------------------------
+
+TITLE: Creating a new branch for breaking changes
+DESCRIPTION: This snippet outlines the steps to create a new branch for introducing breaking changes to the Qdrant client. It involves checking out the branch of the upcoming release, pulling the latest changes, and then creating a new branch for development.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+git checkout v0.7.0 && git pull && git checkout -b v0.7.0-my-changees
+```
+
+----------------------------------------
+
+TITLE: Generating REST Client Code
+DESCRIPTION: This snippet executes a bash script to generate the REST client code for Qdrant. The script automatically fetches the OpenAPI specification from a Qdrant instance running in a development environment (`qdrant:dev`).
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_2
+
+LANGUAGE: bash
+CODE:
+```
+bash -x tools/generate_rest_client.sh
+```
+
+----------------------------------------
+
+TITLE: Generating gRPC Client Code
+DESCRIPTION: This snippet executes a bash script to generate the gRPC client code for Qdrant.  The script automatically fetches the protobuf definition from a Qdrant instance running in a development environment (`qdrant:dev`).
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_3
+
+LANGUAGE: bash
+CODE:
+```
+bash -x tools/generate_grpc_client.sh
+```
+
+----------------------------------------
+
+TITLE: Running Integration Tests
+DESCRIPTION: This snippet indicates that integration tests are run using a specific bash script. This command is essential for verifying the correctness and stability of changes made to the Qdrant client.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_5
+
+LANGUAGE: bash
+CODE:
+```
+tests/integration-tests.sh
+```
+
+----------------------------------------
+
+TITLE: Populating Inspection Cache
+DESCRIPTION: This snippet executes a bash script to populate the inspection cache.  The exact purpose and content of this cache are not specified in the text.
+SOURCE: https://github.com/qdrant/qdrant-client/blob/master/tools/DEVELOPMENT.md#_snippet_4
+
+LANGUAGE: bash
+CODE:
+```
+bash -x tools/populate_inspection_cache.sh
+```

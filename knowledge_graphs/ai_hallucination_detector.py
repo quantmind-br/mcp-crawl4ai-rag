@@ -288,12 +288,16 @@ Examples:
     load_dotenv()
     
     # Get Neo4j credentials
-    neo4j_uri = args.neo4j_uri or os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
-    neo4j_user = args.neo4j_user or os.environ.get('NEO4J_USER', 'neo4j')
-    neo4j_password = args.neo4j_password or os.environ.get('NEO4J_PASSWORD', 'password')
+    neo4j_uri = args.neo4j_uri or os.environ.get('NEO4J_URI')
+    neo4j_user = args.neo4j_user or os.environ.get('NEO4J_USER')
+    neo4j_password = args.neo4j_password or os.environ.get('NEO4J_PASSWORD')
     
-    if not neo4j_password or neo4j_password == 'password':
-        logger.error("Please set NEO4J_PASSWORD environment variable or use --neo4j-password")
+    if not all([neo4j_uri, neo4j_user, neo4j_password]):
+        logger.error(
+            "Neo4j connection details are missing. "
+            "Please set NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD environment variables "
+            "or provide them as command-line arguments."
+        )
         sys.exit(1)
     
     # Initialize detector

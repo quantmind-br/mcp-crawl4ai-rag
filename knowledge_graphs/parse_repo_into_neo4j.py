@@ -815,9 +815,14 @@ async def main():
     """Example usage"""
     load_dotenv()
     
-    neo4j_uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
-    neo4j_user = os.environ.get('NEO4J_USER', 'neo4j')
-    neo4j_password = os.environ.get('NEO4J_PASSWORD', 'password')
+    neo4j_uri = os.environ.get('NEO4J_URI')
+    neo4j_user = os.environ.get('NEO4J_USER')
+    neo4j_password = os.environ.get('NEO4J_PASSWORD')
+    
+    if not all([neo4j_uri, neo4j_user, neo4j_password]):
+        print("Error: Neo4j connection details are missing.")
+        print("Please set NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD in your .env file.")
+        return
     
     extractor = DirectNeo4jExtractor(neo4j_uri, neo4j_user, neo4j_password)
     
