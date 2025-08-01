@@ -7,9 +7,17 @@ requires-python = ">=3.12"
 dependencies = [
     "crawl4ai==0.6.2",
     "mcp==1.7.1",
-    "supabase==2.15.1",
+    "qdrant-client>=1.12.0",
     "openai==1.71.0",
     "dotenv==0.9.9",
-    "sentence-transformers>=4.1.0",
     "neo4j>=5.28.1",
+    "tenacity>=8.0.0",
+    "pytest>=8.4.1",
+    "requests>=2.32.3",
+    "sentence-transformers>=5.0.0",
+    # PyTorch CUDA - specified as direct URLs
+    "torch @ https://download.pytorch.org/whl/cu121/torch-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl",
+    "torchvision @ https://download.pytorch.org/whl/cu121/torchvision-0.20.1%2Bcu121-cp312-cp312-win_amd64.whl",
+    "torchaudio @ https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl",
 ]
+
