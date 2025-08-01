@@ -6,3 +6,7 @@ repos
 .claude
 .crush
 test_script_hallucination*
+.serena/cache/
+.serena/memories/
+*.log
+*.tmp
