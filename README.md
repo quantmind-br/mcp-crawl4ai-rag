@@ -4,7 +4,7 @@
   <em>Web Crawling and RAG Capabilities for AI Agents and AI Coding Assistants</em>
 </p>
 
-A powerful implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) integrated with [Crawl4AI](https://crawl4ai.com) and [Supabase](https://supabase.com/) for providing AI agents and AI coding assistants with advanced web crawling and RAG capabilities.
+A powerful implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) integrated with [Crawl4AI](https://crawl4ai.com) and [Qdrant](https://qdrant.tech/) for providing AI agents and AI coding assistants with advanced web crawling and RAG capabilities.
 
 With this MCP server, you can <b>scrape anything</b> and then <b>use that knowledge anywhere</b> for RAG.
 
@@ -14,7 +14,7 @@ Consider this GitHub repository a testbed, hence why I haven't been super active
 
 ## Overview
 
-This MCP server provides tools that enable AI agents to crawl websites, store content in a vector database (Supabase), and perform RAG over the crawled content. It follows the best practices for building MCP servers based on the [Mem0 MCP server template](https://github.com/coleam00/mcp-mem0/) I provided on my channel previously.
+This MCP server provides tools that enable AI agents to crawl websites, store content in a vector database (Qdrant), and perform RAG over the crawled content. It follows the best practices for building MCP servers based on the [Mem0 MCP server template](https://github.com/coleam00/mcp-mem0/) I provided on my channel previously.
 
 The server includes several advanced RAG strategies that can be enabled to enhance retrieval quality:
 - **Contextual Embeddings** for enriched semantic understanding
@@ -71,9 +71,9 @@ The server provides essential web crawling and search tools:
 
 ## Prerequisites
 
-- [Docker/Docker Desktop](https://www.docker.com/products/docker-desktop/) if running the MCP server as a container (recommended)
-- [Python 3.12+](https://www.python.org/downloads/) if running the MCP server directly through uv
-- [Supabase](https://supabase.com/) (database for RAG)
+- [Docker/Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommended for running Qdrant and Neo4j)
+- [Python 3.12+](https://www.python.org/downloads/)
+- [uv](https://github.com/astral-sh/uv) (for dependency management)
 - [OpenAI API key](https://platform.openai.com/api-keys) (for generating embeddings)
 - [Neo4j](https://neo4j.com/) (optional, for knowledge graph functionality) - see [Knowledge Graph Setup](#knowledge-graph-setup) section
 
@@ -124,13 +124,23 @@ The server provides essential web crawling and search tools:
 
 ## Database Setup
 
-Before running the server, you need to set up the database with the pgvector extension:
+Before running the server, you need to set up the local Qdrant and Neo4j services using Docker:
 
-1. Go to the SQL Editor in your Supabase dashboard (create a new project first if necessary)
+1. **Start the Docker services** (required):
+   ```bash
+   # Run the setup script to initialize Docker services
+   setup.bat
+   ```
+   
+   This will:
+   - Start Qdrant vector database (localhost:6333)
+   - Start Neo4j graph database (localhost:7474, bolt://localhost:7687)
+   - Verify services are healthy and accessible
+   - Create necessary collections in Qdrant automatically
 
-2. Create a new query and paste the contents of `crawled_pages.sql`
-
-3. Run the query to create the necessary tables and functions
+2. **Verify services are running**:
+   - Qdrant Web UI: http://localhost:6333/dashboard
+   - Neo4j Browser: http://localhost:7474 (username: neo4j, password: from .env)
 
 ## Knowledge Graph Setup (Optional)
 
@@ -198,14 +208,14 @@ USE_AGENTIC_RAG=false
 USE_RERANKING=false
 USE_KNOWLEDGE_GRAPH=false
 
-# Supabase Configuration
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key
+# Qdrant Configuration (local Docker instance)
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
 
 # Neo4j Configuration (required for knowledge graph functionality)
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_neo4j_password
+NEO4J_PASSWORD=password123
 ```
 
 ### RAG Strategy Options
@@ -239,8 +249,42 @@ Applies cross-encoder reranking to search results after initial retrieval. Uses 
 
 - **When to use**: Enable this when search precision is critical and you need the most relevant results at the top. Particularly useful for complex queries where semantic similarity alone might not capture query intent.
 - **Trade-offs**: Adds ~100-200ms to search queries depending on result count, but significantly improves result ordering.
-- **Cost**: No additional API costs - uses a local model that runs on CPU.
+- **Cost**: No additional API costs - uses a local model that runs on CPU or GPU.
 - **Benefits**: Better result relevance, especially for complex queries. Works with both regular RAG search and code example search.
+
+##### GPU Acceleration for Reranking
+
+When `USE_RERANKING=true`, you can significantly accelerate the CrossEncoder model performance by enabling GPU acceleration:
+
+```bash
+# GPU Acceleration Configuration (optional - requires USE_RERANKING=true)
+USE_GPU_ACCELERATION=auto      # auto, true/cuda, mps, false/cpu
+GPU_PRECISION=float32          # float32, float16, bfloat16
+GPU_DEVICE_INDEX=0            # GPU index for multi-GPU systems
+GPU_MEMORY_FRACTION=0.8       # Fraction of GPU memory to use
+```
+
+**Configuration Options:**
+- `USE_GPU_ACCELERATION=auto` (default): Automatically detects and uses the best available device (CUDA GPU, Apple Silicon MPS, or CPU fallback)
+- `USE_GPU_ACCELERATION=true/cuda`: Forces CUDA GPU usage if available, falls back to CPU
+- `USE_GPU_ACCELERATION=mps`: Forces Apple Silicon GPU (MPS) if available, falls back to CPU
+- `USE_GPU_ACCELERATION=false/cpu`: Forces CPU-only execution
+
+**Performance Benefits:**
+- **5-10x speedup** on GPU-enabled systems for reranking operations
+- Automatic fallback to CPU when GPU is unavailable or encounters errors
+- Zero breaking changes for existing CPU-only deployments
+
+**GPU Memory Management:**
+The system automatically manages GPU memory to prevent out-of-memory issues:
+- Precision settings (`float16`, `bfloat16`) reduce memory usage on GPU
+- Automatic memory cleanup after reranking operations
+- Configurable memory fraction limits
+
+**Troubleshooting GPU Acceleration:**
+- Check device availability: GPU acceleration requires PyTorch with CUDA support or Apple Silicon with MPS
+- Monitor GPU memory: The system logs device selection and any fallback scenarios
+- Memory issues: Try `GPU_PRECISION=float16` to reduce memory usage or `GPU_MEMORY_FRACTION=0.6` for conservative memory allocation
 
 #### 5. **USE_KNOWLEDGE_GRAPH**
 Enables AI hallucination detection and repository analysis using Neo4j knowledge graphs. When enabled, the system can parse GitHub repositories into a graph database and validate AI-generated code against real repository structures. (NOT fully compatible with Docker yet, I'd recommend running through uv)
@@ -301,16 +345,27 @@ USE_KNOWLEDGE_GRAPH=false
 
 ## Running the Server
 
-### Using Docker
+### Using uv with Docker Services (Recommended)
+
+1. **Start the Docker services first**:
+   ```bash
+   setup.bat
+   ```
+
+2. **Start the MCP server**:
+   ```bash
+   start.bat
+   ```
+   
+   Or manually:
+   ```bash
+   uv run -m src
+   ```
+
+### Using Docker (Alternative)
 
 ```bash
 docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
-```
-
-### Using Python
-
-```bash
-uv run src/crawl4ai_mcp.py
 ```
 
 The server will start and listen on the configured host and port.
@@ -359,17 +414,18 @@ Add this server to your MCP configuration for Claude Desktop, Windsurf, or any o
 {
   "mcpServers": {
     "crawl4ai-rag": {
-      "command": "python",
-      "args": ["path/to/crawl4ai-mcp/src/crawl4ai_mcp.py"],
+      "command": "uv",
+      "args": ["run", "-m", "src"],
+      "cwd": "path/to/crawl4ai-mcp",
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "your_openai_api_key",
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_KEY": "your_supabase_service_key",
+        "QDRANT_HOST": "localhost",
+        "QDRANT_PORT": "6333",
         "USE_KNOWLEDGE_GRAPH": "false",
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "your_neo4j_password"
+        "NEO4J_PASSWORD": "password123"
       }
     }
   }
@@ -386,22 +442,22 @@ Add this server to your MCP configuration for Claude Desktop, Windsurf, or any o
       "args": ["run", "--rm", "-i", 
                "-e", "TRANSPORT", 
                "-e", "OPENAI_API_KEY", 
-               "-e", "SUPABASE_URL", 
-               "-e", "SUPABASE_SERVICE_KEY",
+               "-e", "QDRANT_HOST", 
+               "-e", "QDRANT_PORT",
                "-e", "USE_KNOWLEDGE_GRAPH",
                "-e", "NEO4J_URI",
                "-e", "NEO4J_USER",
                "-e", "NEO4J_PASSWORD",
-               "mcp/crawl4ai"],
+               "mcp/crawl4ai-rag"],
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "your_openai_api_key",
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_KEY": "your_supabase_service_key",
+        "QDRANT_HOST": "localhost",
+        "QDRANT_PORT": "6333",
         "USE_KNOWLEDGE_GRAPH": "false",
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "your_neo4j_password"
+        "NEO4J_PASSWORD": "password123"
       }
     }
   }
