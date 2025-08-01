@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse, urldefrag
 from xml.etree import ElementTree
 from dotenv import load_dotenv
-from supabase import Client
+# Removed Supabase import - now using Qdrant client wrapper
 from pathlib import Path
 import requests
 import asyncio
@@ -23,24 +23,46 @@ import os
 import re
 import concurrent.futures
 import sys
+import logging
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, MemoryAdaptiveDispatcher
+try:
+    from .device_manager import get_optimal_device, cleanup_gpu_memory, get_model_kwargs_for_device, get_gpu_preference
+except ImportError:
+    from device_manager import get_optimal_device, cleanup_gpu_memory, get_model_kwargs_for_device, get_gpu_preference
 
 # Add knowledge_graphs folder to path for importing knowledge graph modules
 knowledge_graphs_path = Path(__file__).resolve().parent.parent / 'knowledge_graphs'
 sys.path.append(str(knowledge_graphs_path))
 
-from utils import (
-    get_supabase_client, 
-    add_documents_to_supabase, 
-    search_documents,
-    extract_code_blocks,
-    generate_code_example_summary,
-    add_code_examples_to_supabase,
-    update_source_info,
-    extract_source_summary,
-    search_code_examples
-)
+try:
+    from .utils import (
+        get_supabase_client, 
+        add_documents_to_supabase, 
+        search_documents,
+        extract_code_blocks,
+        generate_code_example_summary,
+        add_code_examples_to_supabase,
+        update_source_info,
+        extract_source_summary,
+        search_code_examples
+    )
+    # Import Qdrant client wrapper for type annotations
+    from .qdrant_wrapper import QdrantClientWrapper
+except ImportError:
+    from utils import (
+        get_supabase_client, 
+        add_documents_to_supabase, 
+        search_documents,
+        extract_code_blocks,
+        generate_code_example_summary,
+        add_code_examples_to_supabase,
+        update_source_info,
+        extract_source_summary,
+        search_code_examples
+    )
+    # Import Qdrant client wrapper for type annotations
+    from qdrant_wrapper import QdrantClientWrapper
 
 # Import knowledge graph modules
 from knowledge_graph_validator import KnowledgeGraphValidator
@@ -117,7 +139,7 @@ def validate_github_url(repo_url: str) -> Dict[str, Any]:
 class Crawl4AIContext:
     """Context for the Crawl4AI MCP server."""
     crawler: AsyncWebCrawler
-    supabase_client: Client
+    qdrant_client: QdrantClientWrapper
     reranking_model: Optional[CrossEncoder] = None
     knowledge_validator: Optional[Any] = None  # KnowledgeGraphValidator when available
     repo_extractor: Optional[Any] = None       # DirectNeo4jExtractor when available
@@ -131,7 +153,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
         server: The FastMCP server instance
         
     Yields:
-        Crawl4AIContext: The context containing the Crawl4AI crawler and Supabase client
+        Crawl4AIContext: The context containing the Crawl4AI crawler and Qdrant client
     """
     # Create browser configuration
     browser_config = BrowserConfig(
@@ -143,14 +165,32 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     crawler = AsyncWebCrawler(config=browser_config)
     await crawler.__aenter__()
     
-    # Initialize Supabase client
-    supabase_client = get_supabase_client()
+    # Initialize Qdrant client
+    qdrant_client = get_supabase_client()  # Legacy function name, returns QdrantClientWrapper
     
     # Initialize cross-encoder model for reranking if enabled
     reranking_model = None
     if os.getenv("USE_RERANKING", "false") == "true":
         try:
-            reranking_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+            # Device detection with configuration
+            device = get_optimal_device(
+                preference=get_gpu_preference(),
+                gpu_index=int(os.getenv("GPU_DEVICE_INDEX", "0"))
+            )
+            
+            # Precision configuration for GPU
+            precision = os.getenv("GPU_PRECISION", "float32")
+            model_kwargs = get_model_kwargs_for_device(device, precision)
+            
+            # Initialize CrossEncoder with device-aware settings
+            reranking_model = CrossEncoder(
+                "cross-encoder/ms-marco-MiniLM-L-6-v2",
+                device=str(device),
+                model_kwargs=model_kwargs
+            )
+            
+            logging.info(f"CrossEncoder loaded on device: {device}")
+            
         except Exception as e:
             print(f"Failed to load reranking model: {e}")
             reranking_model = None
@@ -193,7 +233,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     try:
         yield Crawl4AIContext(
             crawler=crawler,
-            supabase_client=supabase_client,
+            qdrant_client=qdrant_client,
             reranking_model=reranking_model,
             knowledge_validator=knowledge_validator,
             repo_extractor=repo_extractor
@@ -255,6 +295,9 @@ def rerank_results(model: CrossEncoder, query: str, results: List[Dict[str, Any]
         
         # Sort by rerank score
         reranked = sorted(results, key=lambda x: x.get("rerank_score", 0), reverse=True)
+        
+        # Clean up GPU memory after processing (critical for long-running processes)
+        cleanup_gpu_memory()
         
         return reranked
     except Exception as e:
@@ -403,7 +446,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
     try:
         # Get the crawler from the context
         crawler = ctx.request_context.lifespan_context.crawler
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         
         # Configure the crawl
         run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, stream=False)
@@ -447,10 +490,10 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
             
             # Update source information FIRST (before inserting documents)
             source_summary = extract_source_summary(source_id, result.markdown[:5000])  # Use first 5000 chars for summary
-            update_source_info(supabase_client, source_id, source_summary, total_word_count)
+            update_source_info(qdrant_client, source_id, source_summary, total_word_count)
             
-            # Add documentation chunks to Supabase (AFTER source exists)
-            add_documents_to_supabase(supabase_client, urls, chunk_numbers, contents, metadatas, url_to_full_document)
+            # Add documentation chunks to Qdrant (AFTER source exists)
+            add_documents_to_supabase(qdrant_client, urls, chunk_numbers, contents, metadatas, url_to_full_document)
             
             # Extract and process code examples only if enabled
             extract_code_examples = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -489,9 +532,9 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         }
                         code_metadatas.append(code_meta)
                     
-                    # Add code examples to Supabase
+                    # Add code examples to Qdrant
                     add_code_examples_to_supabase(
-                        supabase_client, 
+                        qdrant_client, 
                         code_urls, 
                         code_chunk_numbers, 
                         code_examples, 
@@ -550,7 +593,7 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
     try:
         # Get the crawler from the context
         crawler = ctx.request_context.lifespan_context.crawler
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         
         # Determine the crawl strategy
         crawl_results = []
@@ -640,11 +683,11 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         
         for (source_id, _), summary in zip(source_summary_args, source_summaries):
             word_count = source_word_counts.get(source_id, 0)
-            update_source_info(supabase_client, source_id, summary, word_count)
+            update_source_info(qdrant_client, source_id, summary, word_count)
         
-        # Add documentation chunks to Supabase (AFTER sources exist)
+        # Add documentation chunks to Qdrant (AFTER sources exist)
         batch_size = 20
-        add_documents_to_supabase(supabase_client, urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size=batch_size)
+        add_documents_to_supabase(qdrant_client, urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size=batch_size)
         
         # Extract and process code examples from all documents only if enabled
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -692,10 +735,10 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
                         }
                         code_metadatas.append(code_meta)
             
-            # Add all code examples to Supabase
+            # Add all code examples to Qdrant
             if code_examples:
                 add_code_examples_to_supabase(
-                    supabase_client, 
+                    qdrant_client, 
                     code_urls, 
                     code_chunk_numbers, 
                     code_examples, 
@@ -740,26 +783,22 @@ async def get_available_sources(ctx: Context) -> str:
         JSON string with the list of available sources and their details
     """
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the Qdrant client from the context
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         
-        # Query the sources table directly
-        result = supabase_client.from_('sources')\
-            .select('*')\
-            .order('source_id')\
-            .execute()
+        # Get available sources from Qdrant client wrapper
+        sources_data = qdrant_client.get_available_sources()
         
-        # Format the sources with their details
+        # Format the sources with their details (mapping in-memory format to expected format)
         sources = []
-        if result.data:
-            for source in result.data:
-                sources.append({
-                    "source_id": source.get("source_id"),
-                    "summary": source.get("summary"),
-                    "total_words": source.get("total_words"),
-                    "created_at": source.get("created_at"),
-                    "updated_at": source.get("updated_at")
-                })
+        for source in sources_data:
+            sources.append({
+                "source_id": source.get("source_id"),
+                "summary": source.get("summary"),
+                "total_words": source.get("total_word_count"),  # Different field name in wrapper
+                "created_at": source.get("updated_at"),  # Using updated_at as created_at
+                "updated_at": source.get("updated_at")
+            })
         
         return json.dumps({
             "success": True,
@@ -791,8 +830,8 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
         JSON string with the search results
     """
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the Qdrant client from the context
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         
         # Check if hybrid search is enabled
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false") == "true"
@@ -803,28 +842,23 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
             filter_metadata = {"source": source}
         
         if use_hybrid_search:
-            # Hybrid search: combine vector and keyword search
+            # Hybrid search: combine vector and keyword search using Qdrant
             
             # 1. Get vector search results (get more to account for filtering)
             vector_results = search_documents(
-                client=supabase_client,
+                client=qdrant_client,
                 query=query,
                 match_count=match_count * 2,  # Get double to have room for filtering
                 filter_metadata=filter_metadata
             )
             
-            # 2. Get keyword search results using ILIKE
-            keyword_query = supabase_client.from_('crawled_pages')\
-                .select('id, url, chunk_number, content, metadata, source_id')\
-                .ilike('content', f'%{query}%')
-            
-            # Apply source filter if provided
-            if source and source.strip():
-                keyword_query = keyword_query.eq('source_id', source)
-            
-            # Execute keyword search
-            keyword_response = keyword_query.limit(match_count * 2).execute()
-            keyword_results = keyword_response.data if keyword_response.data else []
+            # 2. Get keyword search results using Qdrant scroll functionality
+            keyword_results = qdrant_client.keyword_search_documents(
+                query=query,
+                match_count=match_count * 2,
+                filter_metadata=filter_metadata,
+                source_filter=source.strip() if source and source.strip() else None
+            )
             
             # 3. Combine results with preference for items appearing in both
             seen_ids = set()
@@ -852,16 +886,7 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
             # Finally, add pure keyword matches if we still need more results
             for kr in keyword_results:
                 if kr['id'] not in seen_ids and len(combined_results) < match_count:
-                    # Convert keyword result to match vector result format
-                    combined_results.append({
-                        'id': kr['id'],
-                        'url': kr['url'],
-                        'chunk_number': kr['chunk_number'],
-                        'content': kr['content'],
-                        'metadata': kr['metadata'],
-                        'source_id': kr['source_id'],
-                        'similarity': 0.5  # Default similarity for keyword-only matches
-                    })
+                    combined_results.append(kr)
                     seen_ids.add(kr['id'])
             
             # Use combined results
@@ -870,7 +895,7 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
         else:
             # Standard vector search only
             results = search_documents(
-                client=supabase_client,
+                client=qdrant_client,
                 query=query,
                 match_count=match_count,
                 filter_metadata=filter_metadata
@@ -940,8 +965,8 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
         }, indent=2)
     
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the Qdrant client from the context
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         
         # Check if hybrid search is enabled
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false") == "true"
@@ -952,31 +977,30 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             filter_metadata = {"source": source_id}
         
         if use_hybrid_search:
-            # Hybrid search: combine vector and keyword search
+            # Hybrid search: combine vector and keyword search using Qdrant
             
             # Import the search function from utils
-            from utils import search_code_examples as search_code_examples_impl
+            try:
+                from .utils import search_code_examples as search_code_examples_impl
+            except ImportError:
+                from utils import search_code_examples as search_code_examples_impl
             
             # 1. Get vector search results (get more to account for filtering)
             vector_results = search_code_examples_impl(
-                client=supabase_client,
+                client=qdrant_client,
                 query=query,
                 match_count=match_count * 2,  # Get double to have room for filtering
-                filter_metadata=filter_metadata
+                filter_metadata=filter_metadata,
+                source_id=source_id
             )
             
-            # 2. Get keyword search results using ILIKE on both content and summary
-            keyword_query = supabase_client.from_('code_examples')\
-                .select('id, url, chunk_number, content, summary, metadata, source_id')\
-                .or_(f'content.ilike.%{query}%,summary.ilike.%{query}%')
-            
-            # Apply source filter if provided
-            if source_id and source_id.strip():
-                keyword_query = keyword_query.eq('source_id', source_id)
-            
-            # Execute keyword search
-            keyword_response = keyword_query.limit(match_count * 2).execute()
-            keyword_results = keyword_response.data if keyword_response.data else []
+            # 2. Get keyword search results using Qdrant scroll functionality
+            keyword_results = qdrant_client.keyword_search_code_examples(
+                query=query,
+                match_count=match_count * 2,
+                filter_metadata=filter_metadata,
+                source_filter=source_id.strip() if source_id and source_id.strip() else None
+            )
             
             # 3. Combine results with preference for items appearing in both
             seen_ids = set()
@@ -1004,17 +1028,7 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             # Finally, add pure keyword matches if we still need more results
             for kr in keyword_results:
                 if kr['id'] not in seen_ids and len(combined_results) < match_count:
-                    # Convert keyword result to match vector result format
-                    combined_results.append({
-                        'id': kr['id'],
-                        'url': kr['url'],
-                        'chunk_number': kr['chunk_number'],
-                        'content': kr['content'],
-                        'summary': kr['summary'],
-                        'metadata': kr['metadata'],
-                        'source_id': kr['source_id'],
-                        'similarity': 0.5  # Default similarity for keyword-only matches
-                    })
+                    combined_results.append(kr)
                     seen_ids.add(kr['id'])
             
             # Use combined results
@@ -1022,13 +1036,17 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             
         else:
             # Standard vector search only
-            from utils import search_code_examples as search_code_examples_impl
+            try:
+                from .utils import search_code_examples as search_code_examples_impl
+            except ImportError:
+                from utils import search_code_examples as search_code_examples_impl
             
             results = search_code_examples_impl(
-                client=supabase_client,
+                client=qdrant_client,
                 query=query,
                 match_count=match_count,
-                filter_metadata=filter_metadata
+                filter_metadata=filter_metadata,
+                source_id=source_id
             )
         
         # Apply reranking if enabled

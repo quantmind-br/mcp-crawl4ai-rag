@@ -1,33 +1,34 @@
 """
-Utility functions for the Crawl4AI MCP server.
+Utility functions for the Crawl4AI MCP server with Qdrant integration.
 """
 import os
 import concurrent.futures
 from typing import List, Dict, Any, Optional, Tuple
 import json
-from supabase import create_client, Client
 from urllib.parse import urlparse
 import openai
 import re
 import time
+import logging
+
+from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, MatchText
+from qdrant_client import QdrantClient
+
+# Import our Qdrant client wrapper
+try:
+    from .qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
+except ImportError:
+    from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
 
 # Load OpenAI API key for embeddings
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def get_supabase_client() -> Client:
+def get_supabase_client():
     """
-    Get a Supabase client with the URL and key from environment variables.
-    
-    Returns:
-        Supabase client instance
+    DEPRECATED: Legacy function name maintained for compatibility.
+    Returns Qdrant client wrapper instead.
     """
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
-    
-    if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment variables")
-    
-    return create_client(url, key)
+    return get_qdrant_client()
 
 def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """
@@ -165,20 +166,20 @@ def process_chunk_with_context(args):
     return generate_contextual_embedding(full_document, content)
 
 def add_documents_to_supabase(
-    client: Client, 
+    client: QdrantClientWrapper, 
     urls: List[str], 
     chunk_numbers: List[int],
     contents: List[str], 
     metadatas: List[Dict[str, Any]],
     url_to_full_document: Dict[str, str],
-    batch_size: int = 20
+    batch_size: int = 100
 ) -> None:
     """
-    Add documents to the Supabase crawled_pages table in batches.
-    Deletes existing records with the same URLs before inserting to prevent duplicates.
+    Add documents to Qdrant crawled_pages collection.
+    LEGACY FUNCTION NAME: Maintained for compatibility.
     
     Args:
-        client: Supabase client
+        client: Qdrant client wrapper
         urls: List of URLs
         chunk_numbers: List of chunk numbers
         contents: List of document contents
@@ -186,44 +187,29 @@ def add_documents_to_supabase(
         url_to_full_document: Dictionary mapping URLs to their full document content
         batch_size: Size of each batch for insertion
     """
-    # Get unique URLs to delete existing records
-    unique_urls = list(set(urls))
+    if not urls:
+        return
     
-    # Delete existing records for these URLs in a single operation
-    try:
-        if unique_urls:
-            # Use the .in_() filter to delete all records with matching URLs
-            client.table("crawled_pages").delete().in_("url", unique_urls).execute()
-    except Exception as e:
-        print(f"Batch delete failed: {e}. Trying one-by-one deletion as fallback.")
-        # Fallback: delete records one by one
-        for url in unique_urls:
-            try:
-                client.table("crawled_pages").delete().eq("url", url).execute()
-            except Exception as inner_e:
-                print(f"Error deleting record for URL {url}: {inner_e}")
-                # Continue with the next URL even if one fails
-    
-    # Check if MODEL_CHOICE is set for contextual embeddings
+    # Check if contextual embeddings are enabled
     use_contextual_embeddings = os.getenv("USE_CONTEXTUAL_EMBEDDINGS", "false") == "true"
     print(f"\n\nUse contextual embeddings: {use_contextual_embeddings}\n\n")
     
-    # Process in batches to avoid memory issues
-    for i in range(0, len(contents), batch_size):
-        batch_end = min(i + batch_size, len(contents))
+    # Get point batches from Qdrant client (this handles URL deletion)
+    point_batches = list(client.add_documents_to_qdrant(
+        urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size
+    ))
+    
+    # Process each batch
+    for batch_idx, points_batch in enumerate(point_batches):
+        batch_contents = [point["content"] for point in points_batch]
         
-        # Get batch slices
-        batch_urls = urls[i:batch_end]
-        batch_chunk_numbers = chunk_numbers[i:batch_end]
-        batch_contents = contents[i:batch_end]
-        batch_metadatas = metadatas[i:batch_end]
-        
-        # Apply contextual embedding to each chunk if MODEL_CHOICE is set
+        # Apply contextual embedding if enabled
         if use_contextual_embeddings:
             # Prepare arguments for parallel processing
             process_args = []
-            for j, content in enumerate(batch_contents):
-                url = batch_urls[j]
+            for i, point in enumerate(points_batch):
+                url = point["payload"]["url"]
+                content = point["content"]
                 full_document = url_to_full_document.get(url, "")
                 process_args.append((url, content, full_document))
             
@@ -235,96 +221,65 @@ def add_documents_to_supabase(
                                 for idx, arg in enumerate(process_args)}
                 
                 # Process results as they complete
+                results = [None] * len(process_args)  # Pre-allocate to maintain order
                 for future in concurrent.futures.as_completed(future_to_idx):
                     idx = future_to_idx[future]
                     try:
                         result, success = future.result()
-                        contextual_contents.append(result)
+                        results[idx] = result
                         if success:
-                            batch_metadatas[idx]["contextual_embedding"] = True
+                            points_batch[idx]["payload"]["contextual_embedding"] = True
                     except Exception as e:
                         print(f"Error processing chunk {idx}: {e}")
                         # Use original content as fallback
-                        contextual_contents.append(batch_contents[idx])
-            
-            # Sort results back into original order if needed
-            if len(contextual_contents) != len(batch_contents):
-                print(f"Warning: Expected {len(batch_contents)} results but got {len(contextual_contents)}")
-                # Use original contents as fallback
-                contextual_contents = batch_contents
+                        results[idx] = batch_contents[idx]
+                
+                contextual_contents = results
         else:
             # If not using contextual embeddings, use original contents
             contextual_contents = batch_contents
         
-        # Create embeddings for the entire batch at once
+        # Create embeddings for the batch
         batch_embeddings = create_embeddings_batch(contextual_contents)
         
-        batch_data = []
-        for j in range(len(contextual_contents)):
-            # Extract metadata fields
-            chunk_size = len(contextual_contents[j])
-            
-            # Extract source_id from URL
-            parsed_url = urlparse(batch_urls[j])
-            source_id = parsed_url.netloc or parsed_url.path
-            
-            # Prepare data for insertion
-            data = {
-                "url": batch_urls[j],
-                "chunk_number": batch_chunk_numbers[j],
-                "content": contextual_contents[j],  # Store original content
-                "metadata": {
-                    "chunk_size": chunk_size,
-                    **batch_metadatas[j]
-                },
-                "source_id": source_id,  # Add source_id field
-                "embedding": batch_embeddings[j]  # Use embedding from contextual content
-            }
-            
-            batch_data.append(data)
+        # Create PointStruct objects
+        qdrant_points = []
+        for i, point in enumerate(points_batch):
+            qdrant_points.append(PointStruct(
+                id=point["id"],
+                vector=batch_embeddings[i],
+                payload=point["payload"]
+            ))
         
-        # Insert batch into Supabase with retry logic
-        max_retries = 3
-        retry_delay = 1.0  # Start with 1 second delay
-        
-        for retry in range(max_retries):
-            try:
-                client.table("crawled_pages").insert(batch_data).execute()
-                # Success - break out of retry loop
-                break
-            except Exception as e:
-                if retry < max_retries - 1:
-                    print(f"Error inserting batch into Supabase (attempt {retry + 1}/{max_retries}): {e}")
-                    print(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    # Final attempt failed
-                    print(f"Failed to insert batch after {max_retries} attempts: {e}")
-                    # Optionally, try inserting records one by one as a last resort
-                    print("Attempting to insert records individually...")
-                    successful_inserts = 0
-                    for record in batch_data:
-                        try:
-                            client.table("crawled_pages").insert(record).execute()
-                            successful_inserts += 1
-                        except Exception as individual_error:
-                            print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
-                    
-                    if successful_inserts > 0:
-                        print(f"Successfully inserted {successful_inserts}/{len(batch_data)} records individually")
+        # Upsert batch to Qdrant
+        try:
+            client.upsert_points("crawled_pages", qdrant_points)
+            print(f"Successfully inserted batch {batch_idx + 1}/{len(point_batches)}")
+        except Exception as e:
+            print(f"Error inserting batch {batch_idx + 1}: {e}")
+            # Try inserting points individually as fallback
+            successful_inserts = 0
+            for point in qdrant_points:
+                try:
+                    client.upsert_points("crawled_pages", [point])
+                    successful_inserts += 1
+                except Exception as individual_error:
+                    print(f"Failed to insert individual point {point.id}: {individual_error}")
+            
+            if successful_inserts > 0:
+                print(f"Successfully inserted {successful_inserts}/{len(qdrant_points)} points individually")
 
 def search_documents(
-    client: Client, 
+    client: QdrantClientWrapper, 
     query: str, 
     match_count: int = 10, 
     filter_metadata: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Search for documents in Supabase using vector similarity.
+    Search for documents using Qdrant vector similarity.
     
     Args:
-        client: Supabase client
+        client: Qdrant client wrapper
         query: Query text
         match_count: Maximum number of results to return
         filter_metadata: Optional metadata filter
@@ -335,25 +290,17 @@ def search_documents(
     # Create embedding for the query
     query_embedding = create_embedding(query)
     
-    # Execute the search using the match_crawled_pages function
+    # Execute the search using Qdrant client
     try:
-        # Only include filter parameter if filter_metadata is provided and not empty
-        params = {
-            'query_embedding': query_embedding,
-            'match_count': match_count
-        }
-        
-        # Only add the filter if it's actually provided and not empty
-        if filter_metadata:
-            params['filter'] = filter_metadata  # Pass the dictionary directly, not JSON-encoded
-        
-        result = client.rpc('match_crawled_pages', params).execute()
-        
-        return result.data
+        results = client.search_documents(
+            query_embedding=query_embedding,
+            match_count=match_count,
+            filter_metadata=filter_metadata
+        )
+        return results
     except Exception as e:
         print(f"Error searching documents: {e}")
         return []
-
 
 def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[Dict[str, Any]]:
     """
@@ -436,7 +383,6 @@ def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[D
     
     return code_blocks
 
-
 def generate_code_example_summary(code: str, context_before: str, context_after: str) -> str:
     """
     Generate a summary for a code example using its surrounding context.
@@ -484,21 +430,21 @@ Based on the code example and its surrounding context, provide a concise summary
         print(f"Error generating code example summary: {e}")
         return "Code example for demonstration purposes."
 
-
 def add_code_examples_to_supabase(
-    client: Client,
+    client: QdrantClientWrapper,
     urls: List[str],
     chunk_numbers: List[int],
     code_examples: List[str],
     summaries: List[str],
     metadatas: List[Dict[str, Any]],
-    batch_size: int = 20
+    batch_size: int = 100
 ):
     """
-    Add code examples to the Supabase code_examples table in batches.
+    Add code examples to Qdrant code_examples collection.
+    LEGACY FUNCTION NAME: Maintained for compatibility.
     
     Args:
-        client: Supabase client
+        client: Qdrant client wrapper
         urls: List of URLs
         chunk_numbers: List of chunk numbers
         code_examples: List of code example contents
@@ -508,124 +454,70 @@ def add_code_examples_to_supabase(
     """
     if not urls:
         return
-        
-    # Delete existing records for these URLs
-    unique_urls = list(set(urls))
-    for url in unique_urls:
-        try:
-            client.table('code_examples').delete().eq('url', url).execute()
-        except Exception as e:
-            print(f"Error deleting existing code examples for {url}: {e}")
     
-    # Process in batches
-    total_items = len(urls)
-    for i in range(0, total_items, batch_size):
-        batch_end = min(i + batch_size, total_items)
-        batch_texts = []
-        
-        # Create combined texts for embedding (code + summary)
-        for j in range(i, batch_end):
-            combined_text = f"{code_examples[j]}\n\nSummary: {summaries[j]}"
-            batch_texts.append(combined_text)
-        
-        # Create embeddings for the batch
-        embeddings = create_embeddings_batch(batch_texts)
+    # Get point batches from Qdrant client (this handles URL deletion)
+    point_batches = list(client.add_code_examples_to_qdrant(
+        urls, chunk_numbers, code_examples, summaries, metadatas, batch_size
+    ))
+    
+    # Process each batch
+    for batch_idx, points_batch in enumerate(point_batches):
+        # Create embeddings for combined text (code + summary)
+        combined_texts = [point["combined_text"] for point in points_batch]
+        embeddings = create_embeddings_batch(combined_texts)
         
         # Check if embeddings are valid (not all zeros)
         valid_embeddings = []
-        for embedding in embeddings:
+        for i, embedding in enumerate(embeddings):
             if embedding and not all(v == 0.0 for v in embedding):
                 valid_embeddings.append(embedding)
             else:
                 print(f"Warning: Zero or invalid embedding detected, creating new one...")
                 # Try to create a single embedding as fallback
-                single_embedding = create_embedding(batch_texts[len(valid_embeddings)])
+                single_embedding = create_embedding(combined_texts[i])
                 valid_embeddings.append(single_embedding)
         
-        # Prepare batch data
-        batch_data = []
-        for j, embedding in enumerate(valid_embeddings):
-            idx = i + j
-            
-            # Extract source_id from URL
-            parsed_url = urlparse(urls[idx])
-            source_id = parsed_url.netloc or parsed_url.path
-            
-            batch_data.append({
-                'url': urls[idx],
-                'chunk_number': chunk_numbers[idx],
-                'content': code_examples[idx],
-                'summary': summaries[idx],
-                'metadata': metadatas[idx],  # Store as JSON object, not string
-                'source_id': source_id,
-                'embedding': embedding
-            })
+        # Create PointStruct objects
+        qdrant_points = []
+        for i, point in enumerate(points_batch):
+            qdrant_points.append(PointStruct(
+                id=point["id"],
+                vector=valid_embeddings[i],
+                payload=point["payload"]
+            ))
         
-        # Insert batch into Supabase with retry logic
-        max_retries = 3
-        retry_delay = 1.0  # Start with 1 second delay
-        
-        for retry in range(max_retries):
-            try:
-                client.table('code_examples').insert(batch_data).execute()
-                # Success - break out of retry loop
-                break
-            except Exception as e:
-                if retry < max_retries - 1:
-                    print(f"Error inserting batch into Supabase (attempt {retry + 1}/{max_retries}): {e}")
-                    print(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    # Final attempt failed
-                    print(f"Failed to insert batch after {max_retries} attempts: {e}")
-                    # Optionally, try inserting records one by one as a last resort
-                    print("Attempting to insert records individually...")
-                    successful_inserts = 0
-                    for record in batch_data:
-                        try:
-                            client.table('code_examples').insert(record).execute()
-                            successful_inserts += 1
-                        except Exception as individual_error:
-                            print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
-                    
-                    if successful_inserts > 0:
-                        print(f"Successfully inserted {successful_inserts}/{len(batch_data)} records individually")
-        print(f"Inserted batch {i//batch_size + 1} of {(total_items + batch_size - 1)//batch_size} code examples")
+        # Upsert batch to Qdrant
+        try:
+            client.upsert_points("code_examples", qdrant_points)
+            print(f"Inserted batch {batch_idx + 1} of {len(point_batches)} code examples")
+        except Exception as e:
+            print(f"Error inserting code examples batch {batch_idx + 1}: {e}")
+            # Try inserting points individually as fallback
+            successful_inserts = 0
+            for point in qdrant_points:
+                try:
+                    client.upsert_points("code_examples", [point])
+                    successful_inserts += 1
+                except Exception as individual_error:
+                    print(f"Failed to insert individual code example {point.id}: {individual_error}")
+            
+            if successful_inserts > 0:
+                print(f"Successfully inserted {successful_inserts}/{len(qdrant_points)} code examples individually")
 
-
-def update_source_info(client: Client, source_id: str, summary: str, word_count: int):
+def update_source_info(client: QdrantClientWrapper, source_id: str, summary: str, word_count: int):
     """
-    Update or insert source information in the sources table.
+    Update source information using Qdrant client wrapper.
     
     Args:
-        client: Supabase client
+        client: Qdrant client wrapper
         source_id: The source ID (domain)
         summary: Summary of the source
         word_count: Total word count for the source
     """
     try:
-        # Try to update existing source
-        result = client.table('sources').update({
-            'summary': summary,
-            'total_word_count': word_count,
-            'updated_at': 'now()'
-        }).eq('source_id', source_id).execute()
-        
-        # If no rows were updated, insert new source
-        if not result.data:
-            client.table('sources').insert({
-                'source_id': source_id,
-                'summary': summary,
-                'total_word_count': word_count
-            }).execute()
-            print(f"Created new source: {source_id}")
-        else:
-            print(f"Updated source: {source_id}")
-            
+        client.update_source_info(source_id, summary, word_count)
     except Exception as e:
         print(f"Error updating source {source_id}: {e}")
-
 
 def extract_source_summary(source_id: str, content: str, max_length: int = 500) -> str:
     """
@@ -686,19 +578,18 @@ The above content is from the documentation for '{source_id}'. Please provide a 
         print(f"Error generating summary with LLM for {source_id}: {e}. Using default summary.")
         return default_summary
 
-
 def search_code_examples(
-    client: Client, 
+    client: QdrantClientWrapper, 
     query: str, 
     match_count: int = 10, 
     filter_metadata: Optional[Dict[str, Any]] = None,
     source_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Search for code examples in Supabase using vector similarity.
+    Search for code examples using Qdrant vector similarity.
     
     Args:
-        client: Supabase client
+        client: Qdrant client wrapper
         query: Query text
         match_count: Maximum number of results to return
         filter_metadata: Optional metadata filter
@@ -708,31 +599,226 @@ def search_code_examples(
         List of matching code examples
     """
     # Create a more descriptive query for better embedding match
-    # Since code examples are embedded with their summaries, we should make the query more descriptive
     enhanced_query = f"Code example for {query}\n\nSummary: Example code showing {query}"
     
     # Create embedding for the enhanced query
     query_embedding = create_embedding(enhanced_query)
     
-    # Execute the search using the match_code_examples function
+    # Execute the search using Qdrant client
     try:
-        # Only include filter parameter if filter_metadata is provided and not empty
-        params = {
-            'query_embedding': query_embedding,
-            'match_count': match_count
-        }
-        
-        # Only add the filter if it's actually provided and not empty
-        if filter_metadata:
-            params['filter'] = filter_metadata
-            
-        # Add source filter if provided
-        if source_id:
-            params['source_filter'] = source_id
-        
-        result = client.rpc('match_code_examples', params).execute()
-        
-        return result.data
+        results = client.search_code_examples(
+            query_embedding=query_embedding,
+            match_count=match_count,
+            filter_metadata=filter_metadata,
+            source_filter=source_id
+        )
+        return results
     except Exception as e:
         print(f"Error searching code examples: {e}")
         return []
+
+
+# Device Management and Diagnostics
+# Import device management utilities
+try:
+    from .device_manager import get_device_info as _get_device_info, cleanup_gpu_memory, get_optimal_device
+except ImportError:
+    from device_manager import get_device_info as _get_device_info, cleanup_gpu_memory, get_optimal_device
+
+
+def get_device_info() -> Dict[str, Any]:
+    """
+    Get comprehensive device information for diagnostics.
+    
+    Provides information about available compute devices (CPU, CUDA, MPS)
+    including memory status, device capabilities, and availability.
+    
+    Returns:
+        Dict with device capabilities and status information including:
+        - torch_available: Whether PyTorch is available
+        - cuda_available: Whether CUDA GPUs are available
+        - mps_available: Whether Apple Silicon MPS is available
+        - device_count: Number of available CUDA devices
+        - devices: List of detailed device information
+    """
+    return _get_device_info()
+
+
+def log_device_status() -> None:
+    """
+    Log comprehensive device information for debugging and monitoring.
+    
+    Logs device information including available GPUs, memory status,
+    and device capabilities. Useful for troubleshooting GPU acceleration issues.
+    """
+    device_info = get_device_info()
+    
+    print("=== Device Status Report ===")
+    print(f"PyTorch Available: {device_info['torch_available']}")
+    print(f"CUDA Available: {device_info['cuda_available']}")
+    print(f"MPS Available: {device_info['mps_available']}")
+    print(f"CUDA Device Count: {device_info['device_count']}")
+    
+    if device_info['devices']:
+        print("Available Devices:")
+        for device in device_info['devices']:
+            if 'name' in device and 'type' not in device:  # CUDA device
+                print(f"  - CUDA {device['index']}: {device['name']}")
+                print(f"    Total Memory: {device['memory_total_gb']:.2f} GB")
+                print(f"    Allocated Memory: {device['memory_allocated_gb']:.2f} GB")
+                print(f"    Current Device: {device['is_current']}")
+            elif 'type' in device:  # MPS device
+                print(f"  - {device['name']} ({device['type']})")
+    else:
+        print("No GPU devices available")
+    
+    print("============================")
+
+
+def monitor_gpu_memory() -> Optional[Dict[str, float]]:
+    """
+    Monitor GPU memory usage for the current device.
+    
+    Returns:
+        Dict with memory information in GB, or None if CUDA not available:
+        - allocated: Currently allocated memory
+        - reserved: Reserved memory (includes allocated)
+        - max_allocated: Peak allocated memory since last reset
+        - max_reserved: Peak reserved memory since last reset
+        - total: Total device memory
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        
+        current_device = torch.cuda.current_device()
+        memory_info = {
+            'allocated': torch.cuda.memory_allocated(current_device) / (1024**3),
+            'reserved': torch.cuda.memory_reserved(current_device) / (1024**3),
+            'max_allocated': torch.cuda.max_memory_allocated(current_device) / (1024**3),
+            'max_reserved': torch.cuda.max_memory_reserved(current_device) / (1024**3),
+            'total': torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+        }
+        return memory_info
+    except Exception as e:
+        print(f"Error monitoring GPU memory: {e}")
+        return None
+
+
+def log_gpu_memory_status() -> None:
+    """
+    Log current GPU memory status for monitoring and debugging.
+    
+    Provides detailed memory usage information including allocated,
+    reserved, and peak usage statistics.
+    """
+    memory_info = monitor_gpu_memory()
+    
+    if memory_info is None:
+        print("GPU memory monitoring not available (CUDA not detected)")
+        return
+    
+    print("=== GPU Memory Status ===")
+    print(f"Allocated: {memory_info['allocated']:.2f} GB")
+    print(f"Reserved: {memory_info['reserved']:.2f} GB")
+    print(f"Max Allocated: {memory_info['max_allocated']:.2f} GB")
+    print(f"Max Reserved: {memory_info['max_reserved']:.2f} GB")
+    print(f"Total Memory: {memory_info['total']:.2f} GB")
+    print(f"Utilization: {(memory_info['allocated']/memory_info['total']*100):.1f}%")
+    print("=========================")
+
+
+def get_optimal_compute_device(preference: str = "auto") -> str:
+    """
+    Get the optimal compute device for machine learning operations.
+    
+    Provides a simple interface to device selection with fallback to CPU.
+    This function wraps the more comprehensive device_manager functionality.
+    
+    Args:
+        preference: Device preference - "auto", "cuda", "cpu", "mps"
+        
+    Returns:
+        String representation of the optimal device (e.g., "cuda:0", "cpu")
+    """
+    try:
+        device = get_optimal_device(preference)
+        return str(device)
+    except Exception as e:
+        print(f"Error getting optimal device: {e}. Falling back to CPU.")
+        return "cpu"
+
+
+def cleanup_compute_memory() -> None:
+    """
+    Clean up compute memory (GPU cache) to prevent memory leaks.
+    
+    Safe wrapper around GPU memory cleanup that handles cases where
+    GPU is not available. Should be called after intensive compute operations.
+    """
+    try:
+        cleanup_gpu_memory()
+    except Exception as e:
+        print(f"Error during memory cleanup: {e}")
+
+
+def health_check_gpu_acceleration() -> Dict[str, Any]:
+    """
+    Comprehensive health check for GPU acceleration capabilities.
+    
+    Performs actual device testing to verify GPU acceleration is working
+    correctly. Useful for monitoring and troubleshooting deployment issues.
+    
+    Returns:
+        Dict with health check results including:
+        - gpu_available: Whether GPU is detected and working
+        - device_name: Name of the GPU device
+        - memory_available: Available GPU memory
+        - test_passed: Whether GPU operations test passed
+        - error_message: Error details if test failed
+    """
+    health_status = {
+        'gpu_available': False,
+        'device_name': 'CPU',
+        'memory_available_gb': None,
+        'test_passed': False,
+        'error_message': None
+    }
+    
+    try:
+        import torch
+        
+        if torch.cuda.is_available():
+            # Test actual GPU operations
+            device = torch.device("cuda:0")
+            
+            # Perform test operation
+            test_tensor = torch.randn(100, 100, device=device)
+            result = test_tensor @ test_tensor.T
+            
+            # If we get here, GPU test passed
+            health_status.update({
+                'gpu_available': True,
+                'device_name': torch.cuda.get_device_name(device),
+                'memory_available_gb': torch.cuda.get_device_properties(device).total_memory / (1024**3),
+                'test_passed': True
+            })
+            
+        elif hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            # Test MPS (Apple Silicon)
+            device = torch.device("mps")
+            test_tensor = torch.randn(100, 100, device=device)
+            result = test_tensor.sum()
+            
+            health_status.update({
+                'gpu_available': True,
+                'device_name': 'Apple Silicon GPU (MPS)',
+                'memory_available_gb': None,  # MPS doesn't expose memory info
+                'test_passed': True
+            })
+            
+    except Exception as e:
+        health_status['error_message'] = str(e)
+    
+    return health_status
