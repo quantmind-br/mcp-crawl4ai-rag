@@ -20,8 +20,143 @@ try:
 except ImportError:
     from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
 
-# Load OpenAI API key for embeddings
+# Load OpenAI API key for embeddings (backward compatibility)
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def get_chat_client():
+    """
+    Get a configured OpenAI client for chat/completion operations.
+    
+    Supports flexible configuration through environment variables:
+    - CHAT_API_KEY: API key for chat model (falls back to OPENAI_API_KEY)
+    - CHAT_API_BASE: Base URL for chat API (defaults to OpenAI)
+    
+    Returns:
+        openai.OpenAI: Configured OpenAI client for chat operations
+        
+    Raises:
+        ValueError: If no API key is configured
+    """
+    # Get configuration with fallback logic
+    api_key = os.getenv("CHAT_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("CHAT_API_BASE")
+    
+    if not api_key:
+        raise ValueError(
+            "No API key configured for chat model. Please set CHAT_API_KEY or OPENAI_API_KEY"
+        )
+    
+    # Create client with optional base_url
+    if base_url:
+        return openai.OpenAI(api_key=api_key, base_url=base_url)
+    else:
+        return openai.OpenAI(api_key=api_key)
+
+def get_embeddings_client():
+    """
+    Get a configured OpenAI client for embeddings operations.
+    
+    Supports flexible configuration through environment variables:
+    - EMBEDDINGS_API_KEY: API key for embeddings (falls back to OPENAI_API_KEY)
+    - EMBEDDINGS_API_BASE: Base URL for embeddings API (defaults to OpenAI)
+    
+    Returns:
+        openai.OpenAI: Configured OpenAI client for embeddings operations
+        
+    Raises:
+        ValueError: If no API key is configured
+    """
+    # Get configuration with fallback logic
+    api_key = os.getenv("EMBEDDINGS_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("EMBEDDINGS_API_BASE")
+    
+    if not api_key:
+        raise ValueError(
+            "No API key configured for embeddings. Please set EMBEDDINGS_API_KEY or OPENAI_API_KEY"
+        )
+    
+    # Create client with optional base_url
+    if base_url:
+        return openai.OpenAI(api_key=api_key, base_url=base_url)
+    else:
+        return openai.OpenAI(api_key=api_key)
+
+def validate_chat_config() -> bool:
+    """
+    Validate chat model configuration and provide helpful guidance.
+    
+    Returns:
+        bool: True if configuration is valid, False otherwise
+        
+    Raises:
+        ValueError: If critical configuration is missing
+    """
+    # Check for API key
+    chat_api_key = os.getenv("CHAT_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    
+    if not chat_api_key and not openai_api_key:
+        raise ValueError(
+            "No API key configured for chat model. Please set one of:\n"
+            "  - CHAT_API_KEY (recommended for new deployments)\n"
+            "  - OPENAI_API_KEY (for backward compatibility)"
+        )
+    
+    # Check for model configuration
+    chat_model = os.getenv("CHAT_MODEL")
+    model_choice = os.getenv("MODEL_CHOICE")
+    
+    if not chat_model and not model_choice:
+        logging.warning(
+            "No chat model specified. Please set CHAT_MODEL environment variable. "
+            "Defaulting to OpenAI's default model."
+        )
+    
+    # Warn about deprecated usage
+    if model_choice and not chat_model:
+        logging.warning(
+            "MODEL_CHOICE is deprecated. Please use CHAT_MODEL instead. "
+            "MODEL_CHOICE support will be removed in a future version."
+        )
+    
+    # Log configuration being used
+    effective_key_source = "CHAT_API_KEY" if chat_api_key else "OPENAI_API_KEY (fallback)"
+    effective_model = chat_model or model_choice or "default"
+    base_url = os.getenv("CHAT_API_BASE", "default OpenAI")
+    
+    logging.debug(f"Chat configuration - Model: {effective_model}, Key source: {effective_key_source}, Base URL: {base_url}")
+    
+    return True
+
+def validate_embeddings_config() -> bool:
+    """
+    Validate embeddings model configuration and provide helpful guidance.
+    
+    Returns:
+        bool: True if configuration is valid, False otherwise
+        
+    Raises:
+        ValueError: If critical configuration is missing
+    """
+    # Check for API key
+    embeddings_api_key = os.getenv("EMBEDDINGS_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    
+    if not embeddings_api_key and not openai_api_key:
+        raise ValueError(
+            "No API key configured for embeddings. Please set one of:\n"
+            "  - EMBEDDINGS_API_KEY (recommended for new deployments)\n"
+            "  - OPENAI_API_KEY (for backward compatibility)"
+        )
+    
+    # Log configuration being used
+    embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
+    effective_key_source = "EMBEDDINGS_API_KEY" if embeddings_api_key else "OPENAI_API_KEY (fallback)"
+    base_url = os.getenv("EMBEDDINGS_API_BASE", "default OpenAI")
+    
+    logging.debug(f"Embeddings configuration - Model: {embeddings_model}, Key source: {effective_key_source}, Base URL: {base_url}")
+    
+    return True
 
 def get_supabase_client():
     """
@@ -48,8 +183,10 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     
     for retry in range(max_retries):
         try:
-            response = openai.embeddings.create(
-                model="text-embedding-3-small", # Hardcoding embedding model for now, will change this later to be more dynamic
+            embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
+            client = get_embeddings_client()
+            response = client.embeddings.create(
+                model=embeddings_model,
                 input=texts
             )
             return [item.embedding for item in response.data]
@@ -68,8 +205,10 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
                 
                 for i, text in enumerate(texts):
                     try:
-                        individual_response = openai.embeddings.create(
-                            model="text-embedding-3-small",
+                        embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
+                        client = get_embeddings_client()
+                        individual_response = client.embeddings.create(
+                            model=embeddings_model,
                             input=[text]
                         )
                         embeddings.append(individual_response.data[0].embedding)
@@ -104,6 +243,8 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
     """
     Generate contextual information for a chunk within a document to improve retrieval.
     
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
+    
     Args:
         full_document: The complete document text
         chunk: The specific chunk of text to generate context for
@@ -113,7 +254,8 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         - The contextual text that situates the chunk within the document
         - Boolean indicating if contextual embedding was performed
     """
-    model_choice = os.getenv("MODEL_CHOICE")
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
     
     try:
         # Create the prompt for generating contextual information
@@ -127,7 +269,8 @@ Here is the chunk we want to situate within the whole document
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
 
         # Call the OpenAI API to generate contextual information
-        response = openai.chat.completions.create(
+        client = get_chat_client()
+        response = client.chat.completions.create(
             model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise contextual information."},
@@ -387,6 +530,8 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     """
     Generate a summary for a code example using its surrounding context.
     
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
+    
     Args:
         code: The code example
         context_before: Context before the code
@@ -395,7 +540,8 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     Returns:
         A summary of what the code example demonstrates
     """
-    model_choice = os.getenv("MODEL_CHOICE")
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
     
     # Create the prompt
     prompt = f"""<context_before>
@@ -414,7 +560,8 @@ Based on the code example and its surrounding context, provide a concise summary
 """
     
     try:
-        response = openai.chat.completions.create(
+        client = get_chat_client()
+        response = client.chat.completions.create(
             model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise code example summaries."},
@@ -523,7 +670,7 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     """
     Extract a summary for a source from its content using an LLM.
     
-    This function uses the OpenAI API to generate a concise summary of the source content.
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
     
     Args:
         source_id: The source ID (domain)
@@ -539,8 +686,8 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     if not content or len(content.strip()) == 0:
         return default_summary
     
-    # Get the model choice from environment variables
-    model_choice = os.getenv("MODEL_CHOICE")
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
     
     # Limit content length to avoid token limits
     truncated_content = content[:25000] if len(content) > 25000 else content
@@ -555,7 +702,8 @@ The above content is from the documentation for '{source_id}'. Please provide a 
     
     try:
         # Call the OpenAI API to generate the summary
-        response = openai.chat.completions.create(
+        client = get_chat_client()
+        response = client.chat.completions.create(
             model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise library/tool/framework summaries."},

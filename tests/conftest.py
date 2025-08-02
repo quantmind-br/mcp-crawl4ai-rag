@@ -16,8 +16,19 @@ sys.path.insert(0, str(src_path))
 def setup_test_environment():
     """Setup test environment variables."""
     test_env = {
+        # Backward compatibility
         "OPENAI_API_KEY": "test-openai-key",
-        "MODEL_CHOICE": "gpt-3.5-turbo",
+        "MODEL_CHOICE": "gpt-3.5-turbo",  # Keep for backward compatibility testing
+        
+        # New flexible configuration
+        "CHAT_MODEL": "gpt-3.5-turbo",
+        "CHAT_API_KEY": "test-chat-api-key",
+        "CHAT_API_BASE": "https://api.openai.com/v1",
+        "EMBEDDINGS_MODEL": "text-embedding-3-small",
+        "EMBEDDINGS_API_KEY": "test-embeddings-api-key", 
+        "EMBEDDINGS_API_BASE": "https://api.openai.com/v1",
+        
+        # Other configuration
         "QDRANT_HOST": "localhost",
         "QDRANT_PORT": "6333",
         "NEO4J_URI": "bolt://localhost:7687",
