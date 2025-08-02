@@ -14,8 +14,19 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 # Setup test environment
+# Backward compatibility
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
-os.environ.setdefault("MODEL_CHOICE", "gpt-3.5-turbo")
+os.environ.setdefault("MODEL_CHOICE", "gpt-3.5-turbo")  # Keep for backward compatibility testing
+
+# New flexible configuration
+os.environ.setdefault("CHAT_MODEL", "gpt-3.5-turbo")
+os.environ.setdefault("CHAT_API_KEY", "test-chat-api-key")
+os.environ.setdefault("CHAT_API_BASE", "https://api.openai.com/v1")
+os.environ.setdefault("EMBEDDINGS_MODEL", "text-embedding-3-small")
+os.environ.setdefault("EMBEDDINGS_API_KEY", "test-embeddings-api-key")
+os.environ.setdefault("EMBEDDINGS_API_BASE", "https://api.openai.com/v1")
+
+# Other configuration
 os.environ.setdefault("QDRANT_HOST", "localhost")
 os.environ.setdefault("QDRANT_PORT", "6333")
 
@@ -140,8 +151,14 @@ class TestMCPBasicFunctionality:
         expected_vars = [
             "QDRANT_HOST",
             "QDRANT_PORT", 
+            # Backward compatibility variables
             "OPENAI_API_KEY",
-            "MODEL_CHOICE"
+            "MODEL_CHOICE",
+            # New flexible configuration variables
+            "CHAT_MODEL",
+            "CHAT_API_KEY", 
+            "EMBEDDINGS_MODEL",
+            "EMBEDDINGS_API_KEY"
         ]
         
         for var in expected_vars:

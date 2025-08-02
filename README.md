@@ -189,41 +189,150 @@ Alternatively, install Neo4j directly:
 
 Create a `.env` file in the project root with the following variables:
 
-```
+```bash
 # MCP Server Configuration
 HOST=0.0.0.0
 PORT=8051
 TRANSPORT=sse
 
-# OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key
+# === API CONFIGURATION ===
+# Flexible API configuration supporting multiple providers
 
-# LLM for summaries and contextual embeddings
-MODEL_CHOICE=gpt-4.1-nano
+# Chat Model Configuration (for summaries, contextual embeddings, code analysis)
+CHAT_MODEL=gpt-4o-mini                    # Model to use for chat operations
+CHAT_API_KEY=your_chat_api_key            # API key for chat model service
+CHAT_API_BASE=https://api.openai.com/v1   # Base URL for chat API (optional)
 
-# RAG Strategies (set to "true" or "false", default to "false")
+# Embeddings Model Configuration (for vector search and semantic similarity)
+EMBEDDINGS_MODEL=text-embedding-3-small          # Model to use for embeddings
+EMBEDDINGS_API_KEY=your_embeddings_api_key       # API key for embeddings service  
+EMBEDDINGS_API_BASE=https://api.openai.com/v1    # Base URL for embeddings API (optional)
+
+# === BACKWARD COMPATIBILITY ===
+# Legacy configuration (deprecated - use CHAT_* and EMBEDDINGS_* instead)
+OPENAI_API_KEY=your_openai_api_key        # Falls back for both chat and embeddings
+MODEL_CHOICE=gpt-4o-mini                  # DEPRECATED: Use CHAT_MODEL instead
+
+# === RAG STRATEGIES ===
+# Set to "true" or "false", default to "false"
 USE_CONTEXTUAL_EMBEDDINGS=false
 USE_HYBRID_SEARCH=false
 USE_AGENTIC_RAG=false
 USE_RERANKING=false
 USE_KNOWLEDGE_GRAPH=false
 
+# === VECTOR DATABASE ===
 # Qdrant Configuration (local Docker instance)
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
 
+# === KNOWLEDGE GRAPH ===
 # Neo4j Configuration (required for knowledge graph functionality)
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password123
 ```
 
+## Provider Configuration Examples
+
+### OpenAI (Default)
+```bash
+CHAT_MODEL=gpt-4o-mini
+CHAT_API_KEY=sk-your-openai-key
+# CHAT_API_BASE defaults to https://api.openai.com/v1
+
+EMBEDDINGS_MODEL=text-embedding-3-small
+EMBEDDINGS_API_KEY=sk-your-openai-key
+# EMBEDDINGS_API_BASE defaults to https://api.openai.com/v1
+```
+
+### Azure OpenAI
+```bash
+CHAT_MODEL=gpt-35-turbo
+CHAT_API_KEY=your-azure-api-key
+CHAT_API_BASE=https://your-resource.openai.azure.com/
+
+EMBEDDINGS_MODEL=text-embedding-ada-002
+EMBEDDINGS_API_KEY=your-azure-api-key
+EMBEDDINGS_API_BASE=https://your-resource.openai.azure.com/
+```
+
+### LocalAI
+```bash
+CHAT_MODEL=llama3-8b-instruct
+CHAT_API_KEY=not-needed
+CHAT_API_BASE=http://localhost:8080/v1
+
+EMBEDDINGS_MODEL=all-MiniLM-L6-v2
+EMBEDDINGS_API_KEY=not-needed
+EMBEDDINGS_API_BASE=http://localhost:8080/v1
+```
+
+### Mixed Providers (Chat via Azure, Embeddings via OpenAI)
+```bash
+# Chat via Azure OpenAI
+CHAT_MODEL=gpt-4
+CHAT_API_KEY=your-azure-key
+CHAT_API_BASE=https://your-resource.openai.azure.com/
+
+# Embeddings via regular OpenAI
+EMBEDDINGS_MODEL=text-embedding-3-small
+EMBEDDINGS_API_KEY=sk-your-openai-key
+# EMBEDDINGS_API_BASE defaults to OpenAI
+```
+
+## Migration Guide
+
+### For Existing Users
+
+**No immediate action required** - your existing configuration will continue to work:
+
+```bash
+# Your current configuration (still works)
+OPENAI_API_KEY=sk-your-key
+MODEL_CHOICE=gpt-4o-mini
+```
+
+### Migrating to New Configuration
+
+**Step 1: Add new chat configuration**
+```bash
+# Keep existing for compatibility
+OPENAI_API_KEY=sk-your-key
+MODEL_CHOICE=gpt-4o-mini
+
+# Add new chat configuration
+CHAT_MODEL=gpt-4o-mini
+CHAT_API_KEY=sk-your-key
+```
+
+**Step 2: Add embeddings configuration**
+```bash
+# Add embeddings configuration
+EMBEDDINGS_MODEL=text-embedding-3-small
+EMBEDDINGS_API_KEY=sk-your-key
+```
+
+**Step 3: Remove legacy variables (optional)**
+```bash
+# Remove when ready (no rush)
+# OPENAI_API_KEY=sk-your-key    # Can be removed
+# MODEL_CHOICE=gpt-4o-mini      # Can be removed
+```
+
+### Benefits of Migration
+
+- **Multi-provider support**: Use different providers for chat and embeddings
+- **Better organization**: Clear separation between chat and embeddings configuration  
+- **Future-proof**: Prepared for new providers and features
+- **Enhanced flexibility**: Custom base URLs for private deployments
+
 ### RAG Strategy Options
 
 The Crawl4AI RAG MCP server supports four powerful RAG strategies that can be enabled independently:
 
 #### 1. **USE_CONTEXTUAL_EMBEDDINGS**
-When enabled, this strategy enhances each chunk's embedding with additional context from the entire document. The system passes both the full document and the specific chunk to an LLM (configured via `MODEL_CHOICE`) to generate enriched context that gets embedded alongside the chunk content.
+When enabled, this strategy enhances each chunk's embedding with additional context from the entire document. The system passes both the full document and the specific chunk to an LLM (configured via `CHAT_MODEL`) to generate enriched context that gets embedded alongside the chunk content.
 
 - **When to use**: Enable this when you need high-precision retrieval where context matters, such as technical documentation where terms might have different meanings in different sections.
 - **Trade-offs**: Slower indexing due to LLM calls for each chunk, but significantly better retrieval accuracy.

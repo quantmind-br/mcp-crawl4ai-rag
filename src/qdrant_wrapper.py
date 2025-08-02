@@ -58,6 +58,9 @@ class QdrantClientWrapper:
     Wrapper class for Qdrant client that provides Supabase-compatible interface.
     """
     
+    # Class-level cache for collection existence to avoid redundant checks
+    _collections_verified = False
+    
     def __init__(self, host: str = None, port: int = None):
         """
         Initialize Qdrant client wrapper.
@@ -72,8 +75,13 @@ class QdrantClientWrapper:
         # Initialize Qdrant client with retry logic
         self.client = self._create_client()
         
-        # Ensure collections exist
-        self._ensure_collections_exist()
+        # Ensure collections exist (only if not already verified)
+        if not QdrantClientWrapper._collections_verified:
+            self._ensure_collections_exist()
+            QdrantClientWrapper._collections_verified = True
+            logging.info(f"Qdrant collections verified and created if necessary")
+        else:
+            logging.debug(f"Qdrant collections already verified, skipping check")
         
         logging.info(f"Qdrant client initialized: {self.host}:{self.port}")
     
@@ -577,24 +585,52 @@ class QdrantClientWrapper:
             return {
                 "status": "healthy",
                 "collections": collection_info,
-                "sources_count": len(sources_storage)
+                "sources_count": len(sources_storage),
+                "collections_verified": QdrantClientWrapper._collections_verified
             }
         except Exception as e:
             return {
                 "status": "unhealthy",
                 "error": str(e)
             }
+    
+    @classmethod
+    def reset_verification_cache(cls):
+        """Reset the collections verification cache. Useful for testing or maintenance."""
+        cls._collections_verified = False
+        logging.info("Qdrant collections verification cache reset")
 
+
+# Global client instance for singleton pattern
+_qdrant_client_instance = None
 
 def get_qdrant_client() -> QdrantClientWrapper:
     """
-    Get a Qdrant client wrapper instance.
+    Get a Qdrant client wrapper instance using singleton pattern.
+    
+    This prevents unnecessary reconnections and collection checks on server restarts.
     
     Returns:
         QdrantClientWrapper instance
     """
+    global _qdrant_client_instance
+    
+    # Return existing instance if available and healthy
+    if _qdrant_client_instance is not None:
+        try:
+            # Quick health check to ensure connection is still valid
+            _qdrant_client_instance.client.get_collections()
+            logging.debug("Reusing existing Qdrant client instance")
+            return _qdrant_client_instance
+        except Exception as e:
+            logging.warning(f"Existing Qdrant client unhealthy, creating new instance: {e}")
+            _qdrant_client_instance = None
+    
+    # Create new instance if none exists or previous one is unhealthy
     try:
-        return QdrantClientWrapper()
+        _qdrant_client_instance = QdrantClientWrapper()
+        logging.info("Created new Qdrant client instance")
+        return _qdrant_client_instance
     except Exception as e:
         logging.error(f"Failed to create Qdrant client: {e}")
         raise
