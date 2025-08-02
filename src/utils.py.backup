@@ -20,13 +20,15 @@ try:
 except ImportError:
     from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
 
+# Load OpenAI API key for embeddings (backward compatibility)
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_chat_client():
     """
     Get a configured OpenAI client for chat/completion operations.
     
     Supports flexible configuration through environment variables:
-    - CHAT_API_KEY: API key for chat model
+    - CHAT_API_KEY: API key for chat model (falls back to OPENAI_API_KEY)
     - CHAT_API_BASE: Base URL for chat API (defaults to OpenAI)
     
     Returns:
@@ -35,13 +37,13 @@ def get_chat_client():
     Raises:
         ValueError: If no API key is configured
     """
-    # Get configuration
-    api_key = os.getenv("CHAT_API_KEY")
+    # Get configuration with fallback logic
+    api_key = os.getenv("CHAT_API_KEY") or os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("CHAT_API_BASE")
     
     if not api_key:
         raise ValueError(
-            "No API key configured for chat model. Please set CHAT_API_KEY"
+            "No API key configured for chat model. Please set CHAT_API_KEY or OPENAI_API_KEY"
         )
     
     # Log configuration for debugging (without exposing API key)
@@ -61,7 +63,7 @@ def get_embeddings_client():
     Get a configured OpenAI client for embeddings operations.
     
     Supports flexible configuration through environment variables:
-    - EMBEDDINGS_API_KEY: API key for embeddings
+    - EMBEDDINGS_API_KEY: API key for embeddings (falls back to OPENAI_API_KEY)
     - EMBEDDINGS_API_BASE: Base URL for embeddings API (defaults to OpenAI)
     
     Returns:
@@ -70,13 +72,13 @@ def get_embeddings_client():
     Raises:
         ValueError: If no API key is configured
     """
-    # Get configuration
-    api_key = os.getenv("EMBEDDINGS_API_KEY")
+    # Get configuration with fallback logic
+    api_key = os.getenv("EMBEDDINGS_API_KEY") or os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("EMBEDDINGS_API_BASE")
     
     if not api_key:
         raise ValueError(
-            "No API key configured for embeddings. Please set EMBEDDINGS_API_KEY"
+            "No API key configured for embeddings. Please set EMBEDDINGS_API_KEY or OPENAI_API_KEY"
         )
     
     # Create client with optional base_url
@@ -84,138 +86,6 @@ def get_embeddings_client():
         return openai.OpenAI(api_key=api_key, base_url=base_url)
     else:
         return openai.OpenAI(api_key=api_key)
-
-def get_chat_fallback_client():
-    """
-    Get a configured OpenAI client for fallback chat/completion operations.
-    
-    Supports flexible configuration through environment variables with inheritance:
-    - CHAT_FALLBACK_API_KEY: API key for fallback chat (inherits CHAT_API_KEY if not set)
-    - CHAT_FALLBACK_API_BASE: Base URL for fallback chat API (inherits CHAT_API_BASE if not set)
-    
-    Returns:
-        openai.OpenAI: Configured OpenAI client for fallback chat operations
-        
-    Raises:
-        ValueError: If no API key is configured (primary or fallback)
-    """
-    # Get fallback configuration with inheritance
-    api_key = os.getenv("CHAT_FALLBACK_API_KEY") or os.getenv("CHAT_API_KEY")
-    base_url = os.getenv("CHAT_FALLBACK_API_BASE") or os.getenv("CHAT_API_BASE")
-    
-    if not api_key:
-        raise ValueError(
-            "No API key configured for fallback chat model. Please set CHAT_FALLBACK_API_KEY or CHAT_API_KEY"
-        )
-    
-    # Log configuration for debugging (without exposing API key)
-    if base_url:
-        print(f"DEBUG: Using fallback chat API endpoint: {base_url}")
-    else:
-        print("DEBUG: Using default OpenAI API endpoint for fallback chat")
-    
-    # Create client with optional base_url
-    if base_url:
-        return openai.OpenAI(api_key=api_key, base_url=base_url)
-    else:
-        return openai.OpenAI(api_key=api_key)
-
-def get_embeddings_fallback_client():
-    """
-    Get a configured OpenAI client for fallback embeddings operations.
-    
-    Supports flexible configuration through environment variables with inheritance:
-    - EMBEDDINGS_FALLBACK_API_KEY: API key for fallback embeddings (inherits EMBEDDINGS_API_KEY if not set)
-    - EMBEDDINGS_FALLBACK_API_BASE: Base URL for fallback embeddings API (inherits EMBEDDINGS_API_BASE if not set)
-    
-    Returns:
-        openai.OpenAI: Configured OpenAI client for fallback embeddings operations
-        
-    Raises:
-        ValueError: If no API key is configured (primary or fallback)
-    """
-    # Get fallback configuration with inheritance
-    api_key = os.getenv("EMBEDDINGS_FALLBACK_API_KEY") or os.getenv("EMBEDDINGS_API_KEY")
-    base_url = os.getenv("EMBEDDINGS_FALLBACK_API_BASE") or os.getenv("EMBEDDINGS_API_BASE")
-    
-    if not api_key:
-        raise ValueError(
-            "No API key configured for fallback embeddings. Please set EMBEDDINGS_FALLBACK_API_KEY or EMBEDDINGS_API_KEY"
-        )
-    
-    # Log configuration for debugging (without exposing API key)
-    if base_url:
-        print(f"DEBUG: Using fallback embeddings API endpoint: {base_url}")
-    else:
-        print("DEBUG: Using default OpenAI API endpoint for fallback embeddings")
-    
-    # Create client with optional base_url
-    if base_url:
-        return openai.OpenAI(api_key=api_key, base_url=base_url)
-    else:
-        return openai.OpenAI(api_key=api_key)
-
-def get_adaptive_chat_client(model_preference=None):
-    """
-    Get an adaptive OpenAI client that tries primary first, then fallback.
-    
-    Args:
-        model_preference: Optional model name preference (uses environment fallback if None)
-        
-    Returns:
-        tuple: (client, model_used, is_fallback)
-            - client: Configured OpenAI client
-            - model_used: The model name that will be used
-            - is_fallback: Boolean indicating if fallback configuration is being used
-            
-    Raises:
-        ValueError: If neither primary nor fallback configuration is available
-    """
-    # Determine model to use
-    if model_preference:
-        model_used = model_preference
-        is_fallback = False
-    else:
-        # Try primary model first
-        primary_model = os.getenv("CHAT_MODEL")
-        if primary_model:
-            model_used = primary_model
-            is_fallback = False
-        else:
-            # Fall back to fallback model
-            fallback_model = os.getenv("CHAT_FALLBACK_MODEL") or "gpt-4o-mini"
-            model_used = fallback_model
-            is_fallback = True
-    
-    # Try to get appropriate client
-    try:
-        if not is_fallback and os.getenv("CHAT_API_KEY"):
-            # Try primary client first
-            client = get_chat_client()
-            return (client, model_used, False)
-        else:
-            # Use fallback client
-            client = get_chat_fallback_client()
-            # If we're using fallback client, make sure we're using fallback model
-            if not model_preference:
-                fallback_model = os.getenv("CHAT_FALLBACK_MODEL") or "gpt-4o-mini"
-                model_used = fallback_model
-            return (client, model_used, True)
-    except ValueError as e:
-        # If primary fails, try fallback
-        if not is_fallback:
-            try:
-                client = get_chat_fallback_client()
-                fallback_model = os.getenv("CHAT_FALLBACK_MODEL") or "gpt-4o-mini"
-                return (client, fallback_model, True)
-            except ValueError:
-                pass
-        
-        # Both failed
-        raise ValueError(
-            f"No valid API configuration available for chat model. "
-            f"Please configure CHAT_API_KEY or CHAT_FALLBACK_API_KEY. Original error: {str(e)}"
-        )
 
 def validate_chat_config() -> bool:
     """
@@ -229,24 +99,35 @@ def validate_chat_config() -> bool:
     """
     # Check for API key
     chat_api_key = os.getenv("CHAT_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     
-    if not chat_api_key:
+    if not chat_api_key and not openai_api_key:
         raise ValueError(
-            "No API key configured for chat model. Please set CHAT_API_KEY"
+            "No API key configured for chat model. Please set one of:\n"
+            "  - CHAT_API_KEY (recommended for new deployments)\n"
+            "  - OPENAI_API_KEY (for backward compatibility)"
         )
     
     # Check for model configuration
     chat_model = os.getenv("CHAT_MODEL")
+    model_choice = os.getenv("MODEL_CHOICE")
     
-    if not chat_model:
+    if not chat_model and not model_choice:
         logging.warning(
             "No chat model specified. Please set CHAT_MODEL environment variable. "
-            "Defaulting to configured fallback model."
+            "Defaulting to OpenAI's default model."
+        )
+    
+    # Warn about deprecated usage
+    if model_choice and not chat_model:
+        logging.warning(
+            "MODEL_CHOICE is deprecated. Please use CHAT_MODEL instead. "
+            "MODEL_CHOICE support will be removed in a future version."
         )
     
     # Log configuration being used
-    effective_key_source = "CHAT_API_KEY"
-    effective_model = chat_model or os.getenv("CHAT_FALLBACK_MODEL") or "default"
+    effective_key_source = "CHAT_API_KEY" if chat_api_key else "OPENAI_API_KEY (fallback)"
+    effective_model = chat_model or model_choice or "default"
     base_url = os.getenv("CHAT_API_BASE", "default OpenAI")
     
     logging.debug(f"Chat configuration - Model: {effective_model}, Key source: {effective_key_source}, Base URL: {base_url}")
@@ -265,121 +146,23 @@ def validate_embeddings_config() -> bool:
     """
     # Check for API key
     embeddings_api_key = os.getenv("EMBEDDINGS_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     
-    if not embeddings_api_key:
+    if not embeddings_api_key and not openai_api_key:
         raise ValueError(
-            "No API key configured for embeddings. Please set EMBEDDINGS_API_KEY"
+            "No API key configured for embeddings. Please set one of:\n"
+            "  - EMBEDDINGS_API_KEY (recommended for new deployments)\n"
+            "  - OPENAI_API_KEY (for backward compatibility)"
         )
     
     # Log configuration being used
     embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
-    effective_key_source = "EMBEDDINGS_API_KEY"
+    effective_key_source = "EMBEDDINGS_API_KEY" if embeddings_api_key else "OPENAI_API_KEY (fallback)"
     base_url = os.getenv("EMBEDDINGS_API_BASE", "default OpenAI")
     
     logging.debug(f"Embeddings configuration - Model: {embeddings_model}, Key source: {effective_key_source}, Base URL: {base_url}")
     
     return True
-
-def validate_chat_fallback_config() -> bool:
-    """
-    Validate chat fallback model configuration with inheritance support.
-    
-    Returns:
-        bool: True if fallback configuration is valid (direct or inherited)
-        
-    Raises:
-        ValueError: If no valid fallback configuration is available
-    """
-    # Check for fallback API key (direct or inherited)
-    fallback_api_key = os.getenv("CHAT_FALLBACK_API_KEY") or os.getenv("CHAT_API_KEY")
-    
-    if not fallback_api_key:
-        raise ValueError(
-            "No API key configured for chat fallback. Please set CHAT_FALLBACK_API_KEY or CHAT_API_KEY"
-        )
-    
-    # Validate base URL format if provided
-    fallback_base_url = os.getenv("CHAT_FALLBACK_API_BASE") or os.getenv("CHAT_API_BASE")
-    if fallback_base_url:
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(fallback_base_url)
-            if not parsed.scheme or not parsed.netloc:
-                raise ValueError(f"Invalid base URL format: {fallback_base_url}")
-        except Exception as e:
-            raise ValueError(f"Invalid fallback base URL configuration: {str(e)}")
-    
-    # Log effective configuration for debugging
-    effective_key_source = "CHAT_FALLBACK_API_KEY" if os.getenv("CHAT_FALLBACK_API_KEY") else "CHAT_API_KEY (inherited)"
-    effective_base_source = "CHAT_FALLBACK_API_BASE" if os.getenv("CHAT_FALLBACK_API_BASE") else "CHAT_API_BASE (inherited)" if fallback_base_url else "default OpenAI"
-    fallback_model = os.getenv("CHAT_FALLBACK_MODEL", "gpt-4o-mini")
-    
-    logging.debug(f"Chat fallback configuration - Model: {fallback_model}, Key source: {effective_key_source}, Base URL source: {effective_base_source}")
-    
-    return True
-
-def validate_embeddings_fallback_config() -> bool:
-    """
-    Validate embeddings fallback model configuration with inheritance support.
-    
-    Returns:
-        bool: True if fallback configuration is valid (direct or inherited)
-        
-    Raises:
-        ValueError: If no valid fallback configuration is available
-    """
-    # Check for fallback API key (direct or inherited)
-    fallback_api_key = os.getenv("EMBEDDINGS_FALLBACK_API_KEY") or os.getenv("EMBEDDINGS_API_KEY")
-    
-    if not fallback_api_key:
-        raise ValueError(
-            "No API key configured for embeddings fallback. Please set EMBEDDINGS_FALLBACK_API_KEY or EMBEDDINGS_API_KEY"
-        )
-    
-    # Validate base URL format if provided
-    fallback_base_url = os.getenv("EMBEDDINGS_FALLBACK_API_BASE") or os.getenv("EMBEDDINGS_API_BASE")
-    if fallback_base_url:
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(fallback_base_url)
-            if not parsed.scheme or not parsed.netloc:
-                raise ValueError(f"Invalid base URL format: {fallback_base_url}")
-        except Exception as e:
-            raise ValueError(f"Invalid fallback base URL configuration: {str(e)}")
-    
-    # Log effective configuration for debugging
-    effective_key_source = "EMBEDDINGS_FALLBACK_API_KEY" if os.getenv("EMBEDDINGS_FALLBACK_API_KEY") else "EMBEDDINGS_API_KEY (inherited)"
-    effective_base_source = "EMBEDDINGS_FALLBACK_API_BASE" if os.getenv("EMBEDDINGS_FALLBACK_API_BASE") else "EMBEDDINGS_API_BASE (inherited)" if fallback_base_url else "default OpenAI"
-    fallback_model = os.getenv("EMBEDDINGS_FALLBACK_MODEL", "text-embedding-3-small")
-    
-    logging.debug(f"Embeddings fallback configuration - Model: {fallback_model}, Key source: {effective_key_source}, Base URL source: {effective_base_source}")
-    
-    return True
-
-def get_effective_fallback_config():
-    """
-    Get the effective fallback configuration with inheritance resolved.
-    Useful for debugging and monitoring.
-    
-    Returns:
-        dict: Configuration details showing what will actually be used
-    """
-    config = {
-        "chat_fallback": {
-            "model": os.getenv("CHAT_FALLBACK_MODEL", "gpt-4o-mini"),
-            "api_key_source": "CHAT_FALLBACK_API_KEY" if os.getenv("CHAT_FALLBACK_API_KEY") else "CHAT_API_KEY (inherited)" if os.getenv("CHAT_API_KEY") else None,
-            "base_url": os.getenv("CHAT_FALLBACK_API_BASE") or os.getenv("CHAT_API_BASE"),
-            "base_url_source": "CHAT_FALLBACK_API_BASE" if os.getenv("CHAT_FALLBACK_API_BASE") else "CHAT_API_BASE (inherited)" if os.getenv("CHAT_API_BASE") else "default OpenAI"
-        },
-        "embeddings_fallback": {
-            "model": os.getenv("EMBEDDINGS_FALLBACK_MODEL", "text-embedding-3-small"),
-            "api_key_source": "EMBEDDINGS_FALLBACK_API_KEY" if os.getenv("EMBEDDINGS_FALLBACK_API_KEY") else "EMBEDDINGS_API_KEY (inherited)" if os.getenv("EMBEDDINGS_API_KEY") else None,
-            "base_url": os.getenv("EMBEDDINGS_FALLBACK_API_BASE") or os.getenv("EMBEDDINGS_API_BASE"),
-            "base_url_source": "EMBEDDINGS_FALLBACK_API_BASE" if os.getenv("EMBEDDINGS_FALLBACK_API_BASE") else "EMBEDDINGS_API_BASE (inherited)" if os.getenv("EMBEDDINGS_API_BASE") else "default OpenAI"
-        }
-    }
-    
-    return config
 
 def get_supabase_client():
     """
@@ -466,7 +249,7 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
     """
     Generate contextual information for a chunk within a document to improve retrieval.
     
-    Uses the chat model configured via CHAT_MODEL environment variable with explicit fallback configuration.
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
     
     Args:
         full_document: The complete document text
@@ -477,11 +260,11 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         - The contextual text that situates the chunk within the document
         - Boolean indicating if contextual embedding was performed
     """
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv("CHAT_MODEL") or os.getenv("CHAT_FALLBACK_MODEL") or "gpt-4o-mini"
+    # Get chat model with fallback to legacy MODEL_CHOICE and then default
+    model_choice = os.getenv("CHAT_MODEL") or os.getenv("MODEL_CHOICE") or "gpt-4o-mini"
     
     if not model_choice:
-        print("Warning: No chat model configured. Set CHAT_MODEL environment variable.")
+        print("Warning: No chat model configured. Set CHAT_MODEL or MODEL_CHOICE environment variable.")
         return chunk, False
     
     try:
@@ -506,15 +289,13 @@ Here is the chunk we want to situate within the whole document
 </chunk> 
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
 
-        # Get adaptive client that can fallback to different provider
-        client, actual_model, is_fallback = get_adaptive_chat_client()
-        
-        # Adjust max_tokens based on actual model being used
-        max_tokens = 150 if "gemini" in actual_model.lower() else 200
+        # Adjust max_tokens based on model
+        max_tokens = 150 if "gemini" in model_choice.lower() else 200
 
         # Call the API to generate contextual information
+        client = get_chat_client()
         response = client.chat.completions.create(
-            model=actual_model,
+            model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise contextual information."},
                 {"role": "user", "content": prompt}
@@ -809,7 +590,7 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     """
     Generate a summary for a code example using its surrounding context.
     
-    Uses the chat model configured via CHAT_MODEL environment variable with explicit fallback configuration.
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
     
     Args:
         code: The code example
@@ -819,8 +600,8 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     Returns:
         A summary of what the code example demonstrates
     """
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv("CHAT_MODEL") or os.getenv("CHAT_FALLBACK_MODEL")
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
     
     # Create the prompt
     prompt = f"""<context_before>
@@ -839,10 +620,9 @@ Based on the code example and its surrounding context, provide a concise summary
 """
     
     try:
-        # Get adaptive client that can fallback to different provider
-        client, actual_model, is_fallback = get_adaptive_chat_client()
+        client = get_chat_client()
         response = client.chat.completions.create(
-            model=actual_model,
+            model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise code example summaries."},
                 {"role": "user", "content": prompt}
@@ -950,7 +730,7 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     """
     Extract a summary for a source from its content using an LLM.
     
-    Uses the chat model configured via CHAT_MODEL environment variable with explicit fallback configuration.
+    Uses the chat model configured via CHAT_MODEL environment variable (with fallback to MODEL_CHOICE).
     
     Args:
         source_id: The source ID (domain)
@@ -966,8 +746,8 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     if not content or len(content.strip()) == 0:
         return default_summary
     
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv("CHAT_MODEL") or os.getenv("CHAT_FALLBACK_MODEL")
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
     
     # Limit content length to avoid token limits
     truncated_content = content[:25000] if len(content) > 25000 else content
@@ -981,10 +761,10 @@ The above content is from the documentation for '{source_id}'. Please provide a 
 """
     
     try:
-        # Get adaptive client that can fallback to different provider
-        client, actual_model, is_fallback = get_adaptive_chat_client()
+        # Call the OpenAI API to generate the summary
+        client = get_chat_client()
         response = client.chat.completions.create(
-            model=actual_model,
+            model=model_choice,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides concise library/tool/framework summaries."},
                 {"role": "user", "content": prompt}

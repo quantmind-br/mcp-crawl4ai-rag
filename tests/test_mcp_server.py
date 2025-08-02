@@ -16,11 +16,7 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 # Mock environment variables before importing
-# Backward compatibility
-os.environ.setdefault("OPENAI_API_KEY", "test-key")
-os.environ.setdefault("MODEL_CHOICE", "gpt-3.5-turbo")  # Keep for backward compatibility testing
-
-# New flexible configuration
+# Modern configuration
 os.environ.setdefault("CHAT_MODEL", "gpt-3.5-turbo")
 os.environ.setdefault("CHAT_API_KEY", "test-chat-api-key")
 os.environ.setdefault("CHAT_API_BASE", "https://api.openai.com/v1")

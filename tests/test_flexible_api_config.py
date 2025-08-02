@@ -26,7 +26,6 @@ class TestFlexibleAPIConfiguration:
             key: os.environ.get(key) for key in [
                 'CHAT_MODEL', 'CHAT_API_KEY', 'CHAT_API_BASE',
                 'EMBEDDINGS_MODEL', 'EMBEDDINGS_API_KEY', 'EMBEDDINGS_API_BASE',
-                'MODEL_CHOICE', 'OPENAI_API_KEY'
             ]
         }
         
@@ -73,53 +72,6 @@ class TestFlexibleAPIConfiguration:
         assert client.api_key == 'test-embeddings-key'
         assert str(client.base_url).rstrip('/') == 'https://api.openai.com/v1'
 
-    def test_backward_compatibility_chat_model(self):
-        """Test backward compatibility using MODEL_CHOICE and OPENAI_API_KEY."""
-        # Set legacy configuration only
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        os.environ['OPENAI_API_KEY'] = 'legacy-openai-key'
-        
-        from src.utils import get_chat_client
-        
-        # Should work with legacy variables
-        client = get_chat_client()
-        assert client.api_key == 'legacy-openai-key'
-
-    def test_backward_compatibility_embeddings(self):
-        """Test backward compatibility for embeddings using OPENAI_API_KEY."""
-        # Set legacy configuration only
-        os.environ['OPENAI_API_KEY'] = 'legacy-openai-key'
-        
-        from src.utils import get_embeddings_client
-        
-        # Should work with legacy variables
-        client = get_embeddings_client()
-        assert client.api_key == 'legacy-openai-key'
-
-    def test_model_choice_fallback_logic(self):
-        """Test that CHAT_MODEL takes precedence over MODEL_CHOICE."""
-        # Set both old and new variables
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        os.environ['CHAT_MODEL'] = 'gpt-4'
-        os.environ['OPENAI_API_KEY'] = 'test-key'
-        
-        # Import after setting environment
-        from src.utils import generate_contextual_embedding
-        
-        # Mock the OpenAI client to capture the model being used
-        with patch('src.utils.get_chat_client') as mock_get_client:
-            mock_client = Mock()
-            mock_response = Mock()
-            mock_response.choices = [Mock(message=Mock(content="Test context"))]
-            mock_client.chat.completions.create.return_value = mock_response
-            mock_get_client.return_value = mock_client
-            
-            # Call function that uses the model
-            generate_contextual_embedding("Test document", "Test chunk")
-            
-            # Should use CHAT_MODEL value, not MODEL_CHOICE
-            call_args = mock_client.chat.completions.create.call_args
-            assert call_args[1]['model'] == 'gpt-4'  # CHAT_MODEL value
 
     def test_azure_openai_configuration(self):
         """Test configuration for Azure OpenAI service."""
@@ -183,26 +135,11 @@ class TestFlexibleAPIConfiguration:
         assert validate_chat_config() is True
         assert validate_embeddings_config() is True
 
-    def test_deprecation_warnings(self):
-        """Test that deprecation warnings are issued for MODEL_CHOICE."""
-        # Set legacy configuration
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        os.environ['OPENAI_API_KEY'] = 'test-key'
-        
-        from src.utils import validate_chat_config
-        
-        with patch('logging.warning') as mock_warning:
-            validate_chat_config()
-            
-            # Should warn about deprecated MODEL_CHOICE
-            warning_calls = [call for call in mock_warning.call_args_list 
-                           if 'deprecated' in str(call)]
-            assert len(warning_calls) > 0
 
     def test_embeddings_model_configuration(self):
         """Test that EMBEDDINGS_MODEL is properly used."""
         os.environ['EMBEDDINGS_MODEL'] = 'text-embedding-3-large'
-        os.environ['OPENAI_API_KEY'] = 'test-key'
+        os.environ['EMBEDDINGS_API_KEY'] = 'test-key'
         
         from src.utils import create_embeddings_batch
         
@@ -265,29 +202,12 @@ class TestFlexibleAPIConfiguration:
         
         # Chat should use Azure
         assert chat_client.api_key == 'azure-chat-key'
-        assert str(chat_client.base_url).rstrip('/') == 'https://azure.openai.azure.com/'
+        assert str(chat_client.base_url).rstrip('/') == 'https://azure.openai.azure.com'
         
         # Embeddings should use regular OpenAI (default base_url)
         assert embeddings_client.api_key == 'openai-embeddings-key'
         assert str(embeddings_client.base_url).rstrip('/') == 'https://api.openai.com/v1'
 
-    def test_environment_variable_precedence(self):
-        """Test that new variables take precedence over legacy ones."""
-        # Set both legacy and new variables
-        os.environ['OPENAI_API_KEY'] = 'legacy-key'
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        
-        os.environ['CHAT_API_KEY'] = 'new-chat-key'
-        os.environ['EMBEDDINGS_API_KEY'] = 'new-embeddings-key'
-        
-        from src.utils import get_chat_client, get_embeddings_client
-        
-        chat_client = get_chat_client()
-        embeddings_client = get_embeddings_client()
-        
-        # Should use new variables, not legacy ones
-        assert chat_client.api_key == 'new-chat-key'
-        assert embeddings_client.api_key == 'new-embeddings-key'
 
     def test_configuration_isolation(self):
         """Test that chat and embeddings configurations are independent."""
@@ -311,82 +231,3 @@ class TestFlexibleAPIConfiguration:
         assert str(embeddings_client.base_url).rstrip('/') == 'https://embeddings-provider.com/v1'
 
 
-class TestBackwardCompatibility:
-    """Test complete backward compatibility scenarios."""
-
-    def setup_method(self):
-        """Set up clean test environment."""
-        # Save and clear all relevant environment variables
-        self.env_keys = [
-            'CHAT_MODEL', 'CHAT_API_KEY', 'CHAT_API_BASE',
-            'EMBEDDINGS_MODEL', 'EMBEDDINGS_API_KEY', 'EMBEDDINGS_API_BASE',
-            'MODEL_CHOICE', 'OPENAI_API_KEY'
-        ]
-        self.original_env = {key: os.environ.get(key) for key in self.env_keys}
-        
-        for key in self.env_keys:
-            if key in os.environ:
-                del os.environ[key]
-
-    def teardown_method(self):
-        """Restore original environment."""
-        for key in self.env_keys:
-            if key in os.environ:
-                del os.environ[key]
-        
-        for key, value in self.original_env.items():
-            if value is not None:
-                os.environ[key] = value
-
-    def test_legacy_only_configuration(self):
-        """Test that legacy-only configuration still works perfectly."""
-        # Clear all environment first
-        for key in ['CHAT_MODEL', 'CHAT_API_KEY', 'CHAT_API_BASE',
-                   'EMBEDDINGS_MODEL', 'EMBEDDINGS_API_KEY', 'EMBEDDINGS_API_BASE']:
-            if key in os.environ:
-                del os.environ[key]
-        
-        # Set only legacy variables
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        os.environ['OPENAI_API_KEY'] = 'legacy-openai-key'
-        
-        from src.utils import get_chat_client, get_embeddings_client, validate_chat_config, validate_embeddings_config
-        
-        # All functions should work with legacy configuration
-        chat_client = get_chat_client()
-        embeddings_client = get_embeddings_client()
-        
-        assert chat_client.api_key == 'legacy-openai-key'
-        assert embeddings_client.api_key == 'legacy-openai-key'
-        
-        # Validation should pass
-        assert validate_chat_config() is True
-        assert validate_embeddings_config() is True
-
-    def test_gradual_migration_scenario(self):
-        """Test gradual migration from legacy to new configuration."""
-        # Start with legacy configuration
-        os.environ['MODEL_CHOICE'] = 'gpt-3.5-turbo'
-        os.environ['OPENAI_API_KEY'] = 'legacy-key'
-        
-        from src.utils import get_chat_client, get_embeddings_client
-        
-        # Should work with legacy
-        chat_client = get_chat_client()
-        assert chat_client.api_key == 'legacy-key'
-        
-        # Add new chat configuration
-        os.environ['CHAT_MODEL'] = 'gpt-4'
-        os.environ['CHAT_API_KEY'] = 'new-chat-key'
-        
-        # Import fresh modules to get new configuration
-        import importlib
-        import src.utils
-        importlib.reload(src.utils)
-        
-        # Chat should use new config, embeddings still legacy
-        chat_client = src.utils.get_chat_client()
-        embeddings_client = src.utils.get_embeddings_client()
-        
-        assert chat_client.api_key == 'new-chat-key'
-        assert embeddings_client.api_key == 'legacy-key'  # Still using legacy

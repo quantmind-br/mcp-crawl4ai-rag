@@ -25,11 +25,11 @@ class GraphitiDependencies:
 # ========== Helper function to get model configuration ==========
 def get_model():
     """Configure and return the LLM model to use."""
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv('CHAT_MODEL') or os.getenv('CHAT_FALLBACK_MODEL') or 'gpt-4o-mini'
+    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
+    model_choice = os.getenv('CHAT_MODEL', os.getenv('MODEL_CHOICE', 'gpt-4.1-mini'))
     
-    # Get API key
-    api_key = os.getenv('CHAT_API_KEY') or 'no-api-key-provided'
+    # Get API key with fallback to legacy OPENAI_API_KEY for backward compatibility
+    api_key = os.getenv('CHAT_API_KEY', os.getenv('OPENAI_API_KEY', 'no-api-key-provided'))
     
     # Get base URL for flexible API configuration
     base_url = os.getenv('CHAT_API_BASE')

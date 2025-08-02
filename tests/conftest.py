@@ -16,11 +16,7 @@ sys.path.insert(0, str(src_path))
 def setup_test_environment():
     """Setup test environment variables."""
     test_env = {
-        # Backward compatibility
-        "OPENAI_API_KEY": "test-openai-key",
-        "MODEL_CHOICE": "gpt-3.5-turbo",  # Keep for backward compatibility testing
-        
-        # New flexible configuration
+        # Modern configuration
         "CHAT_MODEL": "gpt-3.5-turbo",
         "CHAT_API_KEY": "test-chat-api-key",
         "CHAT_API_BASE": "https://api.openai.com/v1",

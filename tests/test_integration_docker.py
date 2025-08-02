@@ -180,7 +180,7 @@ class TestUtilsWithRealQdrant:
         except Exception as e:
             pytest.fail(f"get_qdrant_client failed: {e}")
 
-    @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="No OpenAI API key")
+    @pytest.mark.skipif(not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key")
     def test_embedding_integration_real(self, docker_services):
         """Test embedding creation and storage (requires OpenAI API key)."""
         if not docker_services["qdrant_ready"]:
@@ -284,7 +284,7 @@ class TestNeo4jIntegration:
 class TestEndToEndWorkflow:
     """Test complete end-to-end workflow with Docker services."""
 
-    @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="No OpenAI API key")
+    @pytest.mark.skipif(not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key")
     def test_complete_rag_workflow(self, docker_services):
         """Test complete RAG workflow from storage to retrieval."""
         if not docker_services["qdrant_ready"]:
