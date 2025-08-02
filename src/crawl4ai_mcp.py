@@ -214,12 +214,12 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
                 # Initialize knowledge graph validator
                 knowledge_validator = KnowledgeGraphValidator(neo4j_uri, neo4j_user, neo4j_password)
                 await knowledge_validator.initialize()
-                print("✓ Knowledge graph validator initialized")
+                print("- Knowledge graph validator initialized")
                 
                 # Initialize repository extractor
                 repo_extractor = DirectNeo4jExtractor(neo4j_uri, neo4j_user, neo4j_password)
                 await repo_extractor.initialize()
-                print("✓ Repository extractor initialized")
+                print("- Repository extractor initialized")
                 
             except Exception as e:
                 print(f"Failed to initialize Neo4j components: {format_neo4j_error(e)}")

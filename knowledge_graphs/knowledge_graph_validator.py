@@ -115,11 +115,24 @@ class KnowledgeGraphValidator:
     
     async def initialize(self):
         """Initialize Neo4j connection"""
-        self.driver = AsyncGraphDatabase.driver(
-            self.neo4j_uri, 
-            auth=(self.neo4j_user, self.neo4j_password)
-        )
-        logger.info("Knowledge graph validator initialized")
+        try:
+            self.driver = AsyncGraphDatabase.driver(
+                self.neo4j_uri, 
+                auth=(self.neo4j_user, self.neo4j_password)
+            )
+            
+            # Test connection
+            async with self.driver.session() as session:
+                await session.run("RETURN 1")
+            
+            logger.info("Knowledge graph validator initialized")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Knowledge graph validator: {e}")
+            if self.driver:
+                await self.driver.close()
+                self.driver = None
+            raise
     
     async def close(self):
         """Close Neo4j connection"""

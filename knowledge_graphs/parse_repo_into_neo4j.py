@@ -406,33 +406,41 @@ class DirectNeo4jExtractor:
     async def initialize(self):
         """Initialize Neo4j connection"""
         logger.info("Initializing Neo4j connection...")
-        self.driver = AsyncGraphDatabase.driver(
-            self.neo4j_uri, 
-            auth=(self.neo4j_user, self.neo4j_password)
-        )
         
-        # Clear existing data
-        # logger.info("Clearing existing data...")
-        # async with self.driver.session() as session:
-        #     await session.run("MATCH (n) DETACH DELETE n")
-        
-        # Create constraints and indexes
-        logger.info("Creating constraints and indexes...")
-        async with self.driver.session() as session:
-            # Create constraints - using MERGE-friendly approach
-            await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE")
-            await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Class) REQUIRE c.full_name IS UNIQUE")
-            # Remove unique constraints for methods/attributes since they can be duplicated across classes
-            # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:Method) REQUIRE m.full_name IS UNIQUE")
-            # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (f:Function) REQUIRE f.full_name IS UNIQUE")
-            # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (a:Attribute) REQUIRE a.full_name IS UNIQUE")
+        try:
+            self.driver = AsyncGraphDatabase.driver(
+                self.neo4j_uri, 
+                auth=(self.neo4j_user, self.neo4j_password)
+            )
             
-            # Create indexes for performance
-            await session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.name)")
-            await session.run("CREATE INDEX IF NOT EXISTS FOR (c:Class) ON (c.name)")
-            await session.run("CREATE INDEX IF NOT EXISTS FOR (m:Method) ON (m.name)")
-        
-        logger.info("Neo4j initialized successfully")
+            # Test connection first
+            async with self.driver.session() as session:
+                await session.run("RETURN 1")
+            
+            # Create constraints and indexes
+            logger.info("Creating constraints and indexes...")
+            async with self.driver.session() as session:
+                # Create constraints - using MERGE-friendly approach
+                await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE")
+                await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Class) REQUIRE c.full_name IS UNIQUE")
+                # Remove unique constraints for methods/attributes since they can be duplicated across classes
+                # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:Method) REQUIRE m.full_name IS UNIQUE")
+                # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (f:Function) REQUIRE f.full_name IS UNIQUE")
+                # await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (a:Attribute) REQUIRE a.full_name IS UNIQUE")
+                
+                # Create indexes for performance
+                await session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.name)")
+                await session.run("CREATE INDEX IF NOT EXISTS FOR (c:Class) ON (c.name)")
+                await session.run("CREATE INDEX IF NOT EXISTS FOR (m:Method) ON (m.name)")
+            
+            logger.info("Neo4j initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Neo4j: {e}")
+            if self.driver:
+                await self.driver.close()
+                self.driver = None
+            raise
     
     async def clear_repository_data(self, repo_name: str):
         """Clear all data for a specific repository"""
