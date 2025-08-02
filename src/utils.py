@@ -268,9 +268,20 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         return chunk, False
     
     try:
-        # Create the prompt for generating contextual information
-        prompt = f"""<document> 
-{full_document[:25000]} 
+        # Optimize prompt for better token efficiency
+        # Reduce document size for better context generation
+        doc_limit = 15000 if "gemini" in model_choice.lower() else 25000
+        
+        # Create a more concise prompt for Gemini models
+        if "gemini" in model_choice.lower():
+            prompt = f"""Document excerpt: {full_document[:doc_limit]}
+
+Chunk to contextualize: {chunk}
+
+Provide 1-2 sentences of context for this chunk within the document. Be concise."""
+        else:
+            prompt = f"""<document> 
+{full_document[:doc_limit]} 
 </document>
 Here is the chunk we want to situate within the whole document 
 <chunk> 
@@ -278,7 +289,10 @@ Here is the chunk we want to situate within the whole document
 </chunk> 
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
 
-        # Call the OpenAI API to generate contextual information
+        # Adjust max_tokens based on model
+        max_tokens = 150 if "gemini" in model_choice.lower() else 200
+
+        # Call the API to generate contextual information
         client = get_chat_client()
         response = client.chat.completions.create(
             model=model_choice,
@@ -287,19 +301,41 @@ Please give a short succinct context to situate this chunk within the overall do
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            max_tokens=200
+            max_tokens=max_tokens
         )
         
         # Validate response structure
         if not response.choices:
             print(f"Warning: API returned no choices. Model: {model_choice}")
             return chunk, False
+        
+        choice = response.choices[0]
+        
+        # Check if response was truncated due to length
+        if choice.finish_reason == 'length' and choice.message.content is None:
+            print(f"Warning: Model {model_choice} hit token limit before generating content. Trying shorter prompt.")
+            
+            # Retry with much shorter prompt for Gemini
+            short_prompt = f"Context for '{chunk[:100]}...' in document about: {full_document[:500]}... \nProvide brief context (1 sentence):"
+            
+            response = client.chat.completions.create(
+                model=model_choice,
+                messages=[{"role": "user", "content": short_prompt}],
+                temperature=0.3,
+                max_tokens=50
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                choice = response.choices[0]
+            else:
+                print(f"Warning: Even shorter prompt failed for {model_choice}. Using original chunk.")
+                return chunk, False
             
         # Extract the generated context with null check
-        content = response.choices[0].message.content
+        content = choice.message.content
         if content is None:
             print(f"Warning: API returned None content for contextual embedding. Model: {model_choice}")
-            print(f"Response: {response}")
+            print(f"Finish reason: {choice.finish_reason}")
             return chunk, False
             
         context = content.strip()
