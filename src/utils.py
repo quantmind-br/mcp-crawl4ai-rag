@@ -46,6 +46,12 @@ def get_chat_client():
             "No API key configured for chat model. Please set CHAT_API_KEY or OPENAI_API_KEY"
         )
     
+    # Log configuration for debugging (without exposing API key)
+    if base_url:
+        print(f"DEBUG: Using custom chat API endpoint: {base_url}")
+    else:
+        print("DEBUG: Using default OpenAI API endpoint")
+    
     # Create client with optional base_url
     if base_url:
         return openai.OpenAI(api_key=api_key, base_url=base_url)
@@ -254,8 +260,12 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         - The contextual text that situates the chunk within the document
         - Boolean indicating if contextual embedding was performed
     """
-    # Get chat model with fallback to legacy MODEL_CHOICE for backward compatibility
-    model_choice = os.getenv("CHAT_MODEL", os.getenv("MODEL_CHOICE"))
+    # Get chat model with fallback to legacy MODEL_CHOICE and then default
+    model_choice = os.getenv("CHAT_MODEL") or os.getenv("MODEL_CHOICE") or "gpt-4o-mini"
+    
+    if not model_choice:
+        print("Warning: No chat model configured. Set CHAT_MODEL or MODEL_CHOICE environment variable.")
+        return chunk, False
     
     try:
         # Create the prompt for generating contextual information
@@ -280,8 +290,22 @@ Please give a short succinct context to situate this chunk within the overall do
             max_tokens=200
         )
         
-        # Extract the generated context
-        context = response.choices[0].message.content.strip()
+        # Validate response structure
+        if not response.choices:
+            print(f"Warning: API returned no choices. Model: {model_choice}")
+            return chunk, False
+            
+        # Extract the generated context with null check
+        content = response.choices[0].message.content
+        if content is None:
+            print(f"Warning: API returned None content for contextual embedding. Model: {model_choice}")
+            print(f"Response: {response}")
+            return chunk, False
+            
+        context = content.strip()
+        if not context:
+            print(f"Warning: API returned empty content for contextual embedding. Model: {model_choice}")
+            return chunk, False
         
         # Combine the context with the original chunk
         contextual_text = f"{context}\n---\n{chunk}"
@@ -289,7 +313,7 @@ Please give a short succinct context to situate this chunk within the overall do
         return contextual_text, True
     
     except Exception as e:
-        print(f"Error generating contextual embedding: {e}. Using original chunk instead.")
+        print(f"Error generating contextual embedding with model {model_choice}: {e}. Using original chunk instead.")
         return chunk, False
 
 def process_chunk_with_context(args):
