@@ -1,39 +1,66 @@
 # Code Style and Conventions
 
-## Python Style Guidelines
+## Formatting Standards
+- **Line Length**: 120 characters (soft limit)
+- **Formatter**: Prefer `ruff format` (or black defaults)
+- **Trailing Commas**: Required in multi-line literals
+- **Blank Lines**: Between logical groups for readability
 
-### General Conventions
-- **Python Version**: 3.12+ with modern async/await patterns
-- **Import Style**: Standard library first, then third-party, then local imports
-- **Async/Await**: Consistent use of async functions with proper await syntax
-- **Type Hints**: Optional typing used (e.g., `Optional[Any]`)
+## Import Organization
+- **Grouping**: stdlib, third-party, local (with blank lines between)
+- **Style**: One import per line, avoid deep relatives beyond package root
+- **`__all__`**: Keep minimal, only export public API
+- **Relative Imports**: Avoid going beyond package root
 
-### Code Organization
-- **Dataclasses**: Used for structured data (`@dataclass` decorator)
-- **Context Management**: Lifespan context pattern for dependency injection
-- **Tool Decorators**: `@mcp.tool()` decorator for MCP tool functions
-- **Error Handling**: Try-catch with JSON response formatting
+## Type Annotations
+- **Public Functions**: Must be annotated with types
+- **Type Hints**: Use `Optional`, `Dict`, `List`, `Tuple` from typing
+- **Data Structures**: Prefer `@dataclass` for simple structs
+- **MCP Tools**: Return JSON strings (not objects)
 
-### Function Structure
-- **Docstrings**: Google-style docstrings with Args/Returns sections
-- **Parameter Types**: Context object first, then typed parameters
-- **Return Format**: JSON strings for tool responses
-- **Async Functions**: Consistent async/await usage throughout
+## Naming Conventions
+- **Functions/Variables**: `snake_case`
+- **Classes**: `PascalCase`
+- **Constants/Env Vars**: `UPPER_CASE`
+- **Private Helpers**: Prefix with underscore `_private_function`
 
-### Naming Conventions
-- **Functions**: snake_case (e.g., `crawl_single_page`, `smart_chunk_markdown`)
-- **Classes**: PascalCase (e.g., `Crawl4AIContext`)
-- **Variables**: snake_case with descriptive names
-- **Constants**: Environment variables in UPPER_CASE
-- **Private Functions**: Leading underscore (e.g., `_handle_repos_command`)
+## Error Handling
+- **Security**: Never print or log secrets/API keys
+- **Exception Scope**: Catch broad exceptions only at tool boundaries
+- **Return Format**: Structured JSON `{"success": false, "error": "..."}`
+- **Logging**: Use `logging` module, not print statements (except CLI tools)
 
-### Data Handling
-- **JSON Responses**: Pretty-printed with `indent=2`
-- **Metadata**: Dictionary-based with consistent key naming
-- **Error Format**: Structured JSON with success/error fields
-- **URL Parsing**: `urlparse` for consistent URL handling
+## Async/Concurrency
+- **Preferred Pattern**: `async/await` with `@mcp.tool()` decorators
+- **Tool Handlers**: Avoid blocking calls in MCP tool handlers
+- **Parallel Processing**: Use `concurrent.futures` for CPU-bound tasks
 
-### Comments and Documentation
-- **Tool Descriptions**: Comprehensive docstrings explaining purpose and usage
-- **Inline Comments**: Minimal, focus on complex logic explanation
-- **Code Organization**: Logical grouping with clear separation
+## Configuration Management
+- **Environment**: Load `.env` via dotenv on startup
+- **Feature Flags**: Support boolean flags (USE_CONTEXTUAL_EMBEDDINGS, etc.)
+- **API Compatibility**: Support OpenAI-compatible providers via base URL
+- **Validation**: Validate and sanitize URLs/paths for security
+
+## RAG & AI Patterns
+- **Default Embeddings**: OpenAI text-embedding-3-small
+- **Vector Database**: Use QdrantClientWrapper for all operations
+- **Search Strategy**: Prefer hybrid search when enabled
+- **Reranking**: Use CrossEncoder when USE_RERANKING=true
+
+## Testing Guidelines
+- **Network Isolation**: Mock QdrantClient and OpenAI API calls
+- **Deterministic**: Tests should be repeatable and predictable
+- **Location**: Unit tests in `tests/` directory
+- **Async Testing**: Use pytest-asyncio for async test functions
+
+## Security & Access Control
+- **API Keys**: Never log or expose in error messages
+- **File Access**: Guard behind appropriate feature flags
+- **Network Access**: Validate URLs before making requests
+- **Input Sanitization**: Always validate user inputs
+
+## CLI & Entry Points
+- **Script Execution**: `uv run path/to/script.py` for single scripts
+- **Module Entry**: `uv run -m src` for main server
+- **Health Endpoint**: Available at `/health` when using SSE transport
+- **Error Handling**: Return proper exit codes from scripts

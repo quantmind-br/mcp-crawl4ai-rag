@@ -1,44 +1,58 @@
 # Project Structure
 
-## Directory Layout
-
+## Root Directory
 ```
-E:\mcp-crawl4ai-rag\
-├── src/                          # Main source code
-│   ├── crawl4ai_mcp.py          # Main MCP server implementation
-│   └── utils.py                 # Utility functions for Supabase and embeddings
-├── knowledge_graphs/            # Neo4j knowledge graph functionality
-│   ├── ai_hallucination_detector.py    # Main hallucination detection script
-│   ├── ai_script_analyzer.py            # Python AST analysis
-│   ├── hallucination_reporter.py       # Report generation
-│   ├── knowledge_graph_validator.py    # Validation against Neo4j
-│   ├── parse_repo_into_neo4j.py        # GitHub repo parsing
-│   ├── query_knowledge_graph.py        # Interactive graph queries
-│   └── test_script.py                  # Test scripts for validation
-├── PRPs/                        # Project-specific files (gitignored)
-├── .serena/                     # Serena MCP configuration
-├── crawled_pages.sql           # Database schema for Supabase setup
-├── Dockerfile                  # Container configuration
-├── pyproject.toml              # Python project configuration
-├── uv.lock                     # Dependency lock file
-├── .env.example                # Environment variable template
-└── README.md                   # Comprehensive documentation
+mcp-crawl4ai-rag/
+├── src/                    # Main source code
+├── tests/                  # Test suite
+├── knowledge_graphs/       # Knowledge graph and AI analysis tools
+├── scripts/               # Utility scripts
+├── PRPs/                  # Project Request Patterns (documentation)
+├── .serena/               # Serena AI assistant configuration
+├── pyproject.toml         # Project configuration and dependencies
+├── docker-compose.yaml    # Docker services (Qdrant, Neo4j)
+├── Dockerfile            # Container build configuration
+├── .env.example          # Environment variable template
+└── CRUSH.md              # Development quick reference
 ```
 
-## Key Files
+## Source Code (`src/`)
+- **`crawl4ai_mcp.py`**: Main MCP server with all tools and handlers
+- **`device_manager.py`**: GPU/CPU device detection and management
+- **`qdrant_wrapper.py`**: Qdrant client wrapper and connection management
+- **`utils.py`**: Utility functions for embeddings, search, and API clients
+- **`__main__.py`**: Module entry point
+- **`__init__.py`**: Package initialization
 
-### Core Implementation
-- **`src/crawl4ai_mcp.py`**: Main MCP server with all tools and lifespan management
-- **`src/utils.py`**: Supabase integration, embedding generation, and search utilities
+## Key Tools (MCP Functions)
+1. **`crawl_single_page`**: Crawl and store single webpage
+2. **`smart_crawl_url`**: Intelligent crawling based on URL type
+3. **`get_available_sources`**: List available data sources
+4. **`perform_rag_query`**: Semantic search with optional filtering
+5. **`search_code_examples`**: Code-specific search (conditional)
+6. **`parse_github_repository`**: Extract repo to knowledge graph
+7. **`check_ai_script_hallucinations`**: Validate AI-generated code
+8. **`query_knowledge_graph`**: Explore Neo4j graph database
 
-### Knowledge Graph System
-- **`knowledge_graphs/`**: Complete Neo4j-based hallucination detection system
-- **`crawled_pages.sql`**: PostgreSQL schema with pgvector extensions
+## Test Structure (`tests/`)
+- **`conftest.py`**: Pytest fixtures and test environment setup
+- **`test_device_manager.py`**: GPU/CPU device management tests
+- **`test_flexible_api_config.py`**: API configuration tests
+- **`test_gpu_integration.py`**: GPU acceleration tests
+- **`test_integration_docker.py`**: Docker service integration tests
+- **`test_mcp_*.py`**: MCP server functionality tests
+- **`test_qdrant_*.py`**: Vector database tests
+- **`test_utils_integration.py`**: Utility function tests
 
-### Configuration
-- **`pyproject.toml`**: Dependencies and project metadata
-- **`.env.example`**: Complete environment variable documentation
-- **`Dockerfile`**: Production container setup with uv integration
+## Knowledge Graph (`knowledge_graphs/`)
+- **`parse_repo_into_neo4j.py`**: Repository code extraction
+- **`ai_script_analyzer.py`**: AST-based Python script analysis
+- **`knowledge_graph_validator.py`**: Code validation against graph
+- **`hallucination_reporter.py`**: Report generation for validation
+- **`query_knowledge_graph.py`**: Graph exploration utilities
 
-### Documentation
-- **`README.md`**: Comprehensive setup, configuration, and usage guide
+## Entry Points
+- **Server**: `uv run -m src` or `uv run src/crawl4ai_mcp.py`
+- **Scripts**: `start.bat` (Windows) for server startup
+- **Setup**: `setup.bat` (Windows) for Docker services
+- **Direct**: `uv run run_server.py` (alternative entry point)

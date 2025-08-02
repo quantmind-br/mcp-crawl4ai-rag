@@ -1,30 +1,24 @@
-# Project Overview
+# Project Overview: MCP Crawl4AI RAG Server
 
 ## Purpose
-The **Crawl4AI RAG MCP Server** is a powerful implementation of the Model Context Protocol (MCP) that integrates Crawl4AI web crawling capabilities with Supabase vector database for RAG (Retrieval-Augmented Generation). It enables AI agents and AI coding assistants to:
-
-- Crawl websites and store content in vector databases
-- Perform semantic search over crawled content
-- Extract and search code examples from documentation
-- Detect AI hallucinations using Neo4j knowledge graphs
-- Analyze GitHub repositories for code structure
-
-## Primary Goals
-- Integrate into [Archon](https://github.com/coleam00/Archon) as a knowledge engine
-- Support multiple embedding models (currently OpenAI-based)
-- Implement advanced RAG strategies beyond basic lookups
-- Enable local deployment with Ollama support
+A powerful MCP (Model Context Protocol) server that integrates web crawling and RAG (Retrieval-Augmented Generation) capabilities for AI agents and coding assistants. The server provides tools to crawl websites, store content in vector databases, and perform semantic search over crawled content.
 
 ## Key Features
-- **Smart URL Detection**: Handles webpages, sitemaps, text files
-- **Recursive Crawling**: Follows internal links
-- **Parallel Processing**: Efficient multi-page crawling
-- **Advanced RAG Strategies**: Contextual embeddings, hybrid search, reranking
-- **Knowledge Graph Integration**: AI hallucination detection via Neo4j
-- **Code Example Extraction**: Specialized code search for AI coding assistants
+- **Smart URL Detection**: Automatically handles different URL types (webpages, sitemaps, text files)
+- **Recursive Crawling**: Follows internal links to discover content
+- **Parallel Processing**: Efficiently crawls multiple pages simultaneously
+- **Content Chunking**: Intelligently splits content by headers and size
+- **Vector Search**: Performs RAG over crawled content with optional source filtering
+- **Advanced RAG Strategies**: Contextual embeddings, hybrid search, agentic RAG, reranking
+- **Knowledge Graph**: AI hallucination detection using Neo4j (optional)
 
-## Target Use Cases
-- AI coding assistants that need to reference documentation
-- RAG systems requiring high-quality content retrieval
-- Knowledge engines for AI agent development
-- Code validation and hallucination detection systems
+## Target Integration
+- Primary goal: Integration into [Archon](https://github.com/coleam00/Archon) as a knowledge engine
+- Compatible with Claude Desktop, Windsurf, and other MCP clients
+- Supports both SSE and stdio transport protocols
+
+## Core Domains
+- **Web Crawling**: Using Crawl4AI for intelligent content extraction
+- **Vector Storage**: Qdrant for embeddings and semantic search
+- **Knowledge Graphs**: Neo4j for code analysis and hallucination detection
+- **AI Integration**: OpenAI-compatible APIs for embeddings and chat

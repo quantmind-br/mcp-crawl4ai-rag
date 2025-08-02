@@ -1,47 +1,110 @@
 # Task Completion Checklist
 
-## When Completing Development Tasks
+## Pre-Development Setup
+- [ ] Ensure Docker services are running (`setup.bat`)
+- [ ] Verify `.env` file is configured with API keys
+- [ ] Activate virtual environment (`.venv\Scripts\activate`)
+- [ ] Install dependencies (`uv pip install -e .`)
 
-### Code Quality Checks
-- **Syntax Check**: Ensure Python 3.12+ compatibility
-- **Async/Await**: Verify proper async function usage
-- **Type Hints**: Add appropriate Optional/Any type hints where needed
-- **Import Organization**: Follow standard library → third-party → local pattern
+## During Development
 
-### Testing and Validation
-- **MCP Server Test**: Restart server and verify it starts without errors
-- **Tool Registration**: Ensure new tools appear in MCP client
-- **Error Handling**: Test error scenarios return proper JSON responses
-- **Environment Variables**: Verify new config options work with .env
+### Code Changes
+- [ ] Follow naming conventions (snake_case, PascalCase, UPPER_CASE)
+- [ ] Add type annotations to public functions
+- [ ] Use `@dataclass` for simple data structures
+- [ ] Return JSON strings from MCP tools
+- [ ] Handle errors with structured JSON responses
+- [ ] Avoid blocking calls in async MCP tool handlers
 
-### Documentation Updates
-- **Docstrings**: Update function docstrings with Google-style format
-- **README Updates**: Add new tool descriptions to README.md if needed
-- **Environment Example**: Update .env.example if new variables added
+### Security & Best Practices
+- [ ] Never log or print API keys/secrets
+- [ ] Validate and sanitize all user inputs
+- [ ] Use logging module instead of print statements
+- [ ] Guard file/network access behind appropriate flags
+- [ ] Test with mocked external services
 
-### Database and External Services
-- **Supabase Schema**: Run any schema changes via crawled_pages.sql
-- **Neo4j Compatibility**: Test knowledge graph features if modified
-- **API Integration**: Verify OpenAI API calls work correctly
+## Code Quality Gates (Run Before Commit)
 
-### Deployment Verification
-- **Docker Build**: Test `docker build -t mcp/crawl4ai-rag .`
-- **Container Run**: Verify `docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag`
-- **uv Installation**: Test `uv pip install -e .` and `crawl4ai-setup`
+### 1. Testing
+```bash
+pytest -q                                    # All tests must pass
+pytest tests/test_specific_feature.py -v    # Feature-specific tests
+```
 
-### Integration Testing
-- **MCP Registration**: Test MCP client connection
-- **Tool Execution**: Verify all tools work via MCP interface
-- **SSE Transport**: Test Server-Sent Events transport mode
-- **Error Recovery**: Ensure graceful error handling
+### 2. Linting
+```bash
+ruff check .                                 # No linting errors
+ruff check . --fix                          # Auto-fix what's possible
+```
 
-## No Specific Linting/Formatting Commands
-This project doesn't have configured linting tools like black, flake8, or mypy. Follow the established code style patterns in the existing codebase.
+### 3. Formatting
+```bash
+ruff format .                                # Apply consistent formatting
+```
 
-## Pre-commit Checklist
-1. Server starts without errors: `uv run src/crawl4ai_mcp.py`
-2. Docker builds successfully: `docker build -t mcp/crawl4ai-rag .`
-3. Environment template updated if needed
-4. Documentation reflects any new features
-5. Async patterns maintained throughout
-6. JSON response formatting consistent
+### 4. Type Checking
+```bash
+mypy .                                       # No type errors
+mypy src/specific_module.py                  # Module-specific checking
+```
+
+### 5. Combined Quality Check
+```bash
+ruff check . && ruff format . && mypy .     # All quality checks
+```
+
+## Integration Testing
+
+### Local Services
+- [ ] Qdrant accessible at `http://localhost:6333`
+- [ ] Neo4j accessible at `http://localhost:7474` (if knowledge graph enabled)
+- [ ] Server starts successfully (`uv run -m src`)
+- [ ] Health endpoint responds (`curl http://localhost:8051/health`)
+
+### MCP Tools Testing
+- [ ] Test basic crawling functionality
+- [ ] Verify vector search operations
+- [ ] Check RAG query responses
+- [ ] Validate error handling and edge cases
+
+## Documentation Updates
+- [ ] Update README.md if adding new features
+- [ ] Add/update docstrings for new functions
+- [ ] Update `.env.example` for new environment variables
+- [ ] Update CRUSH.md for new commands or patterns
+
+## Performance Considerations
+- [ ] Check memory usage during large crawling operations
+- [ ] Verify GPU acceleration works (if using reranking)
+- [ ] Test with different RAG strategy combinations
+- [ ] Monitor API rate limits and costs
+
+## Final Validation
+- [ ] All tests pass: `pytest -q`
+- [ ] No linting errors: `ruff check .`
+- [ ] Code properly formatted: `ruff format .`
+- [ ] No type errors: `mypy .`
+- [ ] Server starts without errors
+- [ ] Basic MCP functionality works
+- [ ] Environment variables properly configured
+- [ ] Documentation updated where necessary
+
+## Optional: Knowledge Graph Features
+If using knowledge graph functionality:
+- [ ] Neo4j service running and accessible
+- [ ] Repository parsing works correctly
+- [ ] Hallucination detection functions properly
+- [ ] Graph queries return expected results
+
+## Windows-Specific Checks
+- [ ] `.bat` scripts work correctly
+- [ ] Paths use proper Windows format where needed
+- [ ] Port conflicts resolved (8051, 6333, 7474, 7687)
+- [ ] Environment variables properly loaded from `.env`
+
+## Notes
+- Always test with realistic data volumes
+- Consider testing with different API providers
+- Verify error handling with network/service failures
+- Test RAG quality with domain-specific content
+- Monitor costs when using external APIs

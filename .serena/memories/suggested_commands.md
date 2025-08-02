@@ -1,112 +1,128 @@
-# Suggested Commands
+# Essential Development Commands
 
-## Development Environment Setup
-
-### Using uv (Recommended for development)
+## Environment Setup
 ```bash
-# Install uv
-pip install uv
-
-# Create and activate virtual environment
+# Create virtual environment and install dependencies
 uv venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Mac/Linux
-
-# Install dependencies
+.venv\Scripts\activate     # Windows
+# source .venv/bin/activate  # Linux/macOS
 uv pip install -e .
-crawl4ai-setup
+crawl4ai-setup            # Initialize Crawl4AI
 ```
 
-### Using Docker (Recommended for production)
+## Server Operations
+```bash
+# Start Docker services (Qdrant + Neo4j)
+setup.bat                 # Windows automated setup
+
+# Start MCP server (various methods)
+start.bat                 # Windows automated startup
+uv run -m src             # Module entry point (preferred)
+uv run src/crawl4ai_mcp.py  # Direct script execution
+uv run run_server.py      # Alternative entry point
+```
+
+## Testing
+```bash
+# Run all tests (quiet mode)
+pytest -q
+
+# Run specific test file
+pytest tests/test_qdrant_wrapper.py -q
+
+# Run single test method
+pytest tests/test_qdrant_wrapper.py::TestQdrantClientWrapper::test_init_default_config -q
+
+# Run with verbose output
+pytest tests/ -v
+
+# Run async tests with debugging
+pytest -vvs tests/test_integration_docker.py
+```
+
+## Code Quality
+```bash
+# Lint and format code
+ruff check .              # Check for linting errors
+ruff format .             # Format code according to style guide
+
+# Type checking
+mypy .                    # Static type analysis
+
+# Combined quality check (run all)
+ruff check . && ruff format . && mypy .
+```
+
+## Docker Operations
 ```bash
 # Build Docker image
 docker build -t mcp/crawl4ai-rag --build-arg PORT=8051 .
 
-# Run with environment file
+# Run in Docker
 docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
+
+# Docker Compose operations
+docker-compose up -d      # Start services
+docker-compose down       # Stop services
+docker-compose logs       # View logs
+docker-compose logs qdrant  # Service-specific logs
 ```
 
-## Running the Application
-
-### Direct Python Execution
+## Knowledge Graph Tools
 ```bash
-# Run the MCP server
-uv run src/crawl4ai_mcp.py
-# or if in venv: python src/crawl4ai_mcp.py
-```
+# Analyze script for AI hallucinations
+python knowledge_graphs/ai_hallucination_detector.py [script_path]
 
-### Environment Configuration
-```bash
-# Copy and configure environment
-copy .env.example .env
-# Edit .env with your API keys and configuration
-```
-
-## Database Setup Commands
-
-### Supabase Setup
-```bash
-# In Supabase SQL Editor, run:
-# Contents of crawled_pages.sql
-```
-
-### Neo4j Setup (Optional)
-```bash
-# For hallucination detection - clone Local AI Package
-git clone https://github.com/coleam00/local-ai-packaged.git
-cd local-ai-packaged
-# Follow Neo4j setup instructions
-```
-
-## Knowledge Graph Commands (if enabled)
-
-### Manual Hallucination Detection
-```bash
-python knowledge_graphs/ai_hallucination_detector.py [path_to_script]
-```
-
-### Interactive Graph Queries
-```bash
+# Interactive knowledge graph query (if available)
 python knowledge_graphs/query_knowledge_graph.py
 ```
 
-## System Commands (Windows)
-
-### File Operations
-- `dir` - List directory contents
-- `cd` - Change directory
-- `type [file]` - Display file contents
-- `findstr [pattern] [files]` - Search in files
-
-### Git Operations
+## Windows-Specific Utilities
 ```bash
-git status
-git add .
-git commit -m "message"
-git push
+# Check running services
+netstat -an | find "6333"   # Qdrant port
+netstat -an | find "7474"   # Neo4j HTTP port
+netstat -an | find "7687"   # Neo4j Bolt port
+
+# Kill process on port (if needed)
+netstat -aon | findstr ":8051"  # Find PID
+taskkill /F /PID [PID]          # Kill specific process
+
+# Check Docker status
+docker --version
+docker-compose ps
 ```
 
-## Testing and Validation
-
-### Test MCP Server Connection
+## Environment Configuration
 ```bash
-# Test if server is running
-curl http://localhost:8051/health  # if SSE transport
+# Copy environment template
+copy .env.example .env    # Windows
+# cp .env.example .env    # Linux/macOS
+
+# Edit environment variables (key variables to set)
+# OPENAI_API_KEY=your_key_here
+# QDRANT_HOST=localhost
+# QDRANT_PORT=6333
+# NEO4J_URI=bolt://localhost:7687
 ```
 
-### Environment Validation
+## Debugging & Monitoring
 ```bash
-# Check Python version (must be 3.12+)
-python --version
+# Check service health
+curl http://localhost:6333/health    # Qdrant health
+curl http://localhost:7474           # Neo4j web interface
 
-# Verify uv installation
-uv --version
+# View service dashboards
+# Qdrant: http://localhost:6333/dashboard
+# Neo4j: http://localhost:7474 (neo4j/password)
+
+# Server health endpoint
+curl http://localhost:8051/health    # When server is running
 ```
 
-## Development Workflow
-
-1. **Setup**: Create `.env` from `.env.example`
-2. **Install**: `uv pip install -e .` and `crawl4ai-setup`  
-3. **Run**: `uv run src/crawl4ai_mcp.py`
-4. **Test**: Connect via MCP client
-5. **Develop**: Edit code and restart server
+## Task Completion Checklist
+After completing any code changes, run:
+1. `pytest -q` - Ensure all tests pass
+2. `ruff check .` - Check for linting errors
+3. `ruff format .` - Format code
+4. `mypy .` - Verify type annotations
