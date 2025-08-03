@@ -1,10 +1,18 @@
-# .gitignore
-.env
-.venv
+# ==============================================================================
+# .gitignore - Crawl4AI MCP RAG Project
+# ==============================================================================
+
+# ==============================================================================
+# Python Standard Ignores
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -41,6 +49,7 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
 
@@ -52,6 +61,7 @@ coverage.xml
 *.log
 local_settings.py
 db.sqlite3
+db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -76,14 +86,25 @@ ipython_config.py
 # pyenv
 .python-version
 
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
 # celery beat schedule file
 celerybeat-schedule
+celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
 
 # Environments
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .venv
 env/
 venv/
@@ -109,33 +130,232 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Crawl4AI specific
-crawl4ai_mcp.egg-info
-repos
-.claude
-.crush
-test_script_hallucination*
-.serena/cache/
-.serena/memories/
-*.log
-*.tmp
-crawled_pages.sql
-*.db
-*.sqlite3
-models/
-downloads/
-temp/
-tmp/
-.noxic/
-testing/
+# pytype static type analyzer
+.pytype/
 
-# AI model caches
+# Cython debug symbols
+cython_debug/
+
+# ==============================================================================
+# IDE & Editor Files
+# ==============================================================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ==============================================================================
+# OS Generated Files
+# ==============================================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==============================================================================
+# Development Tools & Build Artifacts
+# ==============================================================================
+
+# Ruff
+.ruff_cache/
+
+# uv
+uv.lock
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==============================================================================
+# AI & ML Specific
+# ==============================================================================
+
+# Model caches and artifacts
 .huggingface/
 transformers/
 sentence-transformers/
 .cache/
+models/
+*.model
+*.pkl
+*.joblib
 
-# Local AI service data
+# PyTorch
+*.pth
+*.pt
+
+# TensorFlow
+*.pb
+*.tflite
+
+# ==============================================================================
+# Database & Storage
+# ==============================================================================
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite-journal
+crawled_pages.sql
+
+# Local database storage
 qdrant_storage/
 neo4j_data/
 ai_services_data/
+vector_db/
+graph_db/
+
+# ==============================================================================
+# Docker & Containers
+# ==============================================================================
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# ==============================================================================
+# Project Specific
+# ==============================================================================
+
+# Crawl4AI MCP specific
+crawl4ai_mcp.egg-info/
+repos/
+crawled_data/
+crawl_results/
+
+# AI Development Tools
+.claude/
+.crush/
+.serena/cache/
+.serena/memories/
+.noxic/
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+test_script_hallucination*
+knowledge_graphs/test_script.py.backup
+src/utils.py.backup
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+temporary/
+testing/
+
+# Log files
+*.log
+logs/
+debug.log
+error.log
+
+# Data files
+data/
+datasets/
+uploads/
+downloads/
+exports/
+
+# Configuration overrides
+config.local.*
+settings.local.*
+
+# Development artifacts
+.scratch/
+sandbox/
+experiments/
+prototypes/
+
+# PRP (Project Request Patterns) working files
+PRPs/working/
+PRPs/drafts/
+
+# ==============================================================================
+# Security & Secrets
+# ==============================================================================
+
+# API keys and secrets
+.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+api_keys.txt
+secrets.txt
+
+# ==============================================================================
+# Performance & Profiling
+# ==============================================================================
+
+# Profiling data
+*.prof
+*.pstats
+profiling/
+
+# Benchmarking results
+benchmark_results/
+performance_logs/
