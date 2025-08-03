@@ -2,7 +2,7 @@
 
 **Advanced Web Crawling and RAG Capabilities for AI Agents**
 
-A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https://crawl4ai.com), [Qdrant](https://qdrant.tech/), and [Neo4j](https://neo4j.com/) to provide AI agents and coding assistants with intelligent web crawling, vector search, and AI hallucination detection capabilities.
+A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https://crawl4ai.com), [Qdrant](https://qdrant.tech/), and [Neo4j](https://neo4j.com/) to provide AI agents and coding assistants with intelligent web crawling, GitHub repository indexing, vector search, and AI hallucination detection capabilities.
 
 ![MCP](https://img.shields.io/badge/MCP-Compatible-blue)
 ![Python](https://img.shields.io/badge/Python-3.12+-green)
@@ -58,7 +58,8 @@ A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https:
 
 ### Core Tools
 - **`crawl_single_page`** - Crawl and index individual webpages
-- **`smart_crawl_url`** - Intelligent crawling (auto-detects sitemaps, recursive crawling)
+- **`smart_crawl_url`** - Intelligent crawling (auto-detects sitemaps, recursive crawling)  
+- **`smart_crawl_github`** - Clone GitHub repos and index markdown documentation
 - **`get_available_sources`** - List all indexed sources
 - **`perform_rag_query`** - Semantic search with source filtering
 
@@ -72,45 +73,155 @@ A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https:
 
 ## ⚙️ Configuration
 
-### Basic Setup (.env)
+### Complete Environment Configuration (.env)
 ```bash
-# API Configuration
-CHAT_MODEL=gpt-4o-mini
-CHAT_API_KEY=your_openai_api_key
-EMBEDDINGS_MODEL=text-embedding-3-small
-EMBEDDINGS_API_KEY=your_openai_api_key
+# === MCP SERVER CONFIGURATION ===
+HOST=0.0.0.0
+PORT=8051
+TRANSPORT=sse
 
-# Services
+# === PRIMARY API CONFIGURATION ===
+# Chat Model Configuration (for summaries, contextual embeddings, code analysis)
+CHAT_MODEL=gpt-4o-mini
+CHAT_API_KEY=your_chat_api_key
+CHAT_API_BASE=https://api.openai.com/v1
+
+# Embeddings Model Configuration (for vector search and semantic similarity)
+EMBEDDINGS_MODEL=text-embedding-3-small
+EMBEDDINGS_API_KEY=your_embeddings_api_key
+EMBEDDINGS_API_BASE=https://api.openai.com/v1
+EMBEDDINGS_DIMENSIONS=1536  # Optional: override auto-detection
+
+# === FALLBACK API CONFIGURATION ===
+# Fallback configuration for high availability
+CHAT_FALLBACK_MODEL=gpt-4o-mini
+CHAT_FALLBACK_API_KEY=your_fallback_chat_key
+CHAT_FALLBACK_API_BASE=https://api.openai.com/v1
+
+EMBEDDINGS_FALLBACK_MODEL=text-embedding-3-small
+EMBEDDINGS_FALLBACK_API_KEY=your_fallback_embeddings_key
+EMBEDDINGS_FALLBACK_API_BASE=https://api.openai.com/v1
+
+# === VECTOR DATABASE ===
+# Qdrant Configuration
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
+
+# === KNOWLEDGE GRAPH ===
+# Neo4j Configuration (required for knowledge graph functionality)
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password123
 
-# RAG Strategies (all default to false)
-USE_HYBRID_SEARCH=true
-USE_RERANKING=true
-USE_AGENTIC_RAG=false
+# === RAG STRATEGIES ===
+# Set to "true" or "false", all default to "false"
 USE_CONTEXTUAL_EMBEDDINGS=false
+USE_HYBRID_SEARCH=true
+USE_AGENTIC_RAG=false
+USE_RERANKING=true
 USE_KNOWLEDGE_GRAPH=false
+
+# === GPU ACCELERATION ===
+# GPU Configuration (optional - requires USE_RERANKING=true)
+USE_GPU_ACCELERATION=auto      # auto, true/cuda, mps, false/cpu
+GPU_PRECISION=float32          # float32, float16, bfloat16
+GPU_DEVICE_INDEX=0            # GPU index for multi-GPU systems
+GPU_MEMORY_FRACTION=0.8       # Fraction of GPU memory to use
+
 ```
 
-### Multi-Provider Support
+### Multi-Provider Examples
+
+**OpenAI (Default)**:
 ```bash
-# Mix providers - chat via Azure, embeddings via OpenAI
-CHAT_MODEL=gpt-4
-CHAT_API_KEY=your_azure_key
-CHAT_API_BASE=https://your-resource.openai.azure.com/
+CHAT_MODEL=gpt-4o-mini
+CHAT_API_KEY=sk-your-openai-key
 
 EMBEDDINGS_MODEL=text-embedding-3-small
-EMBEDDINGS_API_KEY=sk-your_openai_key
+EMBEDDINGS_API_KEY=sk-your-openai-key
 ```
 
-### GPU Acceleration (Optional)
+**Azure OpenAI**:
 ```bash
-USE_GPU_ACCELERATION=auto    # auto, cuda, mps, cpu
-GPU_PRECISION=float16        # Reduce memory usage
+CHAT_MODEL=gpt-35-turbo
+CHAT_API_KEY=your-azure-api-key
+CHAT_API_BASE=https://your-resource.openai.azure.com/
+
+EMBEDDINGS_MODEL=text-embedding-ada-002
+EMBEDDINGS_API_KEY=your-azure-api-key
+EMBEDDINGS_API_BASE=https://your-resource.openai.azure.com/
 ```
+
+**DeepInfra (Cost-Effective)**:
+```bash
+CHAT_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
+CHAT_API_KEY=your-deepinfra-key
+CHAT_API_BASE=https://api.deepinfra.com/v1/openai
+
+EMBEDDINGS_MODEL=Qwen/Qwen3-Embedding-0.6B
+EMBEDDINGS_API_KEY=your-deepinfra-key
+EMBEDDINGS_API_BASE=https://api.deepinfra.com/v1/openai
+```
+
+**Mixed Providers with Fallback**:
+```bash
+# Primary: DeepInfra for cost efficiency
+CHAT_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
+CHAT_API_KEY=your-deepinfra-key
+CHAT_API_BASE=https://api.deepinfra.com/v1/openai
+
+# Fallback: OpenAI for reliability
+CHAT_FALLBACK_MODEL=gpt-4o-mini
+CHAT_FALLBACK_API_KEY=sk-your-openai-key
+
+EMBEDDINGS_MODEL=Qwen/Qwen3-Embedding-0.6B
+EMBEDDINGS_API_KEY=your-deepinfra-key
+EMBEDDINGS_API_BASE=https://api.deepinfra.com/v1/openai
+
+EMBEDDINGS_FALLBACK_MODEL=text-embedding-3-small
+EMBEDDINGS_FALLBACK_API_KEY=sk-your-openai-key
+```
+
+### Environment Variables Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| **Server Configuration** |
+| `HOST` | `0.0.0.0` | Server host address |
+| `PORT` | `8051` | Server port |
+| `TRANSPORT` | `sse` | Transport protocol (sse/stdio) |
+| **Primary API Configuration** |
+| `CHAT_MODEL` | - | Chat model (gpt-4o-mini, etc.) |
+| `CHAT_API_KEY` | - | API key for chat operations |
+| `CHAT_API_BASE` | OpenAI default | Base URL for chat API |
+| `EMBEDDINGS_MODEL` | - | Embeddings model |
+| `EMBEDDINGS_API_KEY` | - | API key for embeddings |
+| `EMBEDDINGS_API_BASE` | OpenAI default | Base URL for embeddings API |
+| `EMBEDDINGS_DIMENSIONS` | Auto-detect | Override dimension auto-detection |
+| **Fallback Configuration** |
+| `CHAT_FALLBACK_MODEL` | `gpt-4o-mini` | Fallback chat model |
+| `CHAT_FALLBACK_API_KEY` | - | Fallback chat API key |
+| `CHAT_FALLBACK_API_BASE` | - | Fallback chat base URL |
+| `EMBEDDINGS_FALLBACK_MODEL` | `text-embedding-3-small` | Fallback embeddings model |
+| `EMBEDDINGS_FALLBACK_API_KEY` | - | Fallback embeddings API key |  
+| `EMBEDDINGS_FALLBACK_API_BASE` | - | Fallback embeddings base URL |
+| **Database Configuration** |
+| `QDRANT_HOST` | `localhost` | Qdrant host |
+| `QDRANT_PORT` | `6333` | Qdrant port |  
+| `NEO4J_URI` | - | Neo4j connection URI |
+| `NEO4J_USER` | `neo4j` | Neo4j username |
+| `NEO4J_PASSWORD` | - | Neo4j password |
+| **RAG Strategies** |
+| `USE_CONTEXTUAL_EMBEDDINGS` | `false` | Enhanced chunk context |
+| `USE_HYBRID_SEARCH` | `false` | Semantic + keyword search |
+| `USE_AGENTIC_RAG` | `false` | Code example extraction |
+| `USE_RERANKING` | `false` | Result reordering |
+| `USE_KNOWLEDGE_GRAPH` | `false` | AI hallucination detection |
+| **GPU Acceleration** |
+| `USE_GPU_ACCELERATION` | `auto` | GPU usage (auto/cuda/mps/cpu) |
+| `GPU_PRECISION` | `float32` | Model precision (float32/float16/bfloat16) |
+| `GPU_DEVICE_INDEX` | `0` | GPU device index |
+| `GPU_MEMORY_FRACTION` | `0.8` | GPU memory fraction to use |
 
 ---
 
@@ -237,12 +348,12 @@ docker-compose down --volumes
 ### Core Components
 - **MCP Server**: FastMCP-based server with async tools
 - **Vector Database**: Qdrant for semantic search and storage
-- **Web Crawler**: Crawl4AI with smart URL detection
+- **Web Crawler**: Crawl4AI with smart URL detection and GitHub integration
 - **Knowledge Graph**: Neo4j for code structure analysis
 - **Device Manager**: Automatic GPU/CPU detection and fallback
 
 ### Data Flow
-1. **Crawling**: URLs → Crawl4AI → Content extraction
+1. **Crawling**: URLs/GitHub repos → Crawl4AI/Git clone → Content extraction
 2. **Processing**: Content → Chunking → Embeddings → Qdrant
 3. **Search**: Query → Vector search → Reranking → Results
 4. **Validation**: Code → AST analysis → Neo4j validation
@@ -256,6 +367,9 @@ docker-compose down --volumes
 # Crawl documentation site
 crawl_single_page("https://docs.python.org/3/tutorial/")
 
+# Index entire GitHub project documentation
+smart_crawl_github("https://github.com/psf/requests")
+
 # Search for specific topics
 perform_rag_query("how to handle exceptions in Python")
 ```
@@ -267,6 +381,9 @@ perform_rag_query("how to handle exceptions in Python")
 
 # Crawl API documentation
 smart_crawl_url("https://api.github.com/docs")
+
+# Index GitHub repository documentation  
+smart_crawl_github("https://github.com/user/awesome-project")
 
 # Find code examples
 search_code_examples("GitHub API authentication")
