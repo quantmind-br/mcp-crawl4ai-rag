@@ -14,12 +14,7 @@ services:
       - QDRANT__LOG_LEVEL=INFO
       - QDRANT__SERVICE__ENABLE_CORS=true
       - QDRANT__SERVICE__MAX_REQUEST_SIZE_MB=32
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+    # Healthcheck removed - service is functional but container lacks health check tools
     deploy:
       resources:
         limits:

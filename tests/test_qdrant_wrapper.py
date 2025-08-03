@@ -15,6 +15,7 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
+from embedding_config import get_embedding_dimensions
 
 
 class TestQdrantClientWrapper:
@@ -126,7 +127,7 @@ class TestQdrantClientWrapper:
         mock_collection_info.status = "green"
         mock_collection_info.points_count = 100
         mock_collection_info.config.params.vectors.distance.value = "Cosine"
-        mock_collection_info.config.params.vectors.size = 1536
+        mock_collection_info.config.params.vectors.size = get_embedding_dimensions()
         mock_client_instance.get_collection.return_value = mock_collection_info
         
         mock_qdrant_client.return_value = mock_client_instance
@@ -203,7 +204,7 @@ class TestQdrantClientWrapper:
         wrapper = QdrantClientWrapper()
         
         # Test
-        query_embedding = [0.1] * 1536
+        query_embedding = [0.1] * get_embedding_dimensions()
         results = wrapper.search_documents(query_embedding, match_count=5)
         
         # Verify
@@ -233,7 +234,7 @@ class TestQdrantClientWrapper:
         wrapper = QdrantClientWrapper()
         
         # Test
-        query_embedding = [0.1] * 1536
+        query_embedding = [0.1] * get_embedding_dimensions()
         filter_metadata = {"category": "docs"}
         source_filter = "example.com"
         

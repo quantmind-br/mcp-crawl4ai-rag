@@ -35,6 +35,12 @@ except ImportError:
 knowledge_graphs_path = Path(__file__).resolve().parent.parent / 'knowledge_graphs'
 sys.path.append(str(knowledge_graphs_path))
 
+# Import knowledge graph modules
+from knowledge_graph_validator import KnowledgeGraphValidator  # noqa: E402
+from parse_repo_into_neo4j import DirectNeo4jExtractor  # noqa: E402
+from ai_script_analyzer import AIScriptAnalyzer  # noqa: E402
+from hallucination_reporter import HallucinationReporter  # noqa: E402
+
 try:
     from .utils import (
         get_supabase_client, 
@@ -44,8 +50,7 @@ try:
         generate_code_example_summary,
         add_code_examples_to_supabase,
         update_source_info,
-        extract_source_summary,
-        search_code_examples
+        extract_source_summary
     )
     # Import Qdrant client wrapper for type annotations
     from .qdrant_wrapper import QdrantClientWrapper
@@ -58,17 +63,10 @@ except ImportError:
         generate_code_example_summary,
         add_code_examples_to_supabase,
         update_source_info,
-        extract_source_summary,
-        search_code_examples
+        extract_source_summary
     )
     # Import Qdrant client wrapper for type annotations
     from qdrant_wrapper import QdrantClientWrapper
-
-# Import knowledge graph modules
-from knowledge_graph_validator import KnowledgeGraphValidator
-from parse_repo_into_neo4j import DirectNeo4jExtractor
-from ai_script_analyzer import AIScriptAnalyzer
-from hallucination_reporter import HallucinationReporter
 
 # Load environment variables from the project root .env file
 project_root = Path(__file__).resolve().parent.parent
@@ -167,6 +165,19 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     
     # Initialize Qdrant client
     qdrant_client = get_supabase_client()  # Legacy function name, returns QdrantClientWrapper
+    
+    # Validate embeddings configuration and dimensions
+    try:
+        try:
+            from .embedding_config import validate_embeddings_config, get_embedding_dimensions
+        except ImportError:
+            from embedding_config import validate_embeddings_config, get_embedding_dimensions
+        validate_embeddings_config()
+        embedding_dims = get_embedding_dimensions()
+        print(f"OK Embedding setup validated - dimensions: {embedding_dims}")
+    except Exception as e:
+        print(f"WARNING Embedding configuration validation failed: {e}")
+        print("Server will continue but embedding functionality may not work correctly.")
     
     # Initialize cross-encoder model for reranking if enabled
     reranking_model = None
@@ -692,7 +703,6 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         # Extract and process code examples from all documents only if enabled
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
         if extract_code_examples_enabled:
-            all_code_blocks = []
             code_urls = []
             code_chunk_numbers = []
             code_examples = []

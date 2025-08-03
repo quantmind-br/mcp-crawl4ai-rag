@@ -23,6 +23,7 @@ def setup_test_environment():
         "EMBEDDINGS_MODEL": "text-embedding-3-small",
         "EMBEDDINGS_API_KEY": "test-embeddings-api-key", 
         "EMBEDDINGS_API_BASE": "https://api.openai.com/v1",
+        "EMBEDDINGS_DIMENSIONS": "1536",  # Default test dimensions
         
         # Other configuration
         "QDRANT_HOST": "localhost",

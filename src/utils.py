@@ -4,15 +4,17 @@ Utility functions for the Crawl4AI MCP server with Qdrant integration.
 import os
 import concurrent.futures
 from typing import List, Dict, Any, Optional, Tuple
-import json
-from urllib.parse import urlparse
 import openai
-import re
 import time
 import logging
 
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, MatchText
-from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
+
+# Import embedding configuration utilities
+try:
+    from .embedding_config import get_embedding_dimensions, validate_embeddings_config
+except ImportError:
+    from embedding_config import get_embedding_dimensions, validate_embeddings_config
 
 # Import our Qdrant client wrapper
 try:
@@ -84,6 +86,7 @@ def get_embeddings_client():
         return openai.OpenAI(api_key=api_key, base_url=base_url)
     else:
         return openai.OpenAI(api_key=api_key)
+
 
 def get_chat_fallback_client():
     """
@@ -253,32 +256,6 @@ def validate_chat_config() -> bool:
     
     return True
 
-def validate_embeddings_config() -> bool:
-    """
-    Validate embeddings model configuration and provide helpful guidance.
-    
-    Returns:
-        bool: True if configuration is valid, False otherwise
-        
-    Raises:
-        ValueError: If critical configuration is missing
-    """
-    # Check for API key
-    embeddings_api_key = os.getenv("EMBEDDINGS_API_KEY")
-    
-    if not embeddings_api_key:
-        raise ValueError(
-            "No API key configured for embeddings. Please set EMBEDDINGS_API_KEY"
-        )
-    
-    # Log configuration being used
-    embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
-    effective_key_source = "EMBEDDINGS_API_KEY"
-    base_url = os.getenv("EMBEDDINGS_API_BASE", "default OpenAI")
-    
-    logging.debug(f"Embeddings configuration - Model: {embeddings_model}, Key source: {effective_key_source}, Base URL: {base_url}")
-    
-    return True
 
 def validate_chat_fallback_config() -> bool:
     """
@@ -410,7 +387,8 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
             client = get_embeddings_client()
             response = client.embeddings.create(
                 model=embeddings_model,
-                input=texts
+                input=texts,
+                encoding_format="float"  # Explicitly set encoding format for DeepInfra compatibility
             )
             return [item.embedding for item in response.data]
         except Exception as e:
@@ -432,14 +410,15 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
                         client = get_embeddings_client()
                         individual_response = client.embeddings.create(
                             model=embeddings_model,
-                            input=[text]
+                            input=[text],
+                            encoding_format="float"  # Explicitly set encoding format for DeepInfra compatibility
                         )
                         embeddings.append(individual_response.data[0].embedding)
                         successful_count += 1
                     except Exception as individual_error:
                         print(f"Failed to create embedding for text {i}: {individual_error}")
                         # Add zero embedding as fallback
-                        embeddings.append([0.0] * 1536)
+                        embeddings.append([0.0] * get_embedding_dimensions())
                 
                 print(f"Successfully created {successful_count}/{len(texts)} embeddings individually")
                 return embeddings
@@ -456,11 +435,11 @@ def create_embedding(text: str) -> List[float]:
     """
     try:
         embeddings = create_embeddings_batch([text])
-        return embeddings[0] if embeddings else [0.0] * 1536
+        return embeddings[0] if embeddings else [0.0] * get_embedding_dimensions()
     except Exception as e:
         print(f"Error creating embedding: {e}")
         # Return empty embedding if there's an error
-        return [0.0] * 1536
+        return [0.0] * get_embedding_dimensions()
 
 def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, bool]:
     """
@@ -769,7 +748,7 @@ def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[D
         if len(lines) > 1:
             # Check if first line is a language specifier (no spaces, common language names)
             first_line = lines[0].strip()
-            if first_line and not ' ' in first_line and len(first_line) < 20:
+            if first_line and ' ' not in first_line and len(first_line) < 20:
                 language = first_line
                 code_content = lines[1].strip() if len(lines) > 1 else ""
             else:
@@ -819,9 +798,6 @@ def generate_code_example_summary(code: str, context_before: str, context_after:
     Returns:
         A summary of what the code example demonstrates
     """
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv("CHAT_MODEL") or os.getenv("CHAT_FALLBACK_MODEL")
-    
     # Create the prompt
     prompt = f"""<context_before>
 {context_before[-500:] if len(context_before) > 500 else context_before}
@@ -899,7 +875,7 @@ def add_code_examples_to_supabase(
             if embedding and not all(v == 0.0 for v in embedding):
                 valid_embeddings.append(embedding)
             else:
-                print(f"Warning: Zero or invalid embedding detected, creating new one...")
+                print("Warning: Zero or invalid embedding detected, creating new one...")
                 # Try to create a single embedding as fallback
                 single_embedding = create_embedding(combined_texts[i])
                 valid_embeddings.append(single_embedding)
@@ -965,9 +941,6 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
     
     if not content or len(content.strip()) == 0:
         return default_summary
-    
-    # Get chat model with modern fallback configuration
-    model_choice = os.getenv("CHAT_MODEL") or os.getenv("CHAT_FALLBACK_MODEL")
     
     # Limit content length to avoid token limits
     truncated_content = content[:25000] if len(content) > 25000 else content
@@ -1223,7 +1196,7 @@ def health_check_gpu_acceleration() -> Dict[str, Any]:
             
             # Perform test operation
             test_tensor = torch.randn(100, 100, device=device)
-            result = test_tensor @ test_tensor.T
+            _ = test_tensor @ test_tensor.T  # Test GPU matrix operation
             
             # If we get here, GPU test passed
             health_status.update({
@@ -1237,7 +1210,7 @@ def health_check_gpu_acceleration() -> Dict[str, Any]:
             # Test MPS (Apple Silicon)
             device = torch.device("mps")
             test_tensor = torch.randn(100, 100, device=device)
-            result = test_tensor.sum()
+            _ = test_tensor.sum()  # Test MPS functionality
             
             health_status.update({
                 'gpu_available': True,

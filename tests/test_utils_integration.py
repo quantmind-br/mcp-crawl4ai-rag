@@ -20,6 +20,7 @@ from utils import (
     create_embedding, create_embeddings_batch,
     extract_code_blocks, update_source_info
 )
+from embedding_config import get_embedding_dimensions
 from qdrant_wrapper import QdrantClientWrapper
 
 
@@ -51,7 +52,7 @@ class TestUtilsIntegration:
         ]
         mock_wrapper_class.return_value = mock_client
         
-        mock_create_embedding.return_value = [0.1] * 1536
+        mock_create_embedding.return_value = [0.1] * get_embedding_dimensions()
         
         # Test
         results = search_documents(mock_client, "test query", match_count=5)
@@ -73,7 +74,7 @@ class TestUtilsIntegration:
         ]
         mock_wrapper_class.return_value = mock_client
         
-        mock_create_embedding.return_value = [0.1] * 1536
+        mock_create_embedding.return_value = [0.1] * get_embedding_dimensions()
         
         # Test
         results = search_code_examples(mock_client, "function definition", match_count=3)
@@ -98,7 +99,7 @@ class TestUtilsIntegration:
         mock_client.upsert_points.return_value = None
         mock_wrapper_class.return_value = mock_client
         
-        mock_create_embeddings.return_value = [[0.1] * 1536]
+        mock_create_embeddings.return_value = [[0.1] * get_embedding_dimensions()]
         
         # Test data
         urls = ["https://example.com"]
@@ -129,7 +130,7 @@ class TestUtilsIntegration:
         mock_client.upsert_points.return_value = None
         mock_wrapper_class.return_value = mock_client
         
-        mock_create_embeddings.return_value = [[0.1] * 1536]
+        mock_create_embeddings.return_value = [[0.1] * get_embedding_dimensions()]
         
         # Test data
         urls = ["https://example.com"]
@@ -172,8 +173,8 @@ class TestEmbeddingFunctions:
         # Setup mock
         mock_response = Mock()
         mock_response.data = [
-            Mock(embedding=[0.1] * 1536),
-            Mock(embedding=[0.2] * 1536)
+            Mock(embedding=[0.1] * get_embedding_dimensions()),
+            Mock(embedding=[0.2] * get_embedding_dimensions())
         ]
         mock_openai_create.return_value = mock_response
         
@@ -183,8 +184,8 @@ class TestEmbeddingFunctions:
         
         # Verify
         assert len(embeddings) == 2
-        assert len(embeddings[0]) == 1536
-        assert len(embeddings[1]) == 1536
+        assert len(embeddings[0]) == get_embedding_dimensions()
+        assert len(embeddings[1]) == get_embedding_dimensions()
         mock_openai_create.assert_called_once_with(
             model="text-embedding-3-small",
             input=texts
@@ -199,8 +200,8 @@ class TestEmbeddingFunctions:
             Exception("Batch failed"),  # 1st batch attempt fails
             Exception("Batch failed"),  # 2nd batch attempt fails  
             Exception("Batch failed"),  # 3rd batch attempt fails
-            Mock(data=[Mock(embedding=[0.1] * 1536)]),  # 1st individual call succeeds
-            Mock(data=[Mock(embedding=[0.2] * 1536)])   # 2nd individual call succeeds
+            Mock(data=[Mock(embedding=[0.1] * get_embedding_dimensions())]),  # 1st individual call succeeds
+            Mock(data=[Mock(embedding=[0.2] * get_embedding_dimensions())])   # 2nd individual call succeeds
         ]
         
         # Test
@@ -209,8 +210,8 @@ class TestEmbeddingFunctions:
         
         # Verify
         assert len(embeddings) == 2
-        assert len(embeddings[0]) == 1536
-        assert len(embeddings[1]) == 1536
+        assert len(embeddings[0]) == get_embedding_dimensions()
+        assert len(embeddings[1]) == get_embedding_dimensions()
         assert mock_openai_create.call_count == 5  # 3 batch attempts + 2 individual
         assert mock_sleep.call_count == 2  # Called for retry delays
 
@@ -218,13 +219,13 @@ class TestEmbeddingFunctions:
     def test_create_embedding_single(self, mock_batch):
         """Test single embedding creation."""
         # Setup mock
-        mock_batch.return_value = [[0.1] * 1536]
+        mock_batch.return_value = [[0.1] * get_embedding_dimensions()]
         
         # Test
         embedding = create_embedding("test text")
         
         # Verify
-        assert len(embedding) == 1536
+        assert len(embedding) == get_embedding_dimensions()
         mock_batch.assert_called_once_with(["test text"])
 
     @patch('utils.create_embeddings_batch')
@@ -237,7 +238,7 @@ class TestEmbeddingFunctions:
         embedding = create_embedding("test text")
         
         # Verify fallback to zero embedding
-        assert len(embedding) == 1536
+        assert len(embedding) == get_embedding_dimensions()
         assert all(v == 0.0 for v in embedding)
 
 

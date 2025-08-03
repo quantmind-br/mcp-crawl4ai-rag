@@ -8,22 +8,62 @@ Note: This module is named 'qdrant_client' but provides a wrapper class
 'QdrantClientWrapper' to avoid conflicts with the installed qdrant-client package.
 """
 import os
-import hashlib
 import uuid
 import logging
-import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct, Filter, FieldCondition, 
-    MatchValue, MatchText
+    MatchValue
 )
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-# Collection configurations based on existing Supabase schema
+# Import dynamic dimension utilities
+try:
+    from .embedding_config import get_embedding_dimensions
+except ImportError:
+    from embedding_config import get_embedding_dimensions
+
+def get_collections_config():
+    """
+    Generate collection configurations with dynamic embedding dimensions.
+    
+    Returns:
+        dict: Collection configurations with current embedding dimensions
+    """
+    embedding_dims = get_embedding_dimensions()
+    
+    return {
+        "crawled_pages": {
+            "vectors_config": VectorParams(size=embedding_dims, distance=Distance.COSINE),
+            "payload_schema": {
+                "url": str,
+                "content": str,
+                "chunk_number": int,
+                "source_id": str,
+                "metadata": dict,
+                "created_at": str
+            }
+        },
+        "code_examples": {
+            "vectors_config": VectorParams(size=embedding_dims, distance=Distance.COSINE),
+            "payload_schema": {
+                "url": str,
+                "content": str,
+                "summary": str,
+                "chunk_number": int,
+                "source_id": str,
+                "metadata": dict,
+                "created_at": str
+            }
+        }
+    }
+
+# Legacy global collections - replaced by get_collections_config()
+# Maintained for backward compatibility during transition
 COLLECTIONS = {
     "crawled_pages": {
         "vectors_config": VectorParams(size=1536, distance=Distance.COSINE),
@@ -79,9 +119,9 @@ class QdrantClientWrapper:
         if not QdrantClientWrapper._collections_verified:
             self._ensure_collections_exist()
             QdrantClientWrapper._collections_verified = True
-            logging.info(f"Qdrant collections verified and created if necessary")
+            logging.info("Qdrant collections verified and created if necessary")
         else:
-            logging.debug(f"Qdrant collections already verified, skipping check")
+            logging.debug("Qdrant collections already verified, skipping check")
         
         logging.info(f"Qdrant client initialized: {self.host}:{self.port}")
     
@@ -106,19 +146,95 @@ class QdrantClientWrapper:
         try:
             self.client.get_collection(collection_name)
             return True
-        except:
+        except Exception:
             return False
     
+    def _validate_collection_dimensions(self, collection_name: str, expected_config: VectorParams) -> Dict[str, Any]:
+        """
+        Validate collection dimensions against expected configuration.
+        
+        Args:
+            collection_name: Name of the collection to validate
+            expected_config: Expected vector configuration
+            
+        Returns:
+            dict: Validation results with dimensions and recreation status
+        """
+        try:
+            collection_info = self.client.get_collection(collection_name)
+            current_size = collection_info.config.params.vectors.size
+            expected_size = expected_config.size
+            
+            return {
+                "size_match": current_size == expected_size,
+                "needs_recreation": current_size != expected_size,
+                "current_size": current_size,
+                "expected_size": expected_size
+            }
+        except Exception as e:
+            logging.debug(f"Failed to validate collection {collection_name}: {e}")
+            return {"needs_recreation": True, "error": str(e)}
+    
+    def _recreate_collection_safely(self, collection_name: str, vectors_config: VectorParams):
+        """
+        Safely recreate a collection with new dimensions.
+        
+        Args:
+            collection_name: Name of collection to recreate
+            vectors_config: New vector configuration
+        """
+        try:
+            # Delete existing collection if it exists
+            if self._collection_exists(collection_name):
+                logging.warning(f"Deleting collection {collection_name} due to dimension mismatch")
+                self.client.delete_collection(collection_name)
+            
+            # Create new collection with updated configuration
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=vectors_config
+            )
+            logging.info(f"Recreated collection {collection_name} with dimensions: {vectors_config.size}")
+            
+        except Exception as e:
+            logging.error(f"Failed to recreate collection {collection_name}: {e}")
+            raise
+    
     def _ensure_collections_exist(self):
-        """Initialize collections if they don't exist."""
-        for name, config in COLLECTIONS.items():
-            if not self._collection_exists(name):
+        """Initialize collections with dimension validation and controlled recreation."""
+        collections_config = get_collections_config()
+        
+        for name, config in collections_config.items():
+            vectors_config = config["vectors_config"]
+            
+            if self._collection_exists(name):
+                # Validate existing collection dimensions
+                validation = self._validate_collection_dimensions(name, vectors_config)
+                
+                logging.info(f"Validation result for {name}: {validation}")
+                
+                if validation.get("needs_recreation", False):
+                    current_size = validation.get("current_size", "unknown")
+                    expected_size = validation.get("expected_size", vectors_config.size)
+                    
+                    # CONSERVATIVE APPROACH: Log warning but DO NOT auto-recreate
+                    logging.warning(
+                        f"Collection {name} has dimension mismatch "
+                        f"(current: {current_size}, expected: {expected_size}). "
+                        f"AUTO-RECREATION DISABLED. Use reset_verification_cache() to force recreation if needed."
+                    )
+                    # Continue using existing collection instead of recreating
+                else:
+                    logging.info(f"Collection {name} dimensions validated successfully - no recreation needed")
+            else:
+                # Create new collection only if it doesn't exist
                 try:
+                    logging.info(f"Collection {name} does not exist, creating with dimensions: {vectors_config.size}")
                     self.client.create_collection(
                         collection_name=name,
-                        vectors_config=config["vectors_config"]
+                        vectors_config=vectors_config
                     )
-                    logging.info(f"Created collection: {name}")
+                    logging.info(f"Created collection {name} with dimensions: {vectors_config.size}")
                 except Exception as e:
                     logging.error(f"Failed to create collection {name}: {e}")
                     raise
@@ -599,6 +715,38 @@ class QdrantClientWrapper:
         """Reset the collections verification cache. Useful for testing or maintenance."""
         cls._collections_verified = False
         logging.info("Qdrant collections verification cache reset")
+
+    @classmethod
+    def force_recreate_collections(cls):
+        """
+        Force recreation of all collections with current configuration.
+        
+        WARNING: This will delete all existing data!
+        Use only when you need to update collection dimensions.
+        """
+        logging.warning("FORCE RECREATION: This will delete all existing collection data!")
+        
+        # Reset verification cache first
+        cls.reset_verification_cache()
+        
+        # Create temporary client for recreation
+        temp_client = cls()
+        collections_config = get_collections_config()
+        
+        for name, config in collections_config.items():
+            vectors_config = config["vectors_config"]
+            
+            if temp_client._collection_exists(name):
+                logging.warning(f"Force recreating collection {name} with dimensions: {vectors_config.size}")
+                temp_client._recreate_collection_safely(name, vectors_config)
+            else:
+                logging.info(f"Creating new collection {name} with dimensions: {vectors_config.size}")
+                temp_client.client.create_collection(
+                    collection_name=name,
+                    vectors_config=vectors_config
+                )
+        
+        logging.info("Force recreation completed. All collections now match current configuration.")
 
 
 # Global client instance for singleton pattern
