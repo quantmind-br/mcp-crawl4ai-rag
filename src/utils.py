@@ -12,9 +12,9 @@ from qdrant_client.models import PointStruct
 
 # Import embedding configuration utilities
 try:
-    from .embedding_config import get_embedding_dimensions, validate_embeddings_config
+    from .embedding_config import get_embedding_dimensions
 except ImportError:
-    from embedding_config import get_embedding_dimensions, validate_embeddings_config
+    from embedding_config import get_embedding_dimensions
 
 # Import our Qdrant client wrapper
 try:

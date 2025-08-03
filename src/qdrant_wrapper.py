@@ -59,6 +59,16 @@ def get_collections_config():
                 "metadata": dict,
                 "created_at": str
             }
+        },
+        "sources": {
+            "vectors_config": VectorParams(size=embedding_dims, distance=Distance.COSINE),
+            "payload_schema": {
+                "source_id": str,
+                "summary": str,
+                "total_words": int,
+                "created_at": str,
+                "updated_at": str
+            }
         }
     }
 
@@ -90,8 +100,7 @@ COLLECTIONS = {
     }
 }
 
-# In-memory sources storage (replaces sources table)
-sources_storage = {}
+# Sources are now stored persistently in Qdrant 'sources' collection
 
 class QdrantClientWrapper:
     """
@@ -529,18 +538,61 @@ class QdrantClientWrapper:
             return []
     
     def update_source_info(self, source_id: str, summary: str, word_count: int):
-        """Update source information in memory storage."""
-        sources_storage[source_id] = {
-            "source_id": source_id,
-            "summary": summary,
-            "total_word_count": word_count,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        logging.info(f"Updated source info for: {source_id}")
+        """Update source information in Qdrant sources collection."""
+        try:
+            # Use source_id as the point ID for easy retrieval
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, source_id))
+            now = datetime.now(timezone.utc).isoformat()
+            
+            # Create a dummy vector (we're only using this collection for metadata)
+            dummy_vector = [0.0] * get_embedding_dimensions()
+            
+            point = PointStruct(
+                id=point_id,
+                vector=dummy_vector,
+                payload={
+                    "source_id": source_id,
+                    "summary": summary,
+                    "total_words": word_count,
+                    "created_at": now,
+                    "updated_at": now
+                }
+            )
+            
+            self.client.upsert(
+                collection_name="sources",
+                points=[point],
+                wait=True
+            )
+            logging.info(f"Updated source info for: {source_id}")
+        except Exception as e:
+            logging.error(f"Error updating source info: {e}")
     
     def get_available_sources(self) -> List[Dict[str, Any]]:
-        """Get all available sources from memory storage."""
-        return list(sources_storage.values())
+        """Get all available sources from Qdrant sources collection."""
+        try:
+            # Scroll through all points in sources collection
+            result = self.client.scroll(
+                collection_name="sources",
+                limit=1000,  # Assuming we won't have more than 1000 sources
+                with_payload=True
+            )[0]  # Get points from scroll result
+            
+            sources = []
+            for point in result:
+                payload = point.payload
+                sources.append({
+                    "source_id": payload["source_id"],
+                    "summary": payload["summary"],
+                    "total_words": payload["total_words"],
+                    "created_at": payload["created_at"],
+                    "updated_at": payload["updated_at"]
+                })
+            
+            return sources
+        except Exception as e:
+            logging.error(f"Error getting available sources: {e}")
+            return []
     
     def keyword_search_documents(
         self,
@@ -701,7 +753,7 @@ class QdrantClientWrapper:
             return {
                 "status": "healthy",
                 "collections": collection_info,
-                "sources_count": len(sources_storage),
+                "sources_count": len(self.get_available_sources()),
                 "collections_verified": QdrantClientWrapper._collections_verified
             }
         except Exception as e:

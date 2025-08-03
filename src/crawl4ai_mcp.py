@@ -71,20 +71,39 @@ try:
         update_source_info,
         extract_source_summary,
     )
+    from .utils.github_processor import GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor
+    from .utils.validation import validate_github_url
 
     # Import Qdrant client wrapper for type annotations
     from .qdrant_wrapper import QdrantClientWrapper
 except ImportError:
-    from utils import (
-        get_supabase_client,
-        add_documents_to_supabase,
-        search_documents,
-        extract_code_blocks,
-        generate_code_example_summary,
-        add_code_examples_to_supabase,
-        update_source_info,
-        extract_source_summary,
-    )
+    # When running as main module, import directly from files
+    import sys
+    import importlib.util
+    from pathlib import Path
+    
+    # Add the src directory to the path
+    src_dir = Path(__file__).parent
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+    
+    # Import from the main utils.py file using importlib
+    utils_path = src_dir / "utils.py"
+    spec = importlib.util.spec_from_file_location("main_utils", utils_path)
+    main_utils = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(main_utils)
+    
+    get_supabase_client = main_utils.get_supabase_client
+    add_documents_to_supabase = main_utils.add_documents_to_supabase
+    search_documents = main_utils.search_documents
+    extract_code_blocks = main_utils.extract_code_blocks
+    generate_code_example_summary = main_utils.generate_code_example_summary
+    add_code_examples_to_supabase = main_utils.add_code_examples_to_supabase
+    update_source_info = main_utils.update_source_info
+    extract_source_summary = main_utils.extract_source_summary
+    
+    from utils.github_processor import GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor
+    from utils.validation import validate_github_url
 
     # Import Qdrant client wrapper for type annotations
     from qdrant_wrapper import QdrantClientWrapper
@@ -889,6 +908,247 @@ async def smart_crawl_url(
         )
     except Exception as e:
         return json.dumps({"success": False, "url": url, "error": str(e)}, indent=2)
+
+
+@mcp.tool()
+async def smart_crawl_github(
+    ctx: Context,
+    repo_url: str,
+    max_files: int = 50,
+    chunk_size: int = 5000,
+    max_size_mb: int = 500,
+) -> str:
+    """
+    Clone a GitHub repository, extract markdown files, and store them in the vector database.
+    
+    This tool clones a GitHub repository to a temporary directory, discovers markdown files,
+    extracts metadata, and stores the content in chunks for vector search and retrieval.
+    
+    Args:
+        ctx: The MCP server provided context
+        repo_url: GitHub repository URL (e.g., 'https://github.com/user/repo')
+        max_files: Maximum number of markdown files to process (default: 50)
+        chunk_size: Maximum size of each content chunk in characters (default: 5000)
+        max_size_mb: Maximum repository size in MB (default: 500)
+        
+    Returns:
+        JSON string with crawl summary and storage information
+    """
+    repo_manager = None
+    try:
+        # Validate GitHub URL
+        is_valid, error_msg = validate_github_url(repo_url)
+        if not is_valid:
+            return json.dumps({
+                "success": False,
+                "repo_url": repo_url,
+                "error": f"Invalid GitHub URL: {error_msg}"
+            }, indent=2)
+        
+        # Get clients from context
+        qdrant_client = ctx.request_context.lifespan_context.qdrant_client
+        
+        # Initialize GitHub processing components
+        repo_manager = GitHubRepoManager()
+        markdown_discovery = MarkdownDiscovery()
+        metadata_extractor = GitHubMetadataExtractor()
+        
+        # Clone the repository
+        repo_path = repo_manager.clone_repository(repo_url, max_size_mb)
+        
+        # Extract repository metadata
+        repo_metadata = metadata_extractor.extract_repo_metadata(repo_url, repo_path)
+        
+        # Discover markdown files
+        markdown_files = markdown_discovery.discover_markdown_files(
+            repo_path, 
+            max_files=max_files,
+            min_size_bytes=100,
+            max_size_bytes=1_000_000  # 1MB max per file
+        )
+        
+        if not markdown_files:
+            return json.dumps({
+                "success": False,
+                "repo_url": repo_url,
+                "error": "No markdown files found in repository"
+            }, indent=2)
+        
+        # Process files and prepare for storage
+        urls = []
+        chunk_numbers = []
+        contents = []
+        metadatas = []
+        chunk_count = 0
+        
+        # Track sources and their content
+        source_content_map = {}
+        source_word_counts = {}
+        
+        # Extract source_id from repo URL
+        parsed_url = urlparse(repo_url)
+        base_source_id = parsed_url.netloc + parsed_url.path.rstrip('/')
+        
+        # Store repository content for source summary generation
+        repo_content = ""
+        total_word_count = 0
+        
+        # Process each markdown file
+        for file_info in markdown_files:
+            file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
+            content = file_info['content']
+            
+            # Chunk the content
+            chunks = smart_chunk_markdown(content, chunk_size=chunk_size)
+            
+            # Accumulate content for repository summary
+            repo_content += content[:2000] + "\n\n"  # First 2000 chars per file
+            total_word_count += file_info['word_count']
+            
+            for i, chunk in enumerate(chunks):
+                urls.append(file_url)
+                chunk_numbers.append(i)
+                contents.append(chunk)
+                
+                # Create metadata combining file info and repo metadata
+                meta = {
+                    "chunk_index": i,
+                    "url": file_url,
+                    "source": base_source_id,
+                    "filename": file_info['filename'],
+                    "relative_path": file_info['relative_path'],
+                    "file_size_bytes": file_info['size_bytes'],
+                    "is_readme": file_info['is_readme'],
+                    "word_count": len(chunk.split()),
+                    "char_count": len(chunk),
+                    "crawl_type": "github_repository",
+                    **repo_metadata  # Include all repository metadata
+                }
+                metadatas.append(meta)
+                chunk_count += 1
+        
+        # Store repository summary info
+        source_content_map[base_source_id] = repo_content[:5000]  # First 5000 chars
+        source_word_counts[base_source_id] = total_word_count
+        
+        # Create url_to_full_document mapping
+        url_to_full_document = {}
+        for file_info in markdown_files:
+            file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
+            url_to_full_document[file_url] = file_info['content']
+        
+        # Generate and update source summary
+        repo_summary = extract_source_summary(base_source_id, repo_content)
+        update_source_info(qdrant_client, base_source_id, repo_summary, total_word_count)
+        
+        # Add documents to Qdrant
+        batch_size = 20
+        add_documents_to_supabase(
+            qdrant_client,
+            urls,
+            chunk_numbers,
+            contents,
+            metadatas,
+            url_to_full_document,
+            batch_size=batch_size,
+        )
+        
+        # Extract and process code examples if enabled
+        code_examples_count = 0
+        extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
+        if extract_code_examples_enabled:
+            code_urls = []
+            code_chunk_numbers = []
+            code_examples = []
+            code_summaries = []
+            code_metadatas = []
+            
+            # Extract code blocks from all markdown files
+            for file_info in markdown_files:
+                file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
+                content = file_info['content']
+                code_blocks = extract_code_blocks(content)
+                
+                if code_blocks:
+                    # Process code examples in parallel
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                        # Prepare arguments for parallel processing
+                        summary_args = [
+                            (
+                                block["code"],
+                                block["context_before"],
+                                block["context_after"],
+                            )
+                            for block in code_blocks
+                        ]
+                        
+                        # Generate summaries in parallel
+                        summaries = list(
+                            executor.map(
+                                lambda args: generate_code_example_summary(args[0], args[1], args[2]),
+                                summary_args,
+                            )
+                        )
+                    
+                    # Prepare code example data
+                    for i, (block, summary) in enumerate(zip(code_blocks, summaries)):
+                        code_urls.append(file_url)
+                        code_chunk_numbers.append(len(code_examples))
+                        code_examples.append(block["code"])
+                        code_summaries.append(summary)
+                        
+                        # Create metadata for code example
+                        code_meta = {
+                            "chunk_index": len(code_examples) - 1,
+                            "url": file_url,
+                            "source": base_source_id,
+                            "filename": file_info['filename'],
+                            "relative_path": file_info['relative_path'],
+                            "language": block.get("language", ""),
+                            "char_count": len(block["code"]),
+                            "word_count": len(block["code"].split()),
+                            **repo_metadata  # Include repository metadata
+                        }
+                        code_metadatas.append(code_meta)
+            
+            # Add all code examples to Qdrant
+            if code_examples:
+                add_code_examples_to_supabase(
+                    qdrant_client,
+                    code_urls,
+                    code_chunk_numbers,
+                    code_examples,
+                    code_summaries,
+                    code_metadatas,
+                    batch_size=batch_size,
+                )
+                code_examples_count = len(code_examples)
+        
+        return json.dumps({
+            "success": True,
+            "repo_url": repo_url,
+            "owner": repo_metadata.get("owner", ""),
+            "repo_name": repo_metadata.get("repo_name", ""),
+            "markdown_files_processed": len(markdown_files),
+            "chunks_stored": chunk_count,
+            "code_examples_stored": code_examples_count,
+            "total_word_count": total_word_count,
+            "repository_size_mb": repo_manager._get_directory_size_mb(repo_path),
+            "source_id": base_source_id,
+            "files_processed": [f["relative_path"] for f in markdown_files[:10]]
+            + (["..."] if len(markdown_files) > 10 else []),
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "repo_url": repo_url,
+            "error": str(e)
+        }, indent=2)
+    finally:
+        # Always cleanup temporary directories
+        if repo_manager:
+            repo_manager.cleanup()
 
 
 @mcp.tool()
