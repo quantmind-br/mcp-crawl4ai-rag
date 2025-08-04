@@ -6,6 +6,14 @@ the appropriate crawl method based on URL type (sitemap, txt file, or regular we
 Also includes AI hallucination detection and repository parsing tools using Neo4j knowledge graphs.
 """
 
+# Apply Windows ConnectionResetError fix as early as possible
+try:
+    from .event_loop_fix import setup_event_loop
+except ImportError:
+    from event_loop_fix import setup_event_loop
+
+setup_event_loop()
+
 from mcp.server.fastmcp import FastMCP, Context
 from sentence_transformers import CrossEncoder
 from contextlib import asynccontextmanager
@@ -2391,11 +2399,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Apply Windows ConnectionResetError fix before starting event loop
-    try:
-        from .event_loop_fix import setup_event_loop
-    except ImportError:
-        from event_loop_fix import setup_event_loop
-
-    setup_event_loop()
     asyncio.run(main())

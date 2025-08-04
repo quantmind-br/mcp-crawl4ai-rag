@@ -108,13 +108,33 @@ def get_current_event_loop_policy() -> str:
         return "Unknown"
 
 
+def configure_http_client_limits():
+    """
+    Configure HTTP client connection limits to reduce ConnectionResetError.
+    
+    Sets environment variables to limit concurrent connections and improve
+    connection cleanup behavior during intensive HTTP operations.
+    """
+    import os
+    
+    # Set connection pool limits to reduce connection pressure
+    os.environ.setdefault('HTTPX_HTTP2', 'false')  # Disable HTTP/2 to reduce complexity
+    os.environ.setdefault('HTTPCORE_MAX_CONNECTIONS', '50')  # Limit total connections
+    os.environ.setdefault('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS', '10')  # Limit keepalive
+    os.environ.setdefault('HTTPCORE_KEEPALIVE_EXPIRY', '5.0')  # Shorter keepalive expiry
+    
+    logger.debug("Configured HTTP client connection limits for better stability")
+
+
 def setup_event_loop() -> Optional[str]:
     """
-    Configure appropriate event loop policy for platform.
+    Configure appropriate event loop policy for platform and HTTP client settings.
 
     On Windows, configures SelectorEventLoop to avoid ConnectionResetError
     during HTTP client cleanup, but uses ProactorEventLoop if Playwright is detected
     to prevent subprocess NotImplementedError. On other platforms, uses default policy.
+    
+    Also configures HTTP client connection limits to reduce connection pressure.
 
     Returns:
         Optional[str]: Name of the configured policy, or None if no change made
@@ -123,6 +143,9 @@ def setup_event_loop() -> Optional[str]:
         RuntimeError: If event loop policy configuration fails
     """
     try:
+        # Configure HTTP client limits on all platforms to reduce connection pressure
+        configure_http_client_limits()
+        
         if is_windows():
             original_policy = get_current_event_loop_policy()
             playwright_detected = is_playwright_imported()
