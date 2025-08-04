@@ -1,6 +1,7 @@
 """
 Pytest configuration and fixtures for Crawl4AI MCP RAG tests.
 """
+
 import pytest
 import os
 import sys
@@ -21,27 +22,26 @@ def setup_test_environment():
         "CHAT_API_KEY": "test-chat-api-key",
         "CHAT_API_BASE": "https://api.openai.com/v1",
         "EMBEDDINGS_MODEL": "text-embedding-3-small",
-        "EMBEDDINGS_API_KEY": "test-embeddings-api-key", 
+        "EMBEDDINGS_API_KEY": "test-embeddings-api-key",
         "EMBEDDINGS_API_BASE": "https://api.openai.com/v1",
         "EMBEDDINGS_DIMENSIONS": "1536",  # Default test dimensions
-        
         # Other configuration
         "QDRANT_HOST": "localhost",
         "QDRANT_PORT": "6333",
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "test-password",
-        "USE_CONTEXTUAL_EMBEDDINGS": "false"
+        "USE_CONTEXTUAL_EMBEDDINGS": "false",
     }
-    
+
     # Set test environment variables
     original_env = {}
     for key, value in test_env.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     yield
-    
+
     # Restore original environment
     for key, value in original_env.items():
         if value is None:
@@ -54,7 +54,7 @@ def setup_test_environment():
 def mock_qdrant_client():
     """Provide a mock Qdrant client for testing."""
     mock_client = Mock()
-    
+
     # Setup default behaviors
     mock_client.search_documents.return_value = []
     mock_client.search_code_examples.return_value = []
@@ -66,7 +66,7 @@ def mock_qdrant_client():
     mock_client.upsert_points.return_value = None
     mock_client.add_documents_to_qdrant.return_value = []
     mock_client.add_code_examples_to_qdrant.return_value = []
-    
+
     return mock_client
 
 
@@ -81,17 +81,17 @@ def sample_documents():
             "url": "https://python.org/docs/tutorial",
             "chunk_number": 1,
             "source_id": "python.org",
-            "metadata": {"category": "tutorial"}
+            "metadata": {"category": "tutorial"},
         },
         {
-            "id": "doc2", 
+            "id": "doc2",
             "similarity": 0.87,
             "content": "JavaScript is used for web development.",
             "url": "https://developer.mozilla.org/js",
             "chunk_number": 1,
             "source_id": "developer.mozilla.org",
-            "metadata": {"category": "reference"}
-        }
+            "metadata": {"category": "reference"},
+        },
     ]
 
 
@@ -107,7 +107,7 @@ def sample_code_examples():
             "url": "https://python.org/examples/hello",
             "chunk_number": 1,
             "source_id": "python.org",
-            "metadata": {"language": "python", "difficulty": "beginner"}
+            "metadata": {"language": "python", "difficulty": "beginner"},
         },
         {
             "id": "code2",
@@ -117,8 +117,8 @@ def sample_code_examples():
             "url": "https://developer.mozilla.org/js/examples",
             "chunk_number": 1,
             "source_id": "developer.mozilla.org",
-            "metadata": {"language": "javascript", "difficulty": "beginner"}
-        }
+            "metadata": {"language": "javascript", "difficulty": "beginner"},
+        },
     ]
 
 
@@ -130,33 +130,34 @@ def sample_sources():
             "source_id": "python.org",
             "summary": "Official Python documentation and tutorials",
             "total_word_count": 125000,
-            "updated_at": "2024-01-15T10:30:00Z"
+            "updated_at": "2024-01-15T10:30:00Z",
         },
         {
             "source_id": "developer.mozilla.org",
             "summary": "Mozilla Developer Network web development resources",
             "total_word_count": 89000,
-            "updated_at": "2024-01-10T14:20:00Z"
-        }
+            "updated_at": "2024-01-10T14:20:00Z",
+        },
     ]
 
 
 @pytest.fixture
 def mock_openai_response():
     """Provide mock OpenAI API responses."""
+
     def create_mock_response(embeddings_data=None, chat_content="Test response"):
         if embeddings_data is None:
             embeddings_data = [[0.1] * 1536, [0.2] * 1536]
-        
+
         mock_response = Mock()
         mock_response.data = [Mock(embedding=emb) for emb in embeddings_data]
-        
+
         # For chat completions
         mock_chat_response = Mock()
         mock_chat_response.choices = [Mock(message=Mock(content=chat_content))]
-        
+
         return mock_response, mock_chat_response
-    
+
     return create_mock_response
 
 
@@ -177,7 +178,9 @@ def mock_crawl4ai_result():
     
     More content here for testing.
     """
-    mock_result.extracted_content = "This is a test page with some content. More content here for testing."
+    mock_result.extracted_content = (
+        "This is a test page with some content. More content here for testing."
+    )
     mock_result.metadata = {"title": "Test Page", "description": "A test page"}
-    
+
     return mock_result

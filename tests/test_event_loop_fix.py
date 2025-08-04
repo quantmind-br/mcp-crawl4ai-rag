@@ -71,13 +71,18 @@ class TestPlaywrightDetection:
         """Test is_playwright_imported returns False when no Playwright modules are imported."""
         # Ensure no playwright modules are in sys.modules
         original_modules = {}
-        playwright_modules = ['playwright', 'playwright.async_api', 'playwright._impl', 'crawl4ai']
-        
+        playwright_modules = [
+            "playwright",
+            "playwright.async_api",
+            "playwright._impl",
+            "crawl4ai",
+        ]
+
         for module in playwright_modules:
             if module in sys.modules:
                 original_modules[module] = sys.modules[module]
                 del sys.modules[module]
-        
+
         try:
             assert is_playwright_imported() is False
         finally:
@@ -89,31 +94,31 @@ class TestPlaywrightDetection:
         """Test is_playwright_imported returns True when playwright is imported."""
         import sys
         from types import ModuleType
-        
+
         # Mock playwright module
-        sys.modules['playwright'] = ModuleType('playwright')
-        
+        sys.modules["playwright"] = ModuleType("playwright")
+
         try:
             assert is_playwright_imported() is True
         finally:
             # Clean up
-            if 'playwright' in sys.modules:
-                del sys.modules['playwright']
+            if "playwright" in sys.modules:
+                del sys.modules["playwright"]
 
     def test_is_playwright_imported_with_crawl4ai(self):
         """Test is_playwright_imported returns True when crawl4ai is imported."""
         import sys
         from types import ModuleType
-        
+
         # Mock crawl4ai module
-        sys.modules['crawl4ai'] = ModuleType('crawl4ai')
-        
+        sys.modules["crawl4ai"] = ModuleType("crawl4ai")
+
         try:
             assert is_playwright_imported() is True
         finally:
             # Clean up
-            if 'crawl4ai' in sys.modules:
-                del sys.modules['crawl4ai']
+            if "crawl4ai" in sys.modules:
+                del sys.modules["crawl4ai"]
 
 
 class TestEventLoopPolicyDetection:
@@ -165,7 +170,9 @@ class TestEventLoopPolicyDetection:
     def test_should_use_selector_loop_with_playwright(self):
         """Test should_use_selector_loop returns False when Playwright is imported."""
         with patch("src.event_loop_fix.is_playwright_imported", return_value=True):
-            with patch("src.event_loop_fix.has_selector_event_loop_policy", return_value=True):
+            with patch(
+                "src.event_loop_fix.has_selector_event_loop_policy", return_value=True
+            ):
                 assert should_use_selector_loop() is False
 
 
@@ -220,12 +227,22 @@ class TestEventLoopPolicyConfiguration:
     @patch("src.event_loop_fix.should_use_selector_loop")
     @patch("src.event_loop_fix.get_current_event_loop_policy")
     @patch("src.event_loop_fix.asyncio.set_event_loop_policy")
-    def test_setup_event_loop_windows_success(self, mock_set_policy, mock_get_policy, mock_should_use, mock_playwright, mock_is_windows):
+    def test_setup_event_loop_windows_success(
+        self,
+        mock_set_policy,
+        mock_get_policy,
+        mock_should_use,
+        mock_playwright,
+        mock_is_windows,
+    ):
         """Test setup_event_loop success path on Windows."""
         mock_is_windows.return_value = True
         mock_playwright.return_value = False
         mock_should_use.return_value = True
-        mock_get_policy.side_effect = ["WindowsProactorEventLoopPolicy", "WindowsSelectorEventLoopPolicy"]
+        mock_get_policy.side_effect = [
+            "WindowsProactorEventLoopPolicy",
+            "WindowsSelectorEventLoopPolicy",
+        ]
 
         with patch(
             "src.event_loop_fix.asyncio.WindowsSelectorEventLoopPolicy"
@@ -255,7 +272,9 @@ class TestEventLoopPolicyConfiguration:
         mock_playwright.return_value = True
         mock_should_use.return_value = False
 
-        with patch("src.event_loop_fix.asyncio.WindowsProactorEventLoopPolicy") as mock_policy_class:
+        with patch(
+            "src.event_loop_fix.asyncio.WindowsProactorEventLoopPolicy"
+        ) as mock_policy_class:
             result = setup_event_loop()
 
             mock_set_policy.assert_called_once_with(mock_policy_class())
@@ -344,30 +363,46 @@ class TestValidationFunctions:
         """Test validate_event_loop_setup properly detects Playwright scenarios."""
         with patch("src.event_loop_fix.is_playwright_imported", return_value=True):
             info = validate_event_loop_setup()
-            
+
             assert info["playwright_detected"] is True
-            
+
             if platform.system().lower() == "windows":
                 if info["current_policy"] == "WindowsProactorEventLoopPolicy":
                     assert info["fix_applied"] is True
-                    assert any("OK" in rec and "Playwright detected" in rec for rec in info["recommendations"])
-                    assert any("WARNING" in rec and "ConnectionResetError may still occur" in rec for rec in info["recommendations"])
+                    assert any(
+                        "OK" in rec and "Playwright detected" in rec
+                        for rec in info["recommendations"]
+                    )
+                    assert any(
+                        "WARNING" in rec
+                        and "ConnectionResetError may still occur" in rec
+                        for rec in info["recommendations"]
+                    )
                 else:
-                    assert any("WARNING" in rec and "Playwright detected" in rec for rec in info["recommendations"])
+                    assert any(
+                        "WARNING" in rec and "Playwright detected" in rec
+                        for rec in info["recommendations"]
+                    )
 
     def test_validate_event_loop_setup_no_playwright_detection(self):
         """Test validate_event_loop_setup when no Playwright is detected."""
         with patch("src.event_loop_fix.is_playwright_imported", return_value=False):
             info = validate_event_loop_setup()
-            
+
             assert info["playwright_detected"] is False
-            
+
             if platform.system().lower() == "windows":
                 if info["current_policy"] == "WindowsSelectorEventLoopPolicy":
                     assert info["fix_applied"] is True
-                    assert any("OK" in rec and "ConnectionResetError fix is active" in rec for rec in info["recommendations"])
+                    assert any(
+                        "OK" in rec and "ConnectionResetError fix is active" in rec
+                        for rec in info["recommendations"]
+                    )
                 else:
-                    assert any("WARNING" in rec and "SelectorEventLoop not active" in rec for rec in info["recommendations"])
+                    assert any(
+                        "WARNING" in rec and "SelectorEventLoop not active" in rec
+                        for rec in info["recommendations"]
+                    )
 
     def test_print_event_loop_info_no_exception(self, capsys):
         """Test print_event_loop_info runs without exception."""

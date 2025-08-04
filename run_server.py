@@ -3,6 +3,7 @@
 Simple entry point for the Crawl4AI MCP server.
 This avoids relative import issues by running from the project root.
 """
+
 import sys
 import asyncio
 from pathlib import Path

@@ -80,9 +80,14 @@ try:
         extract_source_summary,
     )
     from .utils.github_processor import (
-        GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor,
-        MultiFileDiscovery, PythonProcessor, TypeScriptProcessor, 
-        ConfigProcessor, MarkdownProcessor
+        GitHubRepoManager,
+        MarkdownDiscovery,
+        GitHubMetadataExtractor,
+        MultiFileDiscovery,
+        PythonProcessor,
+        TypeScriptProcessor,
+        ConfigProcessor,
+        MarkdownProcessor,
     )
     from .utils.validation import validate_github_url
 
@@ -93,18 +98,18 @@ except ImportError:
     import sys
     import importlib.util
     from pathlib import Path
-    
+
     # Add the src directory to the path
     src_dir = Path(__file__).parent
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
-    
+
     # Import from the main utils.py file using importlib
     utils_path = src_dir / "utils.py"
     spec = importlib.util.spec_from_file_location("main_utils", utils_path)
     main_utils = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(main_utils)
-    
+
     get_supabase_client = main_utils.get_supabase_client
     add_documents_to_supabase = main_utils.add_documents_to_supabase
     search_documents = main_utils.search_documents
@@ -113,11 +118,15 @@ except ImportError:
     add_code_examples_to_supabase = main_utils.add_code_examples_to_supabase
     update_source_info = main_utils.update_source_info
     extract_source_summary = main_utils.extract_source_summary
-    
+
     from utils.github_processor import (
-        GitHubRepoManager, GitHubMetadataExtractor,
-        MultiFileDiscovery, PythonProcessor, TypeScriptProcessor, 
-        ConfigProcessor, MarkdownProcessor
+        GitHubRepoManager,
+        GitHubMetadataExtractor,
+        MultiFileDiscovery,
+        PythonProcessor,
+        TypeScriptProcessor,
+        ConfigProcessor,
+        MarkdownProcessor,
     )
     from utils.validation import validate_github_url
 
@@ -265,7 +274,9 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             model_kwargs = get_model_kwargs_for_device(device, precision)
 
             # Initialize CrossEncoder with device-aware settings
-            model_name = os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            model_name = os.getenv(
+                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
             reranking_model = CrossEncoder(
                 model_name,
                 device=str(device),
@@ -273,7 +284,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             )
 
             logging.info(f"CrossEncoder loaded on device: {device}")
-            
+
             # Warm up the model with dummy predictions if enabled
             warmup_samples = int(os.getenv("RERANKING_WARMUP_SAMPLES", "5"))
             if warmup_samples > 0:
@@ -281,7 +292,9 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
                     dummy_pairs = [["warmup query", "warmup document"]] * warmup_samples
                     _ = reranking_model.predict(dummy_pairs)
                     cleanup_gpu_memory()
-                    logging.info(f"Reranking model warmed up with {warmup_samples} samples")
+                    logging.info(
+                        f"Reranking model warmed up with {warmup_samples} samples"
+                    )
                 except Exception as warmup_error:
                     print(f"Model warmup failed (continuing anyway): {warmup_error}")
 
@@ -552,55 +565,66 @@ def process_code_example(args):
 async def health_check_reranking(ctx: Context) -> str:
     """
     Perform comprehensive health check for the reranking model functionality.
-    
+
     This tool validates that the reranking model is loaded correctly and can perform
     inference operations. It tests model loading, device allocation, and inference
     capability with dummy data.
-    
+
     Returns:
         JSON string with health check results including model availability,
         device information, inference test results, and performance metrics.
     """
     import json
     from utils import health_check_reranking_model
-    
+
     try:
         # Get the reranking model from the lifespan context
         reranking_model = None
-        if (hasattr(ctx, 'request_context') and 
-            hasattr(ctx.request_context, 'lifespan_context') and
-            hasattr(ctx.request_context.lifespan_context, 'reranking_model')):
+        if (
+            hasattr(ctx, "request_context")
+            and hasattr(ctx.request_context, "lifespan_context")
+            and hasattr(ctx.request_context.lifespan_context, "reranking_model")
+        ):
             reranking_model = ctx.request_context.lifespan_context.reranking_model
-        
+
         # Perform health check
         health_status = health_check_reranking_model(reranking_model)
-        
+
         # Add overall status
-        overall_status = "healthy" if health_status.get('inference_test_passed', False) else "unhealthy"
-        health_status['overall_status'] = overall_status
-        
+        overall_status = (
+            "healthy"
+            if health_status.get("inference_test_passed", False)
+            else "unhealthy"
+        )
+        health_status["overall_status"] = overall_status
+
         # Add configuration information
-        health_status['configuration'] = {
-            'use_reranking_enabled': os.getenv("USE_RERANKING", "false"),
-            'model_name_config': os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
-            'warmup_samples_config': os.getenv("RERANKING_WARMUP_SAMPLES", "5"),
-            'gpu_device_index': os.getenv("GPU_DEVICE_INDEX", "0"),
-            'gpu_precision': os.getenv("GPU_PRECISION", "float32")
+        health_status["configuration"] = {
+            "use_reranking_enabled": os.getenv("USE_RERANKING", "false"),
+            "model_name_config": os.getenv(
+                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            ),
+            "warmup_samples_config": os.getenv("RERANKING_WARMUP_SAMPLES", "5"),
+            "gpu_device_index": os.getenv("GPU_DEVICE_INDEX", "0"),
+            "gpu_precision": os.getenv("GPU_PRECISION", "float32"),
         }
-        
+
         return json.dumps(health_status, indent=2)
-        
+
     except Exception as e:
         error_status = {
-            'overall_status': 'error',
-            'model_available': False,
-            'error_message': f"Health check failed with exception: {str(e)}",
-            'configuration': {
-                'use_reranking_enabled': os.getenv("USE_RERANKING", "false"),
-                'model_name_config': os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")
-            }
+            "overall_status": "error",
+            "model_available": False,
+            "error_message": f"Health check failed with exception: {str(e)}",
+            "configuration": {
+                "use_reranking_enabled": os.getenv("USE_RERANKING", "false"),
+                "model_name_config": os.getenv(
+                    "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+                ),
+            },
         }
         return json.dumps(error_status, indent=2)
+
 
 @mcp.tool()
 async def crawl_single_page(ctx: Context, url: str) -> str:
@@ -999,16 +1023,16 @@ async def smart_crawl_github(
     max_files: int = 50,
     chunk_size: int = 5000,
     max_size_mb: int = 500,
-    file_types_to_index: List[str] = ['.md']
+    file_types_to_index: List[str] = [".md"],
 ) -> str:
     """
     Clone a GitHub repository, extract content from multiple file types,
     and store them in the vector database.
-    
+
     This tool clones a GitHub repository to a temporary directory, discovers files
-    of specified types, extracts content and metadata, and stores the content in 
+    of specified types, extracts content and metadata, and stores the content in
     chunks for vector search and retrieval.
-    
+
     Args:
         ctx: The MCP server provided context
         repo_url: GitHub repository URL (e.g., 'https://github.com/user/repo')
@@ -1017,7 +1041,7 @@ async def smart_crawl_github(
         max_size_mb: Maximum repository size in MB (default: 500)
         file_types_to_index: File extensions to process (default: ['.md'])
                            Supported: ['.md', '.py', '.ts', '.tsx', '.json', '.yaml', '.yml', '.toml']
-        
+
     Returns:
         JSON string with crawl summary and storage information
     """
@@ -1026,135 +1050,142 @@ async def smart_crawl_github(
         # Validate GitHub URL
         is_valid, error_msg = validate_github_url(repo_url)
         if not is_valid:
-            return json.dumps({
-                "success": False,
-                "repo_url": repo_url,
-                "error": f"Invalid GitHub URL: {error_msg}"
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "success": False,
+                    "repo_url": repo_url,
+                    "error": f"Invalid GitHub URL: {error_msg}",
+                },
+                indent=2,
+            )
+
         # Get clients from context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
-        
+
         # Initialize GitHub processing components
         repo_manager = GitHubRepoManager()
         file_discovery = MultiFileDiscovery()
         metadata_extractor = GitHubMetadataExtractor()
-        
+
         # Clone the repository
         repo_path = repo_manager.clone_repository(repo_url, max_size_mb)
-        
+
         # Extract repository metadata
         repo_metadata = metadata_extractor.extract_repo_metadata(repo_url, repo_path)
-        
+
         # Discover files of specified types
         discovered_files = file_discovery.discover_files(
-            repo_path, 
-            file_types=file_types_to_index,
-            max_files=max_files
+            repo_path, file_types=file_types_to_index, max_files=max_files
         )
-        
+
         if not discovered_files:
-            return json.dumps({
-                "success": False,
-                "repo_url": repo_url,
-                "error": f"No files found in repository for types: {file_types_to_index}"
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "success": False,
+                    "repo_url": repo_url,
+                    "error": f"No files found in repository for types: {file_types_to_index}",
+                },
+                indent=2,
+            )
+
         # Process files by type using appropriate processors
         processor_map = {
-            '.md': MarkdownProcessor,
-            '.markdown': MarkdownProcessor, 
-            '.mdown': MarkdownProcessor,
-            '.mkd': MarkdownProcessor,
-            '.py': PythonProcessor,
-            '.ts': TypeScriptProcessor,
-            '.tsx': TypeScriptProcessor,
-            '.json': ConfigProcessor,
-            '.yaml': ConfigProcessor,
-            '.yml': ConfigProcessor, 
-            '.toml': ConfigProcessor
+            ".md": MarkdownProcessor,
+            ".markdown": MarkdownProcessor,
+            ".mdown": MarkdownProcessor,
+            ".mkd": MarkdownProcessor,
+            ".py": PythonProcessor,
+            ".ts": TypeScriptProcessor,
+            ".tsx": TypeScriptProcessor,
+            ".json": ConfigProcessor,
+            ".yaml": ConfigProcessor,
+            ".yml": ConfigProcessor,
+            ".toml": ConfigProcessor,
         }
-        
+
         processed_documents = []
         total_chunks = 0
         file_type_stats = {}
-        
+
         # Extract source_id from repo URL
         parsed_url = urlparse(repo_url)
-        base_source_id = parsed_url.netloc + parsed_url.path.rstrip('/')
-        
+        base_source_id = parsed_url.netloc + parsed_url.path.rstrip("/")
+
         # Store repository content for source summary generation
         repo_content = ""
         total_word_count = 0
-        
+
         # Process each discovered file
         for file_info in discovered_files:
-            file_path = file_info['path']
-            relative_path = file_info['relative_path']
-            file_ext = file_info['file_type']
-            
+            file_path = file_info["path"]
+            relative_path = file_info["relative_path"]
+            file_ext = file_info["file_type"]
+
             # Get appropriate processor
             if file_ext in processor_map:
                 processor = processor_map[file_ext]()
                 extracted_items = processor.process_file(file_path, relative_path)
-                
+
                 # Update file type statistics
                 if file_ext not in file_type_stats:
-                    file_type_stats[file_ext] = {'files': 0, 'items': 0}
-                file_type_stats[file_ext]['files'] += 1
-                file_type_stats[file_ext]['items'] += len(extracted_items)
-                
+                    file_type_stats[file_ext] = {"files": 0, "items": 0}
+                file_type_stats[file_ext]["files"] += 1
+                file_type_stats[file_ext]["items"] += len(extracted_items)
+
                 for item in extracted_items:
                     # Create document for chunking
-                    content = item['content']
+                    content = item["content"]
                     file_url = f"{repo_url}/blob/main/{relative_path}"
-                    
+
                     # Accumulate content for repository summary
                     repo_content += content[:1000] + "\n\n"  # First 1000 chars per item
                     content_word_count = len(content.split())
                     total_word_count += content_word_count
-                    
+
                     # Create metadata
                     metadata = {
-                        'file_path': relative_path,
-                        'type': item['type'],
-                        'name': item['name'],
-                        'signature': item.get('signature'),
-                        'line_number': item.get('line_number'),
-                        'language': item['language'],
-                        'repo_url': repo_url,
-                        'source_type': 'github_repository',
-                        'url': file_url,
-                        'source': base_source_id,
-                        'filename': file_info['filename'],
-                        'file_size_bytes': file_info['size_bytes'],
-                        'is_readme': file_info['is_readme'],
-                        'crawl_type': 'github_repository',
-                        **repo_metadata  # Include all repository metadata
+                        "file_path": relative_path,
+                        "type": item["type"],
+                        "name": item["name"],
+                        "signature": item.get("signature"),
+                        "line_number": item.get("line_number"),
+                        "language": item["language"],
+                        "repo_url": repo_url,
+                        "source_type": "github_repository",
+                        "url": file_url,
+                        "source": base_source_id,
+                        "filename": file_info["filename"],
+                        "file_size_bytes": file_info["size_bytes"],
+                        "is_readme": file_info["is_readme"],
+                        "crawl_type": "github_repository",
+                        **repo_metadata,  # Include all repository metadata
                     }
-                    
+
                     # Use existing chunking pipeline
                     chunks = smart_chunk_markdown(content, chunk_size)
-                    
+
                     for i, chunk in enumerate(chunks):
                         chunk_metadata = metadata.copy()
-                        chunk_metadata.update({
-                            'chunk_index': i,
-                            'total_chunks': len(chunks),
-                            'word_count': len(chunk.split()),
-                            'char_count': len(chunk)
-                        })
-                        
-                        processed_documents.append({
-                            'content': chunk,
-                            'metadata': chunk_metadata
-                        })
+                        chunk_metadata.update(
+                            {
+                                "chunk_index": i,
+                                "total_chunks": len(chunks),
+                                "word_count": len(chunk.split()),
+                                "char_count": len(chunk),
+                            }
+                        )
+
+                        processed_documents.append(
+                            {"content": chunk, "metadata": chunk_metadata}
+                        )
                         total_chunks += 1
-        
+
         # Generate and update source summary
         repo_summary = extract_source_summary(base_source_id, repo_content[:5000])
-        update_source_info(qdrant_client, base_source_id, repo_summary, total_word_count)
-        
+        update_source_info(
+            qdrant_client, base_source_id, repo_summary, total_word_count
+        )
+
         # Store processed documents using new format
         if processed_documents:
             # Extract data for existing storage function
@@ -1163,18 +1194,18 @@ async def smart_crawl_github(
             contents = []
             metadatas = []
             url_to_full_document = {}
-            
+
             for doc in processed_documents:
-                contents.append(doc['content'])
-                metadatas.append(doc['metadata'])
-                urls.append(doc['metadata']['url'])
-                chunk_numbers.append(doc['metadata']['chunk_index'])
-                
+                contents.append(doc["content"])
+                metadatas.append(doc["metadata"])
+                urls.append(doc["metadata"]["url"])
+                chunk_numbers.append(doc["metadata"]["chunk_index"])
+
                 # Build url_to_full_document mapping (use first 5000 chars as full document)
-                url = doc['metadata']['url']
+                url = doc["metadata"]["url"]
                 if url not in url_to_full_document:
-                    url_to_full_document[url] = doc['content'][:5000]
-            
+                    url_to_full_document[url] = doc["content"][:5000]
+
             # Add documents to Qdrant using existing function
             batch_size = 20
             add_documents_to_supabase(
@@ -1186,7 +1217,7 @@ async def smart_crawl_github(
                 url_to_full_document,
                 batch_size=batch_size,
             )
-        
+
         # Extract and process code examples if enabled
         code_examples_count = 0
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -1196,23 +1227,31 @@ async def smart_crawl_github(
             code_examples = []
             code_summaries = []
             code_metadatas = []
-            
+
             # Extract code blocks from markdown files only
-            markdown_files = [f for f in discovered_files if f['file_type'] in ['.md', '.markdown', '.mdown', '.mkd']]
+            markdown_files = [
+                f
+                for f in discovered_files
+                if f["file_type"] in [".md", ".markdown", ".mdown", ".mkd"]
+            ]
             for file_info in markdown_files:
                 file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
-                
+
                 # Read markdown content for code block extraction
                 try:
-                    with open(file_info['path'], 'r', encoding='utf-8', errors='ignore') as f:
+                    with open(
+                        file_info["path"], "r", encoding="utf-8", errors="ignore"
+                    ) as f:
                         content = f.read()
                     code_blocks = extract_code_blocks(content)
                 except Exception:
                     continue  # Skip if can't read file
-                
+
                 if code_blocks:
                     # Process code examples in parallel
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=10
+                    ) as executor:
                         # Prepare arguments for parallel processing
                         summary_args = [
                             (
@@ -1222,36 +1261,38 @@ async def smart_crawl_github(
                             )
                             for block in code_blocks
                         ]
-                        
+
                         # Generate summaries in parallel
                         summaries = list(
                             executor.map(
-                                lambda args: generate_code_example_summary(args[0], args[1], args[2]),
+                                lambda args: generate_code_example_summary(
+                                    args[0], args[1], args[2]
+                                ),
                                 summary_args,
                             )
                         )
-                    
+
                     # Prepare code example data
                     for i, (block, summary) in enumerate(zip(code_blocks, summaries)):
                         code_urls.append(file_url)
                         code_chunk_numbers.append(len(code_examples))
                         code_examples.append(block["code"])
                         code_summaries.append(summary)
-                        
+
                         # Create metadata for code example
                         code_meta = {
                             "chunk_index": len(code_examples) - 1,
                             "url": file_url,
                             "source": base_source_id,
-                            "filename": file_info['filename'],
-                            "relative_path": file_info['relative_path'],
+                            "filename": file_info["filename"],
+                            "relative_path": file_info["relative_path"],
                             "language": block.get("language", ""),
                             "char_count": len(block["code"]),
                             "word_count": len(block["code"].split()),
-                            **repo_metadata  # Include repository metadata
+                            **repo_metadata,  # Include repository metadata
                         }
                         code_metadatas.append(code_meta)
-            
+
             # Add all code examples to Qdrant
             if code_examples:
                 add_code_examples_to_supabase(
@@ -1264,30 +1305,31 @@ async def smart_crawl_github(
                     batch_size=batch_size,
                 )
                 code_examples_count = len(code_examples)
-        
-        return json.dumps({
-            "success": True,
-            "repo_url": repo_url,
-            "owner": repo_metadata.get("owner", ""),
-            "repo_name": repo_metadata.get("repo_name", ""),
-            "file_types_requested": file_types_to_index,
-            "files_discovered": len(discovered_files),
-            "file_type_stats": file_type_stats,
-            "chunks_stored": total_chunks,
-            "code_examples_stored": code_examples_count,
-            "total_word_count": total_word_count,
-            "repository_size_mb": repo_manager._get_directory_size_mb(repo_path),
-            "source_id": base_source_id,
-            "files_processed": [f["relative_path"] for f in discovered_files[:10]]
-            + (["..."] if len(discovered_files) > 10 else []),
-        }, indent=2)
-        
+
+        return json.dumps(
+            {
+                "success": True,
+                "repo_url": repo_url,
+                "owner": repo_metadata.get("owner", ""),
+                "repo_name": repo_metadata.get("repo_name", ""),
+                "file_types_requested": file_types_to_index,
+                "files_discovered": len(discovered_files),
+                "file_type_stats": file_type_stats,
+                "chunks_stored": total_chunks,
+                "code_examples_stored": code_examples_count,
+                "total_word_count": total_word_count,
+                "repository_size_mb": repo_manager._get_directory_size_mb(repo_path),
+                "source_id": base_source_id,
+                "files_processed": [f["relative_path"] for f in discovered_files[:10]]
+                + (["..."] if len(discovered_files) > 10 else []),
+            },
+            indent=2,
+        )
+
     except Exception as e:
-        return json.dumps({
-            "success": False,
-            "repo_url": repo_url,
-            "error": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"success": False, "repo_url": repo_url, "error": str(e)}, indent=2
+        )
     finally:
         # Always cleanup temporary directories
         if repo_manager:

@@ -3,6 +3,7 @@ Integration tests with real Docker services.
 
 Tests the actual integration with Qdrant and Neo4j running in Docker containers.
 """
+
 import pytest
 import requests
 import time
@@ -34,14 +35,11 @@ def docker_services():
     """Ensure Docker services are running and healthy."""
     # Check if Qdrant is ready (use collections endpoint)
     qdrant_ready = is_docker_service_ready("http://localhost:6333/collections")
-    
+
     # Neo4j takes longer to start, so we're more lenient
     neo4j_ready = is_docker_service_ready("http://localhost:7474", max_retries=20)
-    
-    return {
-        "qdrant_ready": qdrant_ready,
-        "neo4j_ready": neo4j_ready
-    }
+
+    return {"qdrant_ready": qdrant_ready, "neo4j_ready": neo4j_ready}
 
 
 class TestQdrantIntegration:
@@ -51,7 +49,7 @@ class TestQdrantIntegration:
         """Test Qdrant root endpoint."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         response = requests.get("http://localhost:6333/")
         assert response.status_code == 200
         data = response.json()
@@ -62,7 +60,7 @@ class TestQdrantIntegration:
         """Test Qdrant collections endpoint."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         response = requests.get("http://localhost:6333/collections")
         assert response.status_code == 200
         data = response.json()
@@ -72,29 +70,29 @@ class TestQdrantIntegration:
         """Test QdrantClientWrapper with real Qdrant service."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         from qdrant_wrapper import QdrantClientWrapper
-        
+
         # Test connection
         try:
             client = QdrantClientWrapper(host="localhost", port=6333)
-            
+
             # Test health check
             health = client.health_check()
             assert health["status"] == "healthy"
             assert "collections" in health
-            
+
             # Test collections were created
             collections = health["collections"]
             expected_collections = ["crawled_pages", "code_examples"]
-            
+
             for collection_name in expected_collections:
                 if collection_name in collections:
                     collection_info = collections[collection_name]
                     assert "status" in collection_info
                     assert "config" in collection_info
                     assert collection_info["config"]["size"] == 1536
-            
+
         except Exception as e:
             pytest.fail(f"QdrantClientWrapper connection failed: {e}")
 
@@ -102,13 +100,13 @@ class TestQdrantIntegration:
         """Test basic Qdrant operations with real service."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         from qdrant_wrapper import QdrantClientWrapper
         from qdrant_client.models import PointStruct
-        
+
         try:
             client = QdrantClientWrapper(host="localhost", port=6333)
-            
+
             # Test adding a test point with UUID
             test_id = str(uuid.uuid4())
             test_point = PointStruct(
@@ -118,42 +116,39 @@ class TestQdrantIntegration:
                     "url": "https://test.com",
                     "content": "Test content for integration",
                     "chunk_number": 1,
-                    "source_id": "test.com"
-                }
+                    "source_id": "test.com",
+                },
             )
-            
+
             # Insert test point
             client.upsert_points("crawled_pages", [test_point])
-            
+
             # Wait a moment for indexing
             time.sleep(1)
-            
+
             # Test search
             results = client.search_documents(
-                query_embedding=[0.1] * 1536,
-                match_count=1
+                query_embedding=[0.1] * 1536, match_count=1
             )
-            
+
             # Verify we can search (even if no exact matches)
             assert isinstance(results, list)
-            
+
             # Test keyword search
             keyword_results = client.keyword_search_documents(
-                query="Test content",
-                match_count=5
+                query="Test content", match_count=5
             )
-            
+
             assert isinstance(keyword_results, list)
-            
+
             # Clean up test point (optional)
             try:
                 client.client.delete(
-                    collection_name="crawled_pages",
-                    points_selector=[test_id]
+                    collection_name="crawled_pages", points_selector=[test_id]
                 )
             except:
                 pass  # Clean up failure is not critical
-            
+
         except Exception as e:
             pytest.fail(f"Qdrant operations failed: {e}")
 
@@ -165,41 +160,43 @@ class TestUtilsWithRealQdrant:
         """Test getting real Qdrant client."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         from qdrant_wrapper import get_qdrant_client
-        
+
         try:
             client = get_qdrant_client()
             assert client is not None
-            
+
             # Test health check
             health = client.health_check()
             assert health["status"] == "healthy"
-            
+
         except Exception as e:
             pytest.fail(f"get_qdrant_client failed: {e}")
 
-    @pytest.mark.skipif(not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key")
+    @pytest.mark.skipif(
+        not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key"
+    )
     def test_embedding_integration_real(self, docker_services):
         """Test embedding creation and storage (requires OpenAI API key)."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         from utils import create_embedding, get_supabase_client
         from qdrant_client.models import PointStruct
-        
+
         try:
             # Get client
             client = get_supabase_client()  # Returns Qdrant client
-            
+
             # Create test embedding (this will use real OpenAI API if key is available)
             test_text = "This is a test for integration testing"
             embedding = create_embedding(test_text)
-            
+
             # Verify embedding structure
             assert isinstance(embedding, list)
             assert len(embedding) == 1536
-            
+
             # Test storing embedding
             test_point = PointStruct(
                 id="integration-test-embedding",
@@ -208,21 +205,18 @@ class TestUtilsWithRealQdrant:
                     "url": "https://integration-test.com",
                     "content": test_text,
                     "chunk_number": 1,
-                    "source_id": "integration-test.com"
-                }
+                    "source_id": "integration-test.com",
+                },
             )
-            
+
             client.upsert_points("crawled_pages", [test_point])
-            
+
             # Wait for indexing
             time.sleep(1)
-            
+
             # Test search with the same embedding
-            results = client.search_documents(
-                query_embedding=embedding,
-                match_count=1
-            )
-            
+            results = client.search_documents(query_embedding=embedding, match_count=1)
+
             assert isinstance(results, list)
             if results:
                 # If we found results, verify structure
@@ -230,16 +224,16 @@ class TestUtilsWithRealQdrant:
                 assert "id" in result
                 assert "similarity" in result
                 assert "content" in result
-            
+
             # Clean up
             try:
                 client.client.delete(
                     collection_name="crawled_pages",
-                    points_selector=["integration-test-embedding"]
+                    points_selector=["integration-test-embedding"],
                 )
             except:
                 pass
-            
+
         except Exception as e:
             pytest.fail(f"Embedding integration test failed: {e}")
 
@@ -250,8 +244,10 @@ class TestNeo4jIntegration:
     def test_neo4j_availability(self, docker_services):
         """Test if Neo4j is accessible."""
         if not docker_services["neo4j_ready"]:
-            pytest.skip("Neo4j not ready - this is optional for basic RAG functionality")
-        
+            pytest.skip(
+                "Neo4j not ready - this is optional for basic RAG functionality"
+            )
+
         # Try to connect to Neo4j browser interface
         try:
             response = requests.get("http://localhost:7474", timeout=5)
@@ -264,18 +260,18 @@ class TestNeo4jIntegration:
         """Test if Neo4j Bolt port is accessible."""
         if not docker_services["neo4j_ready"]:
             pytest.skip("Neo4j not ready")
-        
+
         import socket
-        
+
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2)
-            result = sock.connect_ex(('localhost', 7687))
+            result = sock.connect_ex(("localhost", 7687))
             sock.close()
-            
+
             # Port should be open (connect_ex returns 0 on success)
             assert result == 0, "Neo4j Bolt port 7687 should be accessible"
-            
+
         except Exception as e:
             pytest.skip(f"Neo4j port test failed: {e}")
 
@@ -283,29 +279,35 @@ class TestNeo4jIntegration:
 class TestEndToEndWorkflow:
     """Test complete end-to-end workflow with Docker services."""
 
-    @pytest.mark.skipif(not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key")
+    @pytest.mark.skipif(
+        not os.getenv("EMBEDDINGS_API_KEY"), reason="No embeddings API key"
+    )
     def test_complete_rag_workflow(self, docker_services):
         """Test complete RAG workflow from storage to retrieval."""
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
-        
+
         from utils import (
-            get_supabase_client, add_documents_to_supabase, search_documents
+            get_supabase_client,
+            add_documents_to_supabase,
+            search_documents,
         )
-        
+
         try:
             # Get client
             client = get_supabase_client()
-            
+
             # Test data
             test_urls = ["https://test-integration.com/page1"]
-            test_contents = ["This is integration test content about Python programming and machine learning."]
+            test_contents = [
+                "This is integration test content about Python programming and machine learning."
+            ]
             test_chunk_numbers = [1]
             test_metadatas = [{"category": "integration_test", "language": "en"}]
             test_url_to_full_doc = {
                 "https://test-integration.com/page1": "Full document content for integration testing"
             }
-            
+
             # Store documents
             add_documents_to_supabase(
                 client=client,
@@ -313,22 +315,20 @@ class TestEndToEndWorkflow:
                 chunk_numbers=test_chunk_numbers,
                 contents=test_contents,
                 metadatas=test_metadatas,
-                url_to_full_document=test_url_to_full_doc
+                url_to_full_document=test_url_to_full_doc,
             )
-            
+
             # Wait for indexing
             time.sleep(2)
-            
+
             # Search for documents
             search_results = search_documents(
-                client=client,
-                query="Python programming",
-                match_count=5
+                client=client, query="Python programming", match_count=5
             )
-            
+
             # Verify search results
             assert isinstance(search_results, list)
-            
+
             # Clean up test data
             try:
                 # Try to remove test documents (cleanup)
@@ -336,7 +336,7 @@ class TestEndToEndWorkflow:
                 pass
             except:
                 pass
-            
+
         except Exception as e:
             pytest.fail(f"End-to-end workflow test failed: {e}")
 

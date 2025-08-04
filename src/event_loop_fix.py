@@ -51,24 +51,24 @@ def has_selector_event_loop_policy() -> bool:
 def is_playwright_imported() -> bool:
     """
     Check if Playwright is imported in the current process.
-    
+
     Playwright requires ProactorEventLoop for subprocess support on Windows,
     so we need to detect its presence to avoid NotImplementedError.
-    
+
     Returns:
         bool: True if Playwright is imported, False otherwise
     """
     playwright_modules = [
-        'playwright',
-        'playwright.async_api',
-        'playwright._impl',
-        'crawl4ai'  # crawl4ai uses playwright internally
+        "playwright",
+        "playwright.async_api",
+        "playwright._impl",
+        "crawl4ai",  # crawl4ai uses playwright internally
     ]
-    
+
     for module_name in playwright_modules:
         if module_name in sys.modules:
             return True
-    
+
     return False
 
 
@@ -85,12 +85,12 @@ def should_use_selector_loop() -> bool:
     """
     if not has_selector_event_loop_policy():
         return False
-    
+
     # Don't use SelectorEventLoop if Playwright is imported
     # since it requires ProactorEventLoop for subprocess support
     if is_playwright_imported():
         return False
-    
+
     return True
 
 
@@ -111,33 +111,43 @@ def get_current_event_loop_policy() -> str:
 def configure_http_client_limits():
     """
     Configure HTTP client connection limits to reduce ConnectionResetError.
-    
+
     Sets environment variables to balance connection stability with performance.
     Uses more generous limits to maintain crawling speed while preventing errors.
-    
+
     Configuration can be overridden by setting environment variables before startup:
     - HTTPX_HTTP2: 'true'/'false' to enable/disable HTTP/2
     - HTTPCORE_MAX_CONNECTIONS: Max total connections (default: 200)
-    - HTTPCORE_MAX_KEEPALIVE_CONNECTIONS: Max keepalive connections (default: 50)  
+    - HTTPCORE_MAX_KEEPALIVE_CONNECTIONS: Max keepalive connections (default: 50)
     - HTTPCORE_KEEPALIVE_EXPIRY: Keepalive expiry in seconds (default: 30.0)
     """
     import os
-    
+
     # Balanced connection pool limits for stability + performance
     # Use setdefault so existing env vars take precedence
-    os.environ.setdefault('HTTPX_HTTP2', 'true')   # Re-enable HTTP/2 for better performance
-    os.environ.setdefault('HTTPCORE_MAX_CONNECTIONS', '200')  # Increased for better throughput
-    os.environ.setdefault('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS', '50')  # More keepalive connections
-    os.environ.setdefault('HTTPCORE_KEEPALIVE_EXPIRY', '30.0')  # Longer keepalive for reuse
-    
+    os.environ.setdefault(
+        "HTTPX_HTTP2", "true"
+    )  # Re-enable HTTP/2 for better performance
+    os.environ.setdefault(
+        "HTTPCORE_MAX_CONNECTIONS", "200"
+    )  # Increased for better throughput
+    os.environ.setdefault(
+        "HTTPCORE_MAX_KEEPALIVE_CONNECTIONS", "50"
+    )  # More keepalive connections
+    os.environ.setdefault(
+        "HTTPCORE_KEEPALIVE_EXPIRY", "30.0"
+    )  # Longer keepalive for reuse
+
     # Log current configuration for debugging
     current_config = {
-        'HTTPX_HTTP2': os.environ.get('HTTPX_HTTP2'),
-        'HTTPCORE_MAX_CONNECTIONS': os.environ.get('HTTPCORE_MAX_CONNECTIONS'),
-        'HTTPCORE_MAX_KEEPALIVE_CONNECTIONS': os.environ.get('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS'),
-        'HTTPCORE_KEEPALIVE_EXPIRY': os.environ.get('HTTPCORE_KEEPALIVE_EXPIRY')
+        "HTTPX_HTTP2": os.environ.get("HTTPX_HTTP2"),
+        "HTTPCORE_MAX_CONNECTIONS": os.environ.get("HTTPCORE_MAX_CONNECTIONS"),
+        "HTTPCORE_MAX_KEEPALIVE_CONNECTIONS": os.environ.get(
+            "HTTPCORE_MAX_KEEPALIVE_CONNECTIONS"
+        ),
+        "HTTPCORE_KEEPALIVE_EXPIRY": os.environ.get("HTTPCORE_KEEPALIVE_EXPIRY"),
     }
-    
+
     logger.debug(f"HTTP client configuration: {current_config}")
     print(f"DEBUG: HTTP client config - {current_config}")
 
@@ -149,7 +159,7 @@ def setup_event_loop() -> Optional[str]:
     On Windows, configures SelectorEventLoop to avoid ConnectionResetError
     during HTTP client cleanup, but uses ProactorEventLoop if Playwright is detected
     to prevent subprocess NotImplementedError. On other platforms, uses default policy.
-    
+
     Also configures HTTP client connection limits to reduce connection pressure.
 
     Returns:
@@ -161,11 +171,11 @@ def setup_event_loop() -> Optional[str]:
     try:
         # Configure HTTP client limits on all platforms to reduce connection pressure
         configure_http_client_limits()
-        
+
         if is_windows():
             original_policy = get_current_event_loop_policy()
             playwright_detected = is_playwright_imported()
-            
+
             if should_use_selector_loop():
                 # Set WindowsSelectorEventLoopPolicy for better cleanup behavior
                 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -177,13 +187,15 @@ def setup_event_loop() -> Optional[str]:
                 )
                 print(f"DEBUG: Applied Windows event loop fix - using {new_policy}")
                 return new_policy
-                
+
             elif playwright_detected:
                 # Playwright detected - ensure ProactorEventLoop is used
                 if hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
-                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                    asyncio.set_event_loop_policy(
+                        asyncio.WindowsProactorEventLoopPolicy()
+                    )
                     new_policy = get_current_event_loop_policy()
-                    
+
                     logger.info(
                         f"Playwright detected on Windows: Using ProactorEventLoop for subprocess support. "
                         f"Changed from {original_policy} to {new_policy}. "
@@ -195,20 +207,30 @@ def setup_event_loop() -> Optional[str]:
                     )
                     return new_policy
                 else:
-                    logger.warning("Playwright detected but WindowsProactorEventLoopPolicy not available")
-                    print("DEBUG: Playwright detected but ProactorEventLoop not available")
+                    logger.warning(
+                        "Playwright detected but WindowsProactorEventLoopPolicy not available"
+                    )
+                    print(
+                        "DEBUG: Playwright detected but ProactorEventLoop not available"
+                    )
             else:
                 # Windows but SelectorEventLoop not suitable and no Playwright
                 logger.info(
                     f"Windows detected but SelectorEventLoop not suitable, "
                     f"using default policy: {original_policy}"
                 )
-                print(f"DEBUG: Windows detected, using default policy: {original_policy}")
+                print(
+                    f"DEBUG: Windows detected, using default policy: {original_policy}"
+                )
         else:
             # Non-Windows platform
             current_policy = get_current_event_loop_policy()
-            logger.debug(f"Non-Windows platform detected, using default policy: {current_policy}")
-            print(f"DEBUG: Non-Windows platform, using default event loop policy: {current_policy}")
+            logger.debug(
+                f"Non-Windows platform detected, using default policy: {current_policy}"
+            )
+            print(
+                f"DEBUG: Non-Windows platform, using default event loop policy: {current_policy}"
+            )
 
         return None
 
@@ -233,7 +255,7 @@ def validate_event_loop_setup() -> dict:
     """
     playwright_detected = is_playwright_imported()
     current_policy = get_current_event_loop_policy()
-    
+
     info = {
         "platform": platform.system(),
         "python_version": sys.version,
