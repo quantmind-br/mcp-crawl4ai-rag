@@ -112,18 +112,34 @@ def configure_http_client_limits():
     """
     Configure HTTP client connection limits to reduce ConnectionResetError.
     
-    Sets environment variables to limit concurrent connections and improve
-    connection cleanup behavior during intensive HTTP operations.
+    Sets environment variables to balance connection stability with performance.
+    Uses more generous limits to maintain crawling speed while preventing errors.
+    
+    Configuration can be overridden by setting environment variables before startup:
+    - HTTPX_HTTP2: 'true'/'false' to enable/disable HTTP/2
+    - HTTPCORE_MAX_CONNECTIONS: Max total connections (default: 200)
+    - HTTPCORE_MAX_KEEPALIVE_CONNECTIONS: Max keepalive connections (default: 50)  
+    - HTTPCORE_KEEPALIVE_EXPIRY: Keepalive expiry in seconds (default: 30.0)
     """
     import os
     
-    # Set connection pool limits to reduce connection pressure
-    os.environ.setdefault('HTTPX_HTTP2', 'false')  # Disable HTTP/2 to reduce complexity
-    os.environ.setdefault('HTTPCORE_MAX_CONNECTIONS', '50')  # Limit total connections
-    os.environ.setdefault('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS', '10')  # Limit keepalive
-    os.environ.setdefault('HTTPCORE_KEEPALIVE_EXPIRY', '5.0')  # Shorter keepalive expiry
+    # Balanced connection pool limits for stability + performance
+    # Use setdefault so existing env vars take precedence
+    os.environ.setdefault('HTTPX_HTTP2', 'true')   # Re-enable HTTP/2 for better performance
+    os.environ.setdefault('HTTPCORE_MAX_CONNECTIONS', '200')  # Increased for better throughput
+    os.environ.setdefault('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS', '50')  # More keepalive connections
+    os.environ.setdefault('HTTPCORE_KEEPALIVE_EXPIRY', '30.0')  # Longer keepalive for reuse
     
-    logger.debug("Configured HTTP client connection limits for better stability")
+    # Log current configuration for debugging
+    current_config = {
+        'HTTPX_HTTP2': os.environ.get('HTTPX_HTTP2'),
+        'HTTPCORE_MAX_CONNECTIONS': os.environ.get('HTTPCORE_MAX_CONNECTIONS'),
+        'HTTPCORE_MAX_KEEPALIVE_CONNECTIONS': os.environ.get('HTTPCORE_MAX_KEEPALIVE_CONNECTIONS'),
+        'HTTPCORE_KEEPALIVE_EXPIRY': os.environ.get('HTTPCORE_KEEPALIVE_EXPIRY')
+    }
+    
+    logger.debug(f"HTTP client configuration: {current_config}")
+    print(f"DEBUG: HTTP client config - {current_config}")
 
 
 def setup_event_loop() -> Optional[str]:
