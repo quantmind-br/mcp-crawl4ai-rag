@@ -286,6 +286,7 @@ crawl_results/
 # AI Development Tools
 .claude/
 .crush/
+.serena/
 .serena/cache/
 .serena/memories/
 .noxic/

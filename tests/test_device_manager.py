@@ -7,8 +7,7 @@ following the patterns established in conftest.py.
 
 import pytest
 import os
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any
+from unittest.mock import Mock, patch
 
 # Import the device manager functions
 import sys

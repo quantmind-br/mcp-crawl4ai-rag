@@ -7,7 +7,7 @@ import pytest
 import os
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

@@ -9,7 +9,6 @@ import tempfile
 import os
 from pathlib import Path
 import sys
-from typing import List, Dict, Any
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

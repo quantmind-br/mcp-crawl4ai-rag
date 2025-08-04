@@ -7,7 +7,7 @@ to ensure unnecessary reconnections and schema checks are avoided.
 import pytest
 import os
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 import sys
 
@@ -167,7 +167,6 @@ class TestQdrantOptimization:
     @patch('src.qdrant_wrapper.QdrantClient')
     def test_concurrent_access_safety(self, mock_qdrant_client):
         """Test that singleton pattern is safe for concurrent access."""
-        import threading
         import concurrent.futures
         
         # Mock Qdrant client

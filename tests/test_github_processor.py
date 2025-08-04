@@ -7,10 +7,8 @@ import pytest
 import os
 import sys
 import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, mock_open
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch, mock_open
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

@@ -34,7 +34,7 @@ try:
         cleanup_compute_memory,
         get_optimal_compute_device
     )
-except ImportError as e:
+except ImportError:
     # If we can't import from utils, define minimal stubs
     def get_embeddings_client():
         raise NotImplementedError("get_embeddings_client not available")

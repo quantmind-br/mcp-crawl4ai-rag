@@ -31,7 +31,7 @@ docker-compose down --remove-orphans --volumes 2>nul
 echo OK Limpeza concluida
 
 echo [4/4] Iniciando servicos Docker...
-echo Iniciando Qdrant e Neo4j...
+echo Iniciando Qdrant, Neo4j e Redis...
 docker-compose up -d
 
 timeout /t 5 /nobreak >nul
@@ -61,15 +61,31 @@ if %errorlevel% neq 0 (
 )
 echo OK Neo4j disponivel em http://localhost:7474
 
+echo Verificando Redis...
+timeout /t 3 /nobreak >nul
+docker exec mcp-redis redis-cli ping >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Redis pode ainda estar iniciando...
+    timeout /t 3 /nobreak >nul
+)
+echo OK Redis disponivel em localhost:6379
+
 echo.
 echo ========================================
 echo       Setup concluido!
 echo ========================================
 
+echo Servicos iniciados:
+echo   Qdrant: http://localhost:6333
+echo   Neo4j:  http://localhost:7474 (user: neo4j, pass: password)
+echo   Redis:  localhost:6379
+
+echo.
 echo Comandos uteis:
 echo   docker-compose logs
 echo   docker-compose logs qdrant
 echo   docker-compose logs neo4j
+echo   docker-compose logs redis
 echo   docker-compose down
 
 endlocal

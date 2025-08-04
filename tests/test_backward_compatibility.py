@@ -6,10 +6,8 @@ Tests that the default behavior (markdown-only) still works correctly.
 import pytest
 import tempfile
 import os
-import json
 from pathlib import Path
 import sys
-from unittest.mock import Mock, patch
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

@@ -22,6 +22,12 @@ try:
 except ImportError:
     from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
 
+# Import embedding cache
+try:
+    from .embedding_cache import get_embedding_cache
+except ImportError:
+    from embedding_cache import get_embedding_cache
+
 
 def get_chat_client():
     """
@@ -367,7 +373,72 @@ def get_supabase_client():
 
 def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """
-    Create embeddings for multiple texts in a single API call.
+    Create embeddings for multiple texts with Redis caching support.
+    
+    This function implements a high-performance caching layer that:
+    - Checks Redis cache for existing embeddings first
+    - Only calls external APIs for cache misses
+    - Stores new embeddings in cache for future use
+    - Provides graceful degradation when cache is unavailable
+    
+    Args:
+        texts: List of texts to create embeddings for
+        
+    Returns:
+        List of embeddings (each embedding is a list of floats)
+    """
+    if not texts:
+        return []
+    
+    embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
+    final_embeddings = [None] * len(texts)
+    
+    # Try cache first if available
+    cache = get_embedding_cache()
+    if cache:
+        cached_embeddings = cache.get_batch(texts, embeddings_model)
+        
+        texts_to_embed = []
+        indices_to_embed = []
+        
+        for i, text in enumerate(texts):
+            if text in cached_embeddings:
+                final_embeddings[i] = cached_embeddings[text]  # Cache hit
+                logging.debug(f"Cache hit for text {i}")
+            else:
+                texts_to_embed.append(text)  # Cache miss
+                indices_to_embed.append(i)
+        
+        if cached_embeddings:
+            logging.info(f"Cache hits: {len(cached_embeddings)}/{len(texts)} embeddings")
+    else:
+        # No cache available, embed all texts
+        texts_to_embed = texts
+        indices_to_embed = list(range(len(texts)))
+    
+    # Create embeddings for cache misses using existing retry logic
+    if texts_to_embed:
+        logging.info(f"Creating {len(texts_to_embed)} new embeddings via API")
+        new_embeddings_list = _create_embeddings_api_call(texts_to_embed)
+        
+        # Store new embeddings in cache
+        if cache and new_embeddings_list:
+            new_to_cache = {text: emb for text, emb in zip(texts_to_embed, new_embeddings_list)}
+            ttl = int(os.getenv("REDIS_EMBEDDING_TTL", "86400"))
+            cache.set_batch(new_to_cache, embeddings_model, ttl)
+            logging.debug(f"Cached {len(new_to_cache)} new embeddings")
+        
+        # Place new embeddings in correct positions
+        for i, new_embedding in enumerate(new_embeddings_list):
+            original_index = indices_to_embed[i]
+            final_embeddings[original_index] = new_embedding
+    
+    return final_embeddings
+
+
+def _create_embeddings_api_call(texts: List[str]) -> List[List[float]]:
+    """
+    Create embeddings via API call with retry logic (extracted from original function).
     
     Args:
         texts: List of texts to create embeddings for

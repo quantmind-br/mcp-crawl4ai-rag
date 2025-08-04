@@ -105,7 +105,7 @@ def test_memory_cleanup():
         
         # Test health check
         health_status = health_check_gpu_acceleration()
-        print(f"[OK] Health check completed")
+        print("[OK] Health check completed")
         print(f"  - GPU available: {health_status['gpu_available']}")
         print(f"  - Device name: {health_status['device_name']}")
         print(f"  - Test passed: {health_status['test_passed']}")
@@ -141,7 +141,7 @@ def test_rerank_integration():
         # Test reranking
         reranked = rerank_results(mock_model, "test query", results)
         
-        print(f"[OK] Reranking completed successfully")
+        print("[OK] Reranking completed successfully")
         print(f"[OK] Results count: {len(reranked)}")
         print(f"[OK] Top result score: {reranked[0]['rerank_score']}")
         

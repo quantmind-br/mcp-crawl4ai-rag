@@ -4,20 +4,16 @@ Unit tests for smart_crawl_github MCP tool.
 Tests the complete GitHub repository crawling functionality.
 """
 import pytest
-import os
 import sys
 import json
-import asyncio
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 from crawl4ai_mcp import smart_crawl_github
-from utils.github_processor import GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor
 
 
 class TestSmartCrawlGitHub:

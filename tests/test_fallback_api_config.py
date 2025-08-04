@@ -7,7 +7,7 @@ mixed provider scenarios, and adaptive client functionality.
 import pytest
 import os
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 import sys
 

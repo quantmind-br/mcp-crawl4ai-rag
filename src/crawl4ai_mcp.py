@@ -115,7 +115,7 @@ except ImportError:
     extract_source_summary = main_utils.extract_source_summary
     
     from utils.github_processor import (
-        GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor,
+        GitHubRepoManager, GitHubMetadataExtractor,
         MultiFileDiscovery, PythonProcessor, TypeScriptProcessor, 
         ConfigProcessor, MarkdownProcessor
     )

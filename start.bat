@@ -58,6 +58,15 @@ if %errorlevel% neq 0 (
     echo OK Neo4j acessivel
 )
 
+echo Verificando Redis...
+netstat -an | find "6379" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo AVISO: Redis nao acessivel em localhost:6379
+    echo Cache de embeddings sera desabilitado.
+) else (
+    echo OK Redis acessivel
+)
+
 echo [4/6] Instalando dependencias...
 uv sync
 if %errorlevel% neq 0 (

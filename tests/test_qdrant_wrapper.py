@@ -4,11 +4,9 @@ Unit tests for QdrantClientWrapper.
 Tests the core functionality of the Qdrant client wrapper that replaced Supabase.
 """
 import pytest
-import os
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

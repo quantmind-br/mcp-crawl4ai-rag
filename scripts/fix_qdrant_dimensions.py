@@ -89,7 +89,7 @@ def main():
             
             # Delete existing collection if it exists
             if collection_name in existing_collections:
-                print(f"   Deleting existing collection...")
+                print("   Deleting existing collection...")
                 client.delete_collection(collection_name)
                 print(f"   DELETED '{collection_name}'")
             
@@ -102,7 +102,7 @@ def main():
             print(f"   CREATED '{collection_name}' with {current_dims} dimensions")
         
         # Step 5: Verify collections
-        print(f"\n[5/5] Verifying collections...")
+        print("\n[5/5] Verifying collections...")
         for collection_name in target_collections:
             collection_info = client.get_collection(collection_name)
             # Handle different Qdrant client versions for verification

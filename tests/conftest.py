@@ -5,7 +5,7 @@ import pytest
 import os
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 # Add src to path for all tests
 src_path = Path(__file__).parent.parent / "src"

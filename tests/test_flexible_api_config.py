@@ -7,7 +7,7 @@ backward compatibility, error handling, and performance.
 import pytest
 import os
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 import sys
 

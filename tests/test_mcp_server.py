@@ -7,9 +7,7 @@ import pytest
 import os
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-from typing import List, Dict, Any
-import asyncio
+from unittest.mock import Mock, patch, AsyncMock
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

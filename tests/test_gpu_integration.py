@@ -7,8 +7,7 @@ and integration with the MCP server following the existing test infrastructure.
 
 import pytest
 import os
-from unittest.mock import Mock, patch, MagicMock
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 # Import test fixtures and setup
 import sys
@@ -18,7 +17,7 @@ sys.path.insert(0, str(src_path))
 
 # Import the functions we're testing
 from crawl4ai_mcp import rerank_results
-from device_manager import get_optimal_device, cleanup_gpu_memory
+from device_manager import get_optimal_device
 from utils import health_check_gpu_acceleration
 
 
@@ -44,7 +43,6 @@ class TestCrossEncoderGPUInitialization:
         mock_crossencoder.return_value = mock_model
         
         # Import and test initialization (would normally happen in main)
-        from crawl4ai_mcp import reranking_model
         
         # Verify CrossEncoder was called with correct parameters
         mock_crossencoder.assert_called_with(
@@ -90,7 +88,7 @@ class TestCrossEncoderGPUInitialization:
         # Here we simulate the error handling
         try:
             model = mock_crossencoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cuda:0")
-        except Exception as e:
+        except Exception:
             model = None
             
         assert model is None
