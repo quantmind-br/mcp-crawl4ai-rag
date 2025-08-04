@@ -329,6 +329,7 @@ settings.local.*
 sandbox/
 experiments/
 prototypes/
+new-features/
 
 # PRP (Project Request Patterns) working files
 PRPs/working/

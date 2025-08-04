@@ -79,7 +79,11 @@ try:
         update_source_info,
         extract_source_summary,
     )
-    from .utils.github_processor import GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor
+    from .utils.github_processor import (
+        GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor,
+        MultiFileDiscovery, PythonProcessor, TypeScriptProcessor, 
+        ConfigProcessor, MarkdownProcessor
+    )
     from .utils.validation import validate_github_url
 
     # Import Qdrant client wrapper for type annotations
@@ -110,7 +114,11 @@ except ImportError:
     update_source_info = main_utils.update_source_info
     extract_source_summary = main_utils.extract_source_summary
     
-    from utils.github_processor import GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor
+    from utils.github_processor import (
+        GitHubRepoManager, MarkdownDiscovery, GitHubMetadataExtractor,
+        MultiFileDiscovery, PythonProcessor, TypeScriptProcessor, 
+        ConfigProcessor, MarkdownProcessor
+    )
     from utils.validation import validate_github_url
 
     # Import Qdrant client wrapper for type annotations
@@ -925,19 +933,24 @@ async def smart_crawl_github(
     max_files: int = 50,
     chunk_size: int = 5000,
     max_size_mb: int = 500,
+    file_types_to_index: List[str] = ['.md']
 ) -> str:
     """
-    Clone a GitHub repository, extract markdown files, and store them in the vector database.
+    Clone a GitHub repository, extract content from multiple file types,
+    and store them in the vector database.
     
-    This tool clones a GitHub repository to a temporary directory, discovers markdown files,
-    extracts metadata, and stores the content in chunks for vector search and retrieval.
+    This tool clones a GitHub repository to a temporary directory, discovers files
+    of specified types, extracts content and metadata, and stores the content in 
+    chunks for vector search and retrieval.
     
     Args:
         ctx: The MCP server provided context
         repo_url: GitHub repository URL (e.g., 'https://github.com/user/repo')
-        max_files: Maximum number of markdown files to process (default: 50)
+        max_files: Maximum number of files to process (default: 50)
         chunk_size: Maximum size of each content chunk in characters (default: 5000)
         max_size_mb: Maximum repository size in MB (default: 500)
+        file_types_to_index: File extensions to process (default: ['.md'])
+                           Supported: ['.md', '.py', '.ts', '.tsx', '.json', '.yaml', '.yml', '.toml']
         
     Returns:
         JSON string with crawl summary and storage information
@@ -958,7 +971,7 @@ async def smart_crawl_github(
         
         # Initialize GitHub processing components
         repo_manager = GitHubRepoManager()
-        markdown_discovery = MarkdownDiscovery()
+        file_discovery = MultiFileDiscovery()
         metadata_extractor = GitHubMetadataExtractor()
         
         # Clone the repository
@@ -967,31 +980,38 @@ async def smart_crawl_github(
         # Extract repository metadata
         repo_metadata = metadata_extractor.extract_repo_metadata(repo_url, repo_path)
         
-        # Discover markdown files
-        markdown_files = markdown_discovery.discover_markdown_files(
+        # Discover files of specified types
+        discovered_files = file_discovery.discover_files(
             repo_path, 
-            max_files=max_files,
-            min_size_bytes=100,
-            max_size_bytes=1_000_000  # 1MB max per file
+            file_types=file_types_to_index,
+            max_files=max_files
         )
         
-        if not markdown_files:
+        if not discovered_files:
             return json.dumps({
                 "success": False,
                 "repo_url": repo_url,
-                "error": "No markdown files found in repository"
+                "error": f"No files found in repository for types: {file_types_to_index}"
             }, indent=2)
         
-        # Process files and prepare for storage
-        urls = []
-        chunk_numbers = []
-        contents = []
-        metadatas = []
-        chunk_count = 0
+        # Process files by type using appropriate processors
+        processor_map = {
+            '.md': MarkdownProcessor,
+            '.markdown': MarkdownProcessor, 
+            '.mdown': MarkdownProcessor,
+            '.mkd': MarkdownProcessor,
+            '.py': PythonProcessor,
+            '.ts': TypeScriptProcessor,
+            '.tsx': TypeScriptProcessor,
+            '.json': ConfigProcessor,
+            '.yaml': ConfigProcessor,
+            '.yml': ConfigProcessor, 
+            '.toml': ConfigProcessor
+        }
         
-        # Track sources and their content
-        source_content_map = {}
-        source_word_counts = {}
+        processed_documents = []
+        total_chunks = 0
+        file_type_stats = {}
         
         # Extract source_id from repo URL
         parsed_url = urlparse(repo_url)
@@ -1001,65 +1021,105 @@ async def smart_crawl_github(
         repo_content = ""
         total_word_count = 0
         
-        # Process each markdown file
-        for file_info in markdown_files:
-            file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
-            content = file_info['content']
+        # Process each discovered file
+        for file_info in discovered_files:
+            file_path = file_info['path']
+            relative_path = file_info['relative_path']
+            file_ext = file_info['file_type']
             
-            # Chunk the content
-            chunks = smart_chunk_markdown(content, chunk_size=chunk_size)
-            
-            # Accumulate content for repository summary
-            repo_content += content[:2000] + "\n\n"  # First 2000 chars per file
-            total_word_count += file_info['word_count']
-            
-            for i, chunk in enumerate(chunks):
-                urls.append(file_url)
-                chunk_numbers.append(i)
-                contents.append(chunk)
+            # Get appropriate processor
+            if file_ext in processor_map:
+                processor = processor_map[file_ext]()
+                extracted_items = processor.process_file(file_path, relative_path)
                 
-                # Create metadata combining file info and repo metadata
-                meta = {
-                    "chunk_index": i,
-                    "url": file_url,
-                    "source": base_source_id,
-                    "filename": file_info['filename'],
-                    "relative_path": file_info['relative_path'],
-                    "file_size_bytes": file_info['size_bytes'],
-                    "is_readme": file_info['is_readme'],
-                    "word_count": len(chunk.split()),
-                    "char_count": len(chunk),
-                    "crawl_type": "github_repository",
-                    **repo_metadata  # Include all repository metadata
-                }
-                metadatas.append(meta)
-                chunk_count += 1
-        
-        # Store repository summary info
-        source_content_map[base_source_id] = repo_content[:5000]  # First 5000 chars
-        source_word_counts[base_source_id] = total_word_count
-        
-        # Create url_to_full_document mapping
-        url_to_full_document = {}
-        for file_info in markdown_files:
-            file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
-            url_to_full_document[file_url] = file_info['content']
+                # Update file type statistics
+                if file_ext not in file_type_stats:
+                    file_type_stats[file_ext] = {'files': 0, 'items': 0}
+                file_type_stats[file_ext]['files'] += 1
+                file_type_stats[file_ext]['items'] += len(extracted_items)
+                
+                for item in extracted_items:
+                    # Create document for chunking
+                    content = item['content']
+                    file_url = f"{repo_url}/blob/main/{relative_path}"
+                    
+                    # Accumulate content for repository summary
+                    repo_content += content[:1000] + "\n\n"  # First 1000 chars per item
+                    content_word_count = len(content.split())
+                    total_word_count += content_word_count
+                    
+                    # Create metadata
+                    metadata = {
+                        'file_path': relative_path,
+                        'type': item['type'],
+                        'name': item['name'],
+                        'signature': item.get('signature'),
+                        'line_number': item.get('line_number'),
+                        'language': item['language'],
+                        'repo_url': repo_url,
+                        'source_type': 'github_repository',
+                        'url': file_url,
+                        'source': base_source_id,
+                        'filename': file_info['filename'],
+                        'file_size_bytes': file_info['size_bytes'],
+                        'is_readme': file_info['is_readme'],
+                        'crawl_type': 'github_repository',
+                        **repo_metadata  # Include all repository metadata
+                    }
+                    
+                    # Use existing chunking pipeline
+                    chunks = smart_chunk_markdown(content, chunk_size)
+                    
+                    for i, chunk in enumerate(chunks):
+                        chunk_metadata = metadata.copy()
+                        chunk_metadata.update({
+                            'chunk_index': i,
+                            'total_chunks': len(chunks),
+                            'word_count': len(chunk.split()),
+                            'char_count': len(chunk)
+                        })
+                        
+                        processed_documents.append({
+                            'content': chunk,
+                            'metadata': chunk_metadata
+                        })
+                        total_chunks += 1
         
         # Generate and update source summary
-        repo_summary = extract_source_summary(base_source_id, repo_content)
+        repo_summary = extract_source_summary(base_source_id, repo_content[:5000])
         update_source_info(qdrant_client, base_source_id, repo_summary, total_word_count)
         
-        # Add documents to Qdrant
-        batch_size = 20
-        add_documents_to_supabase(
-            qdrant_client,
-            urls,
-            chunk_numbers,
-            contents,
-            metadatas,
-            url_to_full_document,
-            batch_size=batch_size,
-        )
+        # Store processed documents using new format
+        if processed_documents:
+            # Extract data for existing storage function
+            urls = []
+            chunk_numbers = []
+            contents = []
+            metadatas = []
+            url_to_full_document = {}
+            
+            for doc in processed_documents:
+                contents.append(doc['content'])
+                metadatas.append(doc['metadata'])
+                urls.append(doc['metadata']['url'])
+                chunk_numbers.append(doc['metadata']['chunk_index'])
+                
+                # Build url_to_full_document mapping (use first 5000 chars as full document)
+                url = doc['metadata']['url']
+                if url not in url_to_full_document:
+                    url_to_full_document[url] = doc['content'][:5000]
+            
+            # Add documents to Qdrant using existing function
+            batch_size = 20
+            add_documents_to_supabase(
+                qdrant_client,
+                urls,
+                chunk_numbers,
+                contents,
+                metadatas,
+                url_to_full_document,
+                batch_size=batch_size,
+            )
         
         # Extract and process code examples if enabled
         code_examples_count = 0
@@ -1071,11 +1131,18 @@ async def smart_crawl_github(
             code_summaries = []
             code_metadatas = []
             
-            # Extract code blocks from all markdown files
+            # Extract code blocks from markdown files only
+            markdown_files = [f for f in discovered_files if f['file_type'] in ['.md', '.markdown', '.mdown', '.mkd']]
             for file_info in markdown_files:
                 file_url = f"{repo_url}/blob/main/{file_info['relative_path']}"
-                content = file_info['content']
-                code_blocks = extract_code_blocks(content)
+                
+                # Read markdown content for code block extraction
+                try:
+                    with open(file_info['path'], 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    code_blocks = extract_code_blocks(content)
+                except Exception:
+                    continue  # Skip if can't read file
                 
                 if code_blocks:
                     # Process code examples in parallel
@@ -1137,14 +1204,16 @@ async def smart_crawl_github(
             "repo_url": repo_url,
             "owner": repo_metadata.get("owner", ""),
             "repo_name": repo_metadata.get("repo_name", ""),
-            "markdown_files_processed": len(markdown_files),
-            "chunks_stored": chunk_count,
+            "file_types_requested": file_types_to_index,
+            "files_discovered": len(discovered_files),
+            "file_type_stats": file_type_stats,
+            "chunks_stored": total_chunks,
             "code_examples_stored": code_examples_count,
             "total_word_count": total_word_count,
             "repository_size_mb": repo_manager._get_directory_size_mb(repo_path),
             "source_id": base_source_id,
-            "files_processed": [f["relative_path"] for f in markdown_files[:10]]
-            + (["..."] if len(markdown_files) > 10 else []),
+            "files_processed": [f["relative_path"] for f in discovered_files[:10]]
+            + (["..."] if len(discovered_files) > 10 else []),
         }, indent=2)
         
     except Exception as e:

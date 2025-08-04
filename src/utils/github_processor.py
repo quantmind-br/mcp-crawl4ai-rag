@@ -11,6 +11,7 @@ import stat
 import subprocess
 import tempfile
 import logging
+import ast
 from typing import List, Dict, Any, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -299,6 +300,410 @@ class MarkdownDiscovery:
         size_priority = min(file_info['word_count'], 5000)
         
         return (readme_priority, size_priority)
+
+
+class FileTypeProcessor:
+    """Base class for file type processors."""
+    
+    def process_file(self, file_path: str, relative_path: str) -> List[Dict[str, Any]]:
+        """Process file and return list of extractable content chunks."""
+        raise NotImplementedError
+
+
+class MarkdownProcessor(FileTypeProcessor):
+    """Process markdown files using existing content."""
+    
+    def process_file(self, file_path: str, relative_path: str) -> List[Dict[str, Any]]:
+        """Process markdown file and return content."""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().strip()
+            
+            if len(content) < 50:
+                return []
+            
+            return [{
+                'content': content,
+                'type': 'markdown',
+                'name': os.path.basename(file_path),
+                'signature': None,
+                'line_number': 1,
+                'language': 'markdown'
+            }]
+            
+        except Exception:
+            return []
+
+
+class PythonProcessor(FileTypeProcessor):
+    """Process Python files using AST for docstring extraction."""
+    
+    def process_file(self, file_path: str, relative_path: str) -> List[Dict[str, Any]]:
+        """Extract docstrings from Python file using AST."""
+        try:
+            # Size check - skip large Python files
+            file_size = os.path.getsize(file_path)
+            if file_size > 1_000_000:  # 1MB limit
+                return []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source = f.read()
+            
+            tree = ast.parse(source, filename=file_path)
+            extracted_items = []
+            
+            # Module docstring
+            module_doc = ast.get_docstring(tree, clean=True)
+            if module_doc:
+                extracted_items.append({
+                    'content': module_doc,
+                    'type': 'module',
+                    'name': relative_path,
+                    'signature': None,
+                    'line_number': 1,
+                    'language': 'python'
+                })
+            
+            # Walk AST for functions and classes
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    docstring = ast.get_docstring(node, clean=True)
+                    if docstring:
+                        extracted_items.append({
+                            'content': docstring,
+                            'type': 'function',
+                            'name': node.name,
+                            'signature': self._extract_signature(node),
+                            'line_number': node.lineno,
+                            'language': 'python'
+                        })
+                
+                elif isinstance(node, ast.ClassDef):
+                    docstring = ast.get_docstring(node, clean=True)
+                    if docstring:
+                        extracted_items.append({
+                            'content': docstring,
+                            'type': 'class',
+                            'name': node.name,
+                            'signature': None,
+                            'line_number': node.lineno,
+                            'language': 'python'
+                        })
+            
+            return extracted_items
+            
+        except SyntaxError:
+            # Skip files with syntax errors
+            return []
+        except Exception:
+            return []
+    
+    def _extract_signature(self, node: ast.FunctionDef) -> str:
+        """Extract function signature with type annotations."""
+        try:
+            args = []
+            for arg in node.args.args:
+                arg_str = arg.arg
+                if arg.annotation:
+                    arg_str += f": {ast.unparse(arg.annotation)}"
+                args.append(arg_str)
+            
+            signature = f"({', '.join(args)})"
+            if node.returns:
+                signature += f" -> {ast.unparse(node.returns)}"
+            
+            return signature
+        except Exception:
+            return "(signature_extraction_failed)"
+
+
+class TypeScriptProcessor(FileTypeProcessor):
+    """Process TypeScript files for JSDoc comments."""
+    
+    def process_file(self, file_path: str, relative_path: str) -> List[Dict[str, Any]]:
+        """Extract JSDoc comments from TypeScript file."""
+        try:
+            # Size check - skip large TypeScript files
+            file_size = os.path.getsize(file_path)
+            if file_size > 1_000_000:  # 1MB limit
+                return []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Check if file is minified
+            first_line = content.split('\n')[0] if '\n' in content else content
+            if len(first_line) > 1000:
+                return []  # Skip minified files
+            
+            # JSDoc comment pattern
+            jsdoc_pattern = re.compile(
+                r'/\*\*\s*\n((?:\s*\*[^\n]*\n)*)\s*\*/',
+                re.MULTILINE | re.DOTALL
+            )
+            
+            # Declaration patterns
+            declaration_patterns = {
+                'function': re.compile(
+                    r'(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\([^)]*\)',
+                    re.MULTILINE
+                ),
+                'class': re.compile(
+                    r'(?:export\s+)?class\s+(\w+)',
+                    re.MULTILINE
+                ),
+                'interface': re.compile(
+                    r'(?:export\s+)?interface\s+(\w+)',
+                    re.MULTILINE
+                )
+            }
+            
+            extracted_items = []
+            
+            for match in jsdoc_pattern.finditer(content):
+                comment_text = match.group(1)
+                start_pos = match.start()
+                
+                # Clean comment text
+                lines = comment_text.split('\n')
+                cleaned_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('*'):
+                        line = line[1:].strip()
+                    if line:
+                        cleaned_lines.append(line)
+                
+                cleaned_comment = '\n'.join(cleaned_lines)
+                line_number = content[:start_pos].count('\n') + 1
+                
+                # Find associated declaration
+                after_comment = content[match.end():]
+                declaration = self._find_next_declaration(after_comment, declaration_patterns)
+                
+                if declaration and cleaned_comment:
+                    extracted_items.append({
+                        'content': cleaned_comment,
+                        'type': declaration['type'],
+                        'name': declaration['name'], 
+                        'signature': declaration.get('signature', ''),
+                        'line_number': line_number,
+                        'language': 'typescript'
+                    })
+            
+            return extracted_items
+            
+        except Exception:
+            return []
+    
+    def _find_next_declaration(self, content: str, declaration_patterns: Dict) -> Optional[Dict[str, Any]]:
+        """Find the next function/class/interface declaration."""
+        # Remove leading whitespace and newlines
+        content = content.lstrip()
+        
+        # Try each declaration pattern
+        for decl_type, pattern in declaration_patterns.items():
+            match = pattern.search(content)
+            if match and match.start() < 200:  # Must be close to comment
+                return {
+                    'type': decl_type,
+                    'name': match.group(1),
+                    'signature': match.group(0)
+                }
+        
+        return None
+
+
+class ConfigProcessor(FileTypeProcessor):
+    """Process configuration files with full content."""
+    
+    def process_file(self, file_path: str, relative_path: str) -> List[Dict[str, Any]]:
+        """Process configuration file and return full content."""
+        try:
+            # Size check - skip large config files
+            file_size = os.path.getsize(file_path)
+            if file_size > 100_000:  # 100KB limit
+                return []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            
+            if not content:
+                return []
+            
+            # Determine file type
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            return [{
+                'content': content,
+                'type': 'configuration',
+                'name': os.path.basename(file_path),
+                'signature': None,
+                'line_number': 1,
+                'language': self._get_config_language(ext)
+            }]
+            
+        except Exception:
+            return []
+    
+    def _get_config_language(self, ext: str) -> str:
+        """Map file extension to language."""
+        mapping = {
+            '.json': 'json',
+            '.yaml': 'yaml', 
+            '.yml': 'yaml',
+            '.toml': 'toml'
+        }
+        return mapping.get(ext, 'text')
+
+
+class MultiFileDiscovery(MarkdownDiscovery):
+    """Enhanced file discovery supporting multiple file types."""
+    
+    SUPPORTED_EXTENSIONS = {
+        '.md', '.markdown', '.mdown', '.mkd',        # Markdown
+        '.py',                                        # Python
+        '.ts', '.tsx',                               # TypeScript
+        '.json', '.yaml', '.yml', '.toml'           # Configuration
+    }
+    
+    # File size limits by type
+    FILE_SIZE_LIMITS = {
+        '.py': 1_000_000,      # 1MB for Python files
+        '.ts': 1_000_000,      # 1MB for TypeScript files  
+        '.tsx': 1_000_000,     # 1MB for TypeScript files
+        '.json': 100_000,      # 100KB for JSON files
+        '.yaml': 100_000,      # 100KB for YAML files
+        '.yml': 100_000,       # 100KB for YAML files
+        '.toml': 100_000,      # 100KB for TOML files
+        '.md': 1_000_000,      # 1MB for Markdown files
+        '.markdown': 1_000_000, '.mdown': 1_000_000, '.mkd': 1_000_000
+    }
+    
+    def discover_files(
+        self, 
+        repo_path: str, 
+        file_types: List[str] = ['.md'],
+        max_files: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Discover files of specified types with metadata.
+        
+        Args:
+            repo_path: Path to the cloned repository
+            file_types: List of file extensions to process
+            max_files: Maximum number of files to process
+            
+        Returns:
+            List of dictionaries containing file information
+        """
+        discovered_files = []
+        processed_count = 0
+        
+        # Normalize file types
+        file_types = [ft.lower() for ft in file_types]
+        
+        try:
+            for root, dirs, files in os.walk(repo_path):
+                # Filter out excluded directories
+                dirs[:] = [d for d in dirs if not self._should_exclude_dir(d)]
+                
+                for file in files:
+                    if processed_count >= max_files:
+                        break
+                    
+                    if self._is_supported_file(file, file_types):
+                        file_path = os.path.join(root, file)
+                        file_info = self._analyze_file(file_path, repo_path, file_types)
+                        
+                        if file_info:
+                            discovered_files.append(file_info)
+                            processed_count += 1
+                
+                if processed_count >= max_files:
+                    break
+            
+            # Sort by priority (README files first, then by size)
+            discovered_files.sort(key=self._file_priority_key, reverse=True)
+            
+            self.logger.info(f"Discovered {len(discovered_files)} files of types {file_types}")
+            return discovered_files
+            
+        except Exception as e:
+            self.logger.error(f"Error discovering files: {e}")
+            return []
+    
+    def _is_supported_file(self, filename: str, file_types: List[str]) -> bool:
+        """Check if file is of a supported type."""
+        file_ext = os.path.splitext(filename)[1].lower()
+        
+        # Check if extension is in requested file types
+        if file_ext not in file_types:
+            return False
+        
+        # Check if extension is in supported extensions
+        if file_ext not in self.SUPPORTED_EXTENSIONS:
+            return False
+        
+        # Additional filtering for excluded patterns
+        if self._should_exclude_file(filename):
+            return False
+        
+        return True
+    
+    def _analyze_file(
+        self, 
+        file_path: str, 
+        repo_path: str, 
+        file_types: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze a file and return its metadata.
+        
+        Args:
+            file_path: Absolute path to the file
+            repo_path: Path to the repository root
+            file_types: List of requested file types
+            
+        Returns:
+            Dictionary with file metadata or None if file should be skipped
+        """
+        try:
+            file_stat = os.stat(file_path)
+            file_size = file_stat.st_size
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            # Size filtering based on file type
+            max_size = self.FILE_SIZE_LIMITS.get(file_ext, 1_000_000)
+            if file_size > max_size:
+                return None
+            
+            # Basic content check for text files
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    # Read first 1000 chars to check if it's text
+                    sample = f.read(1000)
+                    if '\x00' in sample:  # Binary file indicator
+                        return None
+            except UnicodeDecodeError:
+                return None  # Skip non-UTF-8 files
+            
+            # Calculate relative path
+            relative_path = os.path.relpath(file_path, repo_path)
+            
+            return {
+                'path': file_path,
+                'relative_path': relative_path,
+                'filename': os.path.basename(file_path),
+                'size_bytes': file_size,
+                'file_type': file_ext,
+                'is_readme': self._is_readme_file(os.path.basename(file_path)),
+                'word_count': max(1, file_size // 5)  # Estimate word count for priority sorting
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Error analyzing file {file_path}: {e}")
+            return None
 
 
 class GitHubMetadataExtractor:
