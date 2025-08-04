@@ -901,16 +901,18 @@ class GitHubMetadataExtractor:
         git_info = {}
 
         try:
-            # Get latest commit info
+            # Get latest commit info with proper encoding handling
             result = subprocess.run(
                 ["git", "log", "-1", "--format=%H|%s|%ai"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace invalid characters instead of failing
                 timeout=10,
             )
 
-            if result.returncode == 0:
+            if result.returncode == 0 and result.stdout:
                 parts = result.stdout.strip().split("|")
                 if len(parts) >= 3:
                     git_info.update(

@@ -92,8 +92,8 @@ try:
     )
     from .utils.validation import validate_github_url
 
-    # Import Qdrant client wrapper for type annotations
-    from .qdrant_wrapper import QdrantClientWrapper
+    # Delay import of Qdrant client wrapper to avoid circular imports
+    QdrantClientWrapper = None
 except ImportError:
     # When running as main module, import directly from files
     import sys
@@ -132,7 +132,6 @@ except ImportError:
     from utils.validation import validate_github_url
 
     # Import Qdrant client wrapper for type annotations
-    from qdrant_wrapper import QdrantClientWrapper
 
 # Load environment variables from the project root .env file
 project_root = Path(__file__).resolve().parent.parent
@@ -210,7 +209,7 @@ class Crawl4AIContext:
     """Context for the Crawl4AI MCP server."""
 
     crawler: AsyncWebCrawler
-    qdrant_client: QdrantClientWrapper
+    qdrant_client: Any  # QdrantClientWrapper - using Any to avoid circular import
     reranking_model: Optional[CrossEncoder] = None
     knowledge_validator: Optional[Any] = None  # KnowledgeGraphValidator when available
     repo_extractor: Optional[Any] = None  # DirectNeo4jExtractor when available
@@ -234,10 +233,13 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     crawler = AsyncWebCrawler(config=browser_config)
     await crawler.__aenter__()
 
-    # Initialize Qdrant client
-    qdrant_client = (
-        get_supabase_client()
-    )  # Legacy function name, returns QdrantClientWrapper
+    # Initialize Qdrant client with late import to avoid circular dependencies
+    try:
+        from .qdrant_wrapper import QdrantClientWrapper
+    except ImportError:
+        pass
+    
+    qdrant_client = get_supabase_client()  # Legacy function name, returns QdrantClientWrapper
 
     # Validate embeddings configuration and dimensions
     try:
@@ -1415,66 +1417,24 @@ async def perform_rag_query(
 
         # Prepare filter if source is provided and not empty
         filter_metadata = None
+        source_filter = None
         if source and source.strip():
             filter_metadata = {"source": source}
+            source_filter = source.strip()
 
         if use_hybrid_search:
-            # Hybrid search: combine vector and keyword search using Qdrant
-
-            # 1. Get vector search results (get more to account for filtering)
-            vector_results = search_documents(
-                client=qdrant_client,
+            # Native Qdrant hybrid search using search_batch with RRF
+            results = qdrant_client.hybrid_search_documents(
                 query=query,
-                match_count=match_count * 2,  # Get double to have room for filtering
+                query_embedding=None,  # Will be created automatically
+                match_count=match_count,
                 filter_metadata=filter_metadata,
+                source_filter=source_filter,
+                rrf_k=60,  # Default RRF parameter
+                dense_weight=0.5  # Equal weight for dense and sparse
             )
-
-            # 2. Get keyword search results using Qdrant scroll functionality
-            keyword_results = qdrant_client.keyword_search_documents(
-                query=query,
-                match_count=match_count * 2,
-                filter_metadata=filter_metadata,
-                source_filter=source.strip() if source and source.strip() else None,
-            )
-
-            # 3. Combine results with preference for items appearing in both
-            seen_ids = set()
-            combined_results = []
-
-            # First, add items that appear in both searches (these are the best matches)
-            vector_ids = {r.get("id") for r in vector_results if r.get("id")}
-            for kr in keyword_results:
-                if kr["id"] in vector_ids and kr["id"] not in seen_ids:
-                    # Find the vector result to get similarity score
-                    for vr in vector_results:
-                        if vr.get("id") == kr["id"]:
-                            # Boost similarity score for items in both results
-                            vr["similarity"] = min(1.0, vr.get("similarity", 0) * 1.2)
-                            combined_results.append(vr)
-                            seen_ids.add(kr["id"])
-                            break
-
-            # Then add remaining vector results (semantic matches without exact keyword)
-            for vr in vector_results:
-                if (
-                    vr.get("id")
-                    and vr["id"] not in seen_ids
-                    and len(combined_results) < match_count
-                ):
-                    combined_results.append(vr)
-                    seen_ids.add(vr["id"])
-
-            # Finally, add pure keyword matches if we still need more results
-            for kr in keyword_results:
-                if kr["id"] not in seen_ids and len(combined_results) < match_count:
-                    combined_results.append(kr)
-                    seen_ids.add(kr["id"])
-
-            # Use combined results
-            results = combined_results[:match_count]
-
         else:
-            # Standard vector search only
+            # Standard dense vector search only
             results = search_documents(
                 client=qdrant_client,
                 query=query,
@@ -1504,6 +1464,11 @@ async def perform_rag_query(
             # Include rerank score if available
             if "rerank_score" in result:
                 formatted_result["rerank_score"] = result["rerank_score"]
+            # Include RRF score and ranking information for hybrid search
+            if use_hybrid_search and "rrf_score" in result:
+                formatted_result["rrf_score"] = result["rrf_score"]
+                formatted_result["dense_rank"] = result.get("dense_rank")
+                formatted_result["sparse_rank"] = result.get("sparse_rank")
             formatted_results.append(formatted_result)
 
         return json.dumps(
@@ -1569,71 +1534,18 @@ async def search_code_examples(
             filter_metadata = {"source": source_id}
 
         if use_hybrid_search:
-            # Hybrid search: combine vector and keyword search using Qdrant
-
-            # Import the search function from utils
-            try:
-                from .utils import search_code_examples as search_code_examples_impl
-            except ImportError:
-                from utils import search_code_examples as search_code_examples_impl
-
-            # 1. Get vector search results (get more to account for filtering)
-            vector_results = search_code_examples_impl(
-                client=qdrant_client,
+            # Native Qdrant hybrid search using search_batch with RRF
+            results = qdrant_client.hybrid_search_code_examples(
                 query=query,
-                match_count=match_count * 2,  # Get double to have room for filtering
+                query_embedding=None,  # Will be created automatically
+                match_count=match_count,
                 filter_metadata=filter_metadata,
-                source_id=source_id,
+                source_filter=source_id.strip() if source_id and source_id.strip() else None,
+                rrf_k=60,  # Default RRF parameter
+                dense_weight=0.5  # Equal weight for dense and sparse
             )
-
-            # 2. Get keyword search results using Qdrant scroll functionality
-            keyword_results = qdrant_client.keyword_search_code_examples(
-                query=query,
-                match_count=match_count * 2,
-                filter_metadata=filter_metadata,
-                source_filter=(
-                    source_id.strip() if source_id and source_id.strip() else None
-                ),
-            )
-
-            # 3. Combine results with preference for items appearing in both
-            seen_ids = set()
-            combined_results = []
-
-            # First, add items that appear in both searches (these are the best matches)
-            vector_ids = {r.get("id") for r in vector_results if r.get("id")}
-            for kr in keyword_results:
-                if kr["id"] in vector_ids and kr["id"] not in seen_ids:
-                    # Find the vector result to get similarity score
-                    for vr in vector_results:
-                        if vr.get("id") == kr["id"]:
-                            # Boost similarity score for items in both results
-                            vr["similarity"] = min(1.0, vr.get("similarity", 0) * 1.2)
-                            combined_results.append(vr)
-                            seen_ids.add(kr["id"])
-                            break
-
-            # Then add remaining vector results (semantic matches without exact keyword)
-            for vr in vector_results:
-                if (
-                    vr.get("id")
-                    and vr["id"] not in seen_ids
-                    and len(combined_results) < match_count
-                ):
-                    combined_results.append(vr)
-                    seen_ids.add(vr["id"])
-
-            # Finally, add pure keyword matches if we still need more results
-            for kr in keyword_results:
-                if kr["id"] not in seen_ids and len(combined_results) < match_count:
-                    combined_results.append(kr)
-                    seen_ids.add(kr["id"])
-
-            # Use combined results
-            results = combined_results[:match_count]
-
         else:
-            # Standard vector search only
+            # Standard dense vector search only
             try:
                 from .utils import search_code_examples as search_code_examples_impl
             except ImportError:
@@ -1671,6 +1583,11 @@ async def search_code_examples(
             # Include rerank score if available
             if "rerank_score" in result:
                 formatted_result["rerank_score"] = result["rerank_score"]
+            # Include RRF score and ranking information for hybrid search
+            if use_hybrid_search and "rrf_score" in result:
+                formatted_result["rrf_score"] = result["rrf_score"]
+                formatted_result["dense_rank"] = result.get("dense_rank")
+                formatted_result["sparse_rank"] = result.get("sparse_rank")
             formatted_results.append(formatted_result)
 
         return json.dumps(

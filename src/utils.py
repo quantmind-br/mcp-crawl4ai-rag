@@ -4,7 +4,7 @@ Utility functions for the Crawl4AI MCP server with Qdrant integration.
 
 import os
 import concurrent.futures
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
 import openai
 import time
 import logging
@@ -15,7 +15,15 @@ from qdrant_client.models import PointStruct
 try:
     from .embedding_config import get_embedding_dimensions
 except ImportError:
-    from embedding_config import get_embedding_dimensions
+    try:
+        from embedding_config import get_embedding_dimensions
+    except ImportError:
+        # Fallback for when utils.py is loaded through complex import paths
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, current_dir)
+        from embedding_config import get_embedding_dimensions
 
 # Import our Qdrant client wrapper
 try:
@@ -28,6 +36,169 @@ try:
     from .embedding_cache import get_embedding_cache
 except ImportError:
     from embedding_cache import get_embedding_cache
+
+
+# Import sparse vector configuration (avoiding circular import)
+try:
+    from .sparse_vector_types import SparseVectorConfig
+except ImportError:
+    from sparse_vector_types import SparseVectorConfig
+
+
+class SparseVectorEncoder:
+    """
+    Singleton encoder for generating BM25 sparse vectors using FastEmbed.
+    
+    Handles lazy loading and training of the FastBM25 encoder to avoid
+    unnecessary initialization overhead.
+    """
+    
+    _instance = None
+    _encoder = None  
+    _trained = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def _ensure_encoder(self):
+        """Lazy load the FastEmbed sparse text embedding model."""
+        if self._encoder is None:
+            try:
+                from fastembed import SparseTextEmbedding
+                logging.info("Initializing FastBM25 sparse encoder (Qdrant/bm25)")
+                self._encoder = SparseTextEmbedding(model_name="Qdrant/bm25")
+            except ImportError as e:
+                logging.error(f"FastEmbed not available: {e}")
+                raise ImportError("FastEmbed is required for sparse vectors. Install with: pip install fastembed")
+            except Exception as e:
+                logging.error(f"Failed to initialize FastBM25 encoder: {e}")
+                raise
+    
+    def encode(self, text: str) -> SparseVectorConfig:
+        """
+        Generate sparse vector for the given text using BM25.
+        
+        Args:
+            text: Input text to encode
+            
+        Returns:
+            SparseVectorConfig: Sparse vector with indices and values
+            
+        Raises:
+            ImportError: If FastEmbed is not available
+            ValueError: If text is empty or encoding fails
+        """
+        if not text or not text.strip():
+            # Return empty sparse vector for empty text
+            return SparseVectorConfig(indices=[], values=[])
+        
+        self._ensure_encoder()
+        
+        try:
+            # CRITICAL: Handle encoder training on first use
+            if not self._trained:
+                logging.info("Training BM25 encoder on first use")
+                # GOTCHA: Must call embed once to initialize BM25 statistics
+                _ = list(self._encoder.embed([text]))
+                self._trained = True
+                logging.info("BM25 encoder training completed")
+            
+            # Generate sparse embedding
+            sparse_embeddings = list(self._encoder.embed([text]))
+            if not sparse_embeddings:
+                logging.warning("FastBM25 encoder returned no embeddings")
+                return SparseVectorConfig(indices=[], values=[])
+            
+            sparse_embedding = sparse_embeddings[0]
+            
+            # Convert to SparseVectorConfig format
+            return SparseVectorConfig(
+                indices=sparse_embedding.indices.tolist(),
+                values=sparse_embedding.values.tolist()
+            )
+            
+        except Exception as e:
+            logging.error(f"Failed to encode sparse vector: {e}")
+            # Graceful fallback: return empty sparse vector
+            return SparseVectorConfig(indices=[], values=[])
+    
+    def encode_batch(self, texts: List[str]) -> List[SparseVectorConfig]:
+        """
+        Generate sparse vectors for multiple texts in batch.
+        
+        Args:
+            texts: List of input texts to encode
+            
+        Returns:
+            List[SparseVectorConfig]: List of sparse vectors
+        """
+        if not texts:
+            return []
+        
+        self._ensure_encoder()
+        
+        try:
+            # Handle training on first batch
+            if not self._trained:
+                logging.info("Training BM25 encoder on first batch")
+                _ = list(self._encoder.embed(texts[:1]))  # Train on first text
+                self._trained = True
+                logging.info("BM25 encoder training completed")
+            
+            # Generate embeddings for all texts
+            sparse_embeddings = list(self._encoder.embed(texts))
+            
+            results = []
+            for i, sparse_embedding in enumerate(sparse_embeddings):
+                if sparse_embedding is None:
+                    logging.warning(f"Empty embedding for text {i}")
+                    results.append(SparseVectorConfig(indices=[], values=[]))
+                else:
+                    results.append(SparseVectorConfig(
+                        indices=sparse_embedding.indices.tolist(),
+                        values=sparse_embedding.values.tolist()
+                    ))
+            
+            return results
+            
+        except Exception as e:
+            logging.error(f"Failed to encode sparse vector batch: {e}")
+            # Graceful fallback: return empty sparse vectors
+            return [SparseVectorConfig(indices=[], values=[]) for _ in texts]
+
+
+# Global sparse encoder instance
+_sparse_encoder = SparseVectorEncoder()
+
+
+def create_sparse_embedding(text: str) -> SparseVectorConfig:
+    """
+    Create a sparse vector embedding for the given text using BM25.
+    
+    This is a convenience function that uses the global sparse encoder instance.
+    
+    Args:
+        text: Input text to encode
+        
+    Returns:
+        SparseVectorConfig: Sparse vector configuration
+    """
+    return _sparse_encoder.encode(text)
+
+
+def create_sparse_embeddings_batch(texts: List[str]) -> List[SparseVectorConfig]:
+    """
+    Create sparse vector embeddings for multiple texts using BM25.
+    
+    Args:
+        texts: List of input texts to encode
+        
+    Returns:
+        List[SparseVectorConfig]: List of sparse vector configurations
+    """
+    return _sparse_encoder.encode_batch(texts)
 
 
 def get_chat_client():
@@ -436,27 +607,35 @@ def get_supabase_client():
     return get_qdrant_client()
 
 
-def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
+def create_embeddings_batch(texts: List[str]) -> Union[List[List[float]], Tuple[List[List[float]], List[SparseVectorConfig]]]:
     """
-    Create embeddings for multiple texts with Redis caching support.
+    Create embeddings for multiple texts with Redis caching support and optional sparse vectors.
 
     This function implements a high-performance caching layer that:
     - Checks Redis cache for existing embeddings first
     - Only calls external APIs for cache misses
     - Stores new embeddings in cache for future use
     - Provides graceful degradation when cache is unavailable
+    - Creates both dense and sparse vectors when USE_HYBRID_SEARCH=true
 
     Args:
         texts: List of texts to create embeddings for
 
     Returns:
-        List of embeddings (each embedding is a list of floats)
+        When USE_HYBRID_SEARCH=false: List of embeddings (each embedding is a list of floats)
+        When USE_HYBRID_SEARCH=true: Tuple of (dense_vectors, sparse_vectors)
     """
     if not texts:
+        # Return appropriate empty structure based on hybrid search mode
+        use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+        if use_hybrid_search:
+            return ([], [])  # (dense_vectors, sparse_vectors)
         return []
 
+    use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
     embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
     final_embeddings = [None] * len(texts)
+    final_sparse_vectors = [None] * len(texts) if use_hybrid_search else None
 
     # Try cache first if available
     cache = get_embedding_cache()
@@ -502,6 +681,21 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
             original_index = indices_to_embed[i]
             final_embeddings[original_index] = new_embedding
 
+    # Generate sparse vectors if hybrid search is enabled
+    if use_hybrid_search:
+        # Create sparse vectors for all texts (not just cache misses)
+        logging.info(f"Creating {len(texts)} sparse vectors for hybrid search")
+        try:
+            sparse_embeddings = create_sparse_embeddings_batch(texts)
+            final_sparse_vectors = sparse_embeddings
+        except Exception as e:
+            logging.error(f"Failed to create sparse vectors: {e}")
+            # Fallback to empty sparse vectors to maintain consistency
+            final_sparse_vectors = [SparseVectorConfig(indices=[], values=[]) for _ in texts]
+
+    # Return appropriate format based on hybrid search mode
+    if use_hybrid_search:
+        return (final_embeddings, final_sparse_vectors)
     return final_embeddings
 
 
@@ -815,17 +1009,42 @@ def add_documents_to_supabase(
             # If not using contextual embeddings, use original contents
             contextual_contents = batch_contents
 
-        # Create embeddings for the batch
-        batch_embeddings = create_embeddings_batch(contextual_contents)
+        # Create embeddings for the batch (supports both dense and sparse vectors)
+        use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+        
+        if use_hybrid_search:
+            batch_embeddings, batch_sparse_vectors = create_embeddings_batch(contextual_contents)
+            logging.info(f"Created {len(batch_embeddings)} dense and {len(batch_sparse_vectors)} sparse vectors for batch")
+        else:
+            batch_embeddings = create_embeddings_batch(contextual_contents)
+            batch_sparse_vectors = None
+            logging.info(f"Created {len(batch_embeddings)} dense vectors for batch")
 
-        # Create PointStruct objects
+        # Create PointStruct objects with appropriate vector configuration
         qdrant_points = []
         for i, point in enumerate(points_batch):
-            qdrant_points.append(
-                PointStruct(
-                    id=point["id"], vector=batch_embeddings[i], payload=point["payload"]
+            if use_hybrid_search:
+                # Create PointStruct with named vectors (dense + sparse)
+                
+                qdrant_points.append(
+                    PointStruct(
+                        id=point["id"],
+                        vector={
+                            "text-dense": batch_embeddings[i],
+                            "text-sparse": batch_sparse_vectors[i].to_qdrant_sparse_vector()
+                        },
+                        payload=point["payload"]
+                    )
                 )
-            )
+            else:
+                # Create PointStruct with single vector (legacy mode)
+                qdrant_points.append(
+                    PointStruct(
+                        id=point["id"], 
+                        vector=batch_embeddings[i], 
+                        payload=point["payload"]
+                    )
+                )
 
         # Upsert batch to Qdrant
         try:
@@ -1061,13 +1280,27 @@ def add_code_examples_to_supabase(
     for batch_idx, points_batch in enumerate(point_batches):
         # Create embeddings for combined text (code + summary)
         combined_texts = [point["combined_text"] for point in points_batch]
-        embeddings = create_embeddings_batch(combined_texts)
+        
+        # Support both dense and sparse vectors for hybrid search
+        use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+        
+        if use_hybrid_search:
+            embeddings, sparse_vectors = create_embeddings_batch(combined_texts)
+            logging.info(f"Created {len(embeddings)} dense and {len(sparse_vectors)} sparse vectors for code examples batch")
+        else:
+            embeddings = create_embeddings_batch(combined_texts)
+            sparse_vectors = None
+            logging.info(f"Created {len(embeddings)} dense vectors for code examples batch")
 
         # Check if embeddings are valid (not all zeros)
         valid_embeddings = []
+        valid_sparse_vectors = [] if use_hybrid_search else None
+        
         for i, embedding in enumerate(embeddings):
             if embedding and not all(v == 0.0 for v in embedding):
                 valid_embeddings.append(embedding)
+                if use_hybrid_search:
+                    valid_sparse_vectors.append(sparse_vectors[i])
             else:
                 print(
                     "Warning: Zero or invalid embedding detected, creating new one..."
@@ -1075,15 +1308,41 @@ def add_code_examples_to_supabase(
                 # Try to create a single embedding as fallback
                 single_embedding = create_embedding(combined_texts[i])
                 valid_embeddings.append(single_embedding)
+                
+                if use_hybrid_search:
+                    # Create fallback sparse vector
+                    try:
+                        fallback_sparse = create_sparse_embedding(combined_texts[i])
+                        valid_sparse_vectors.append(fallback_sparse)
+                    except Exception as e:
+                        logging.error(f"Failed to create fallback sparse vector: {e}")
+                        valid_sparse_vectors.append(SparseVectorConfig(indices=[], values=[]))
 
-        # Create PointStruct objects
+        # Create PointStruct objects with appropriate vector configuration
         qdrant_points = []
         for i, point in enumerate(points_batch):
-            qdrant_points.append(
-                PointStruct(
-                    id=point["id"], vector=valid_embeddings[i], payload=point["payload"]
+            if use_hybrid_search:
+                # Create PointStruct with named vectors (dense + sparse)
+                
+                qdrant_points.append(
+                    PointStruct(
+                        id=point["id"],
+                        vector={
+                            "text-dense": valid_embeddings[i],
+                            "text-sparse": valid_sparse_vectors[i].to_qdrant_sparse_vector()
+                        },
+                        payload=point["payload"]
+                    )
                 )
-            )
+            else:
+                # Create PointStruct with single vector (legacy mode)
+                qdrant_points.append(
+                    PointStruct(
+                        id=point["id"], 
+                        vector=valid_embeddings[i], 
+                        payload=point["payload"]
+                    )
+                )
 
         # Upsert batch to Qdrant
         try:
