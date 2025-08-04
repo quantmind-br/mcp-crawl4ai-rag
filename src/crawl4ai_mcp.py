@@ -265,13 +265,25 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             model_kwargs = get_model_kwargs_for_device(device, precision)
 
             # Initialize CrossEncoder with device-aware settings
+            model_name = os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")
             reranking_model = CrossEncoder(
-                "cross-encoder/ms-marco-MiniLM-L-6-v2",
+                model_name,
                 device=str(device),
                 model_kwargs=model_kwargs,
             )
 
             logging.info(f"CrossEncoder loaded on device: {device}")
+            
+            # Warm up the model with dummy predictions if enabled
+            warmup_samples = int(os.getenv("RERANKING_WARMUP_SAMPLES", "5"))
+            if warmup_samples > 0:
+                try:
+                    dummy_pairs = [["warmup query", "warmup document"]] * warmup_samples
+                    _ = reranking_model.predict(dummy_pairs)
+                    cleanup_gpu_memory()
+                    logging.info(f"Reranking model warmed up with {warmup_samples} samples")
+                except Exception as warmup_error:
+                    print(f"Model warmup failed (continuing anyway): {warmup_error}")
 
         except Exception as e:
             print(f"Failed to load reranking model: {e}")
@@ -535,6 +547,60 @@ def process_code_example(args):
     code, context_before, context_after = args
     return generate_code_example_summary(code, context_before, context_after)
 
+
+@mcp.tool()
+async def health_check_reranking(ctx: Context) -> str:
+    """
+    Perform comprehensive health check for the reranking model functionality.
+    
+    This tool validates that the reranking model is loaded correctly and can perform
+    inference operations. It tests model loading, device allocation, and inference
+    capability with dummy data.
+    
+    Returns:
+        JSON string with health check results including model availability,
+        device information, inference test results, and performance metrics.
+    """
+    import json
+    from utils import health_check_reranking_model
+    
+    try:
+        # Get the reranking model from the lifespan context
+        reranking_model = None
+        if (hasattr(ctx, 'request_context') and 
+            hasattr(ctx.request_context, 'lifespan_context') and
+            hasattr(ctx.request_context.lifespan_context, 'reranking_model')):
+            reranking_model = ctx.request_context.lifespan_context.reranking_model
+        
+        # Perform health check
+        health_status = health_check_reranking_model(reranking_model)
+        
+        # Add overall status
+        overall_status = "healthy" if health_status.get('inference_test_passed', False) else "unhealthy"
+        health_status['overall_status'] = overall_status
+        
+        # Add configuration information
+        health_status['configuration'] = {
+            'use_reranking_enabled': os.getenv("USE_RERANKING", "false"),
+            'model_name_config': os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            'warmup_samples_config': os.getenv("RERANKING_WARMUP_SAMPLES", "5"),
+            'gpu_device_index': os.getenv("GPU_DEVICE_INDEX", "0"),
+            'gpu_precision': os.getenv("GPU_PRECISION", "float32")
+        }
+        
+        return json.dumps(health_status, indent=2)
+        
+    except Exception as e:
+        error_status = {
+            'overall_status': 'error',
+            'model_available': False,
+            'error_message': f"Health check failed with exception: {str(e)}",
+            'configuration': {
+                'use_reranking_enabled': os.getenv("USE_RERANKING", "false"),
+                'model_name_config': os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            }
+        }
+        return json.dumps(error_status, indent=2)
 
 @mcp.tool()
 async def crawl_single_page(ctx: Context, url: str) -> str:

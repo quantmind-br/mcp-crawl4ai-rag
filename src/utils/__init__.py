@@ -18,6 +18,8 @@ try:
         get_embeddings_client,
         get_supabase_client,
         health_check_gpu_acceleration,
+        health_check_reranking_model,
+        cleanup_gpu_memory,
         get_chat_client,
         create_embeddings_batch,
         create_embedding,
@@ -44,6 +46,12 @@ except ImportError:
         
     def health_check_gpu_acceleration():
         raise NotImplementedError("health_check_gpu_acceleration not available")
+        
+    def health_check_reranking_model():
+        raise NotImplementedError("health_check_reranking_model not available")
+        
+    def cleanup_gpu_memory():
+        raise NotImplementedError("cleanup_gpu_memory not available")
 
 __all__ = [
     'GitHubRepoManager',
@@ -54,6 +62,8 @@ __all__ = [
     'get_embeddings_client',
     'get_supabase_client', 
     'health_check_gpu_acceleration',
+    'health_check_reranking_model',
+    'cleanup_gpu_memory',
     'get_chat_client',
     'create_embeddings_batch',
     'create_embedding',

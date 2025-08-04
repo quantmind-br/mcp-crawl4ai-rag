@@ -1294,3 +1294,99 @@ def health_check_gpu_acceleration() -> Dict[str, Any]:
         health_status['error_message'] = str(e)
     
     return health_status
+
+
+def health_check_reranking_model(model=None) -> Dict[str, Any]:
+    """
+    Comprehensive health check for reranking model functionality.
+    
+    Validates the reranking model with dummy inference to ensure it's working
+    correctly. Tests model loading, device allocation, and inference capability.
+    
+    Args:
+        model: Optional CrossEncoder model instance. If None, attempts to access
+               from the current lifespan context.
+    
+    Returns:
+        Dict with health check results including:
+        - model_available: Whether reranking model is loaded
+        - model_name: Name of the loaded model  
+        - device: Device the model is running on
+        - inference_test_passed: Whether dummy inference succeeded
+        - inference_latency_ms: Latency of dummy inference in milliseconds
+        - error_message: Error details if test failed
+    """
+    health_status = {
+        'model_available': False,
+        'model_name': None,
+        'device': None,
+        'inference_test_passed': False,
+        'inference_latency_ms': None,
+        'error_message': None
+    }
+    
+    try:
+        # Import CrossEncoder here to avoid circular imports
+        from sentence_transformers import CrossEncoder
+        import time
+        
+        # If no model provided, try to get from environment or return not available
+        if model is None:
+            if os.getenv("USE_RERANKING", "false") != "true":
+                health_status['error_message'] = "Reranking not enabled (USE_RERANKING=false)"
+                return health_status
+            
+            # Model not provided and can't access it directly - return not available
+            health_status['error_message'] = "Reranking model not accessible for health check"
+            return health_status
+        
+        if not isinstance(model, CrossEncoder):
+            health_status['error_message'] = "Invalid model type - expected CrossEncoder"
+            return health_status
+        
+        # Model is available
+        health_status['model_available'] = True
+        
+        # Get model information
+        if hasattr(model, 'model') and hasattr(model.model, 'name_or_path'):
+            health_status['model_name'] = model.model.name_or_path
+        elif hasattr(model, '_model_name'):
+            health_status['model_name'] = model._model_name
+        else:
+            health_status['model_name'] = 'Unknown'
+        
+        # Get device information
+        if hasattr(model, 'device'):
+            health_status['device'] = str(model.device)
+        else:
+            health_status['device'] = 'Unknown'
+        
+        # Perform dummy inference test
+        dummy_pairs = [
+            ["health check query", "health check document"],
+            ["test reranking", "sample content for validation"]
+        ]
+        
+        start_time = time.time()
+        scores = model.predict(dummy_pairs)
+        end_time = time.time()
+        
+        # Validate inference results
+        if (isinstance(scores, (list, tuple)) and 
+            len(scores) == 2 and 
+            all(isinstance(score, (int, float)) for score in scores)):
+            
+            health_status['inference_test_passed'] = True
+            health_status['inference_latency_ms'] = round((end_time - start_time) * 1000, 2)
+            
+            # Clean up GPU memory after test
+            cleanup_gpu_memory()
+        else:
+            health_status['error_message'] = f"Invalid inference output: {type(scores)} with length {len(scores) if hasattr(scores, '__len__') else 'unknown'}"
+            
+    except ImportError as e:
+        health_status['error_message'] = f"Missing required dependencies: {e}"
+    except Exception as e:
+        health_status['error_message'] = f"Health check failed: {e}"
+    
+    return health_status

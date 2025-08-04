@@ -89,6 +89,36 @@ All default to `false`, enable as needed:
 - `USE_RERANKING` - Cross-encoder result reordering
 - `USE_KNOWLEDGE_GRAPH` - AI hallucination detection
 
+### Reranking Configuration
+
+The reranking system uses Cross-encoder models for semantic result reordering. When `USE_RERANKING=true`, the following configuration options are available:
+
+#### Core Reranking Settings
+- `USE_RERANKING` - Enable/disable reranking (default: `false`)
+- `RERANKING_MODEL_NAME` - CrossEncoder model to use (default: `cross-encoder/ms-marco-MiniLM-L-6-v2`)
+- `RERANKING_WARMUP_SAMPLES` - Number of dummy predictions during startup (default: `5`)
+
+#### Device and Performance Settings
+- `GPU_DEVICE_INDEX` - GPU device index for reranking (default: `0`)
+- `GPU_PRECISION` - Model precision on GPU: `float32`, `float16`, `bfloat16` (default: `float32`)
+- `USE_GPU_ACCELERATION` - Device preference: `auto`, `cuda`, `mps`, `cpu` (default: `auto`)
+
+#### Model Options
+Popular CrossEncoder models for different use cases:
+- `cross-encoder/ms-marco-MiniLM-L-6-v2` - Balanced performance and speed (default)
+- `cross-encoder/ms-marco-MiniLM-L-12-v2` - Higher accuracy, slower
+- `cross-encoder/ms-marco-TinyBERT-L-2-v2` - Fastest, lower accuracy
+- `cross-encoder/stsb-distilroberta-base` - For semantic similarity tasks
+
+#### Health Monitoring
+The system includes comprehensive health checks for reranking functionality:
+- Model loading validation
+- Device allocation verification
+- Inference capability testing
+- Performance metrics collection
+
+Use the `health_check_reranking` MCP tool to validate your reranking setup.
+
 ## MCP Tools
 
 ### Core Tools (Always Available)
