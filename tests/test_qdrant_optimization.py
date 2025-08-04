@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Tests for Qdrant client optimizations and connection management.
 
 Tests the singleton pattern implementation and collection verification caching
@@ -74,7 +75,7 @@ class TestQdrantOptimization:
         from src.qdrant_wrapper import QdrantClientWrapper
 
         # First instance should verify collections
-        client1 = QdrantClientWrapper()
+        QdrantClientWrapper()
         assert QdrantClientWrapper._collections_verified is True
 
         # Reset singleton to force new instance creation
@@ -86,7 +87,7 @@ class TestQdrantOptimization:
         with patch(
             "src.qdrant_wrapper.QdrantClientWrapper._ensure_collections_exist"
         ) as mock_ensure:
-            client2 = QdrantClientWrapper()
+            QdrantClientWrapper()
             mock_ensure.assert_not_called()  # Should not be called due to caching
 
     @patch("src.qdrant_wrapper.QdrantClient")
@@ -100,7 +101,7 @@ class TestQdrantOptimization:
 
         # First call creates healthy client
         mock_client_instance.get_collections.return_value = Mock()
-        client1 = get_qdrant_client()
+        get_qdrant_client()
 
         # Make client unhealthy
         mock_client_instance.get_collections.side_effect = Exception("Connection lost")
@@ -110,7 +111,7 @@ class TestQdrantOptimization:
         mock_new_client.get_collections.return_value = Mock()
         mock_qdrant_client.return_value = mock_new_client
 
-        client2 = get_qdrant_client()
+        get_qdrant_client()
         assert mock_qdrant_client.call_count == 2  # Two instances created
 
     def test_reset_verification_cache(self):

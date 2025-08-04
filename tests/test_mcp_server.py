@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for the MCP server with Qdrant migration.
 
 Tests the main MCP server functionality after Supabase to Qdrant migration.

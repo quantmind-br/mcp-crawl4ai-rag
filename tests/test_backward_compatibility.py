@@ -3,6 +3,7 @@ Simple backward compatibility test for smart_crawl_github.
 
 Tests that the default behavior (markdown-only) still works correctly.
 """
+# ruff: noqa: E402
 
 import pytest
 import tempfile

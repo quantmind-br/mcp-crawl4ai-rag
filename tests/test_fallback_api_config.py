@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for fallback API configuration system.
 
 Tests the fallback API configuration with inheritance patterns,

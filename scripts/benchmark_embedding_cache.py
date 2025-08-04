@@ -15,7 +15,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from embedding_cache import EmbeddingCache
+from embedding_cache import EmbeddingCache  # noqa: E402
 
 
 def benchmark_cache_operations():

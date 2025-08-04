@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Unit tests for smart_crawl_github MCP tool.
 
 Tests the complete GitHub repository crawling functionality.
@@ -324,8 +325,8 @@ class TestSmartCrawlGitHub:
             patch("crawl4ai_mcp.GitHubMetadataExtractor") as mock_extractor_cls,
             patch("crawl4ai_mcp.smart_chunk_markdown") as mock_chunk,
             patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
-            patch("crawl4ai_mcp.update_source_info") as mock_update_source,
-            patch("crawl4ai_mcp.add_documents_to_supabase") as mock_add_docs,
+            patch("crawl4ai_mcp.update_source_info"),
+            patch("crawl4ai_mcp.add_documents_to_supabase"),
         ):
             # Setup mocks
             mock_manager = Mock()

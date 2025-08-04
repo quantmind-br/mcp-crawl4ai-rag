@@ -186,7 +186,7 @@ class AIScriptAnalyzer:
 
     def _analyze_node(self, node: ast.AST, result: AnalysisResult):
         """Analyze individual AST nodes for usage patterns"""
-        line_num = getattr(node, "lineno", 0)
+        getattr(node, "lineno", 0)
 
         # Assignments (class instantiations and method call results)
         if isinstance(node, ast.Assign):

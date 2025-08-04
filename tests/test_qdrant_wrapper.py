@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Unit tests for QdrantClientWrapper.
 
 Tests the core functionality of the Qdrant client wrapper that replaced Supabase.

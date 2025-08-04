@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Unit tests for EmbeddingCache with Redis integration.
 
 Tests the core functionality of the Redis-based embedding cache with mocked Redis operations.

@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for CrossEncoder GPU acceleration functionality.
 
 Tests CrossEncoder GPU initialization, CPU fallback scenarios, memory cleanup,
@@ -378,7 +379,7 @@ class TestRerankingIntegration:
         results = [{"text": "Custom content field", "id": "doc1"}]
 
         with patch("crawl4ai_mcp.cleanup_gpu_memory"):
-            reranked = rerank_results(mock_model, "query", results, content_key="text")
+            rerank_results(mock_model, "query", results, content_key="text")
 
             # Verify correct content was used for reranking
             expected_pairs = [["query", "Custom content field"]]

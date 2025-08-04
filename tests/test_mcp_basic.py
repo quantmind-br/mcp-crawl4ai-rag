@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Basic tests for MCP server functions.
 
 Simple tests to validate core MCP tool functionality after Qdrant migration.

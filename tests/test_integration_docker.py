@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests with real Docker services.
 
 Tests the actual integration with Qdrant and Neo4j running in Docker containers.
@@ -146,7 +147,7 @@ class TestQdrantIntegration:
                 client.client.delete(
                     collection_name="crawled_pages", points_selector=[test_id]
                 )
-            except:
+            except Exception:
                 pass  # Clean up failure is not critical
 
         except Exception as e:
@@ -231,7 +232,7 @@ class TestUtilsWithRealQdrant:
                     collection_name="crawled_pages",
                     points_selector=["integration-test-embedding"],
                 )
-            except:
+            except Exception:
                 pass
 
         except Exception as e:
@@ -334,7 +335,7 @@ class TestEndToEndWorkflow:
                 # Try to remove test documents (cleanup)
                 # This is optional as test data won't interfere with normal operation
                 pass
-            except:
+            except Exception:
                 pass
 
         except Exception as e:

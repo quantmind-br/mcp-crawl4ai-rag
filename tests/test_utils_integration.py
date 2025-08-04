@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for utils.py with Qdrant wrapper.
 
 Tests the integration between utils functions and QdrantClientWrapper.

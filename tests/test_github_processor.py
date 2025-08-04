@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Unit tests for GitHub processor utilities.
 
 Tests the GitHubRepoManager, MarkdownDiscovery, and GitHubMetadataExtractor classes.

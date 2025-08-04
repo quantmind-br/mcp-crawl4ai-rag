@@ -18,9 +18,10 @@ load_dotenv()
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
-from embedding_config import get_embedding_dimensions, validate_embeddings_config
+# Imports after path setup for standalone script
+from qdrant_client import QdrantClient  # noqa: E402
+from qdrant_client.models import Distance, VectorParams  # noqa: E402
+from embedding_config import get_embedding_dimensions, validate_embeddings_config  # noqa: E402
 
 # Configure logging
 logging.basicConfig(

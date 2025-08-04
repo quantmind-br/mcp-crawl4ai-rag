@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Tests for device management functionality.
 
 Tests device detection, fallback mechanisms, error handling, and GPU memory management

@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Performance validation tests for multi-file processing.
 
 Tests processing speed, memory usage, and error handling performance.

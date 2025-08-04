@@ -8,12 +8,12 @@ import sys
 import asyncio
 from pathlib import Path
 
-# Add src directory to Python path
+# Add src directory to Python path before importing from src
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Now we can import directly without relative imports
-from crawl4ai_mcp import main
+# Import after path setup - this is intentional for standalone scripts
+from crawl4ai_mcp import main  # noqa: E402
 
 if __name__ == "__main__":
     asyncio.run(main())

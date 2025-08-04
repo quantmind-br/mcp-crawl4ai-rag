@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for Redis embedding cache with real Redis instance.
 
 These tests require a running Redis instance and test actual Redis operations.

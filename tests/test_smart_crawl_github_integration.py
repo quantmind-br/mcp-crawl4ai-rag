@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for smart_crawl_github multi-file type support.
 
 Tests the complete workflow from repository cloning through multi-file processing

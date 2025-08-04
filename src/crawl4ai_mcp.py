@@ -5,6 +5,7 @@ This server provides tools to crawl websites using Crawl4AI, automatically detec
 the appropriate crawl method based on URL type (sitemap, txt file, or regular webpage).
 Also includes AI hallucination detection and repository parsing tools using Neo4j knowledge graphs.
 """
+# ruff: noqa: E402
 
 # Apply Windows ConnectionResetError fix as early as possible
 try:
@@ -14,6 +15,7 @@ except ImportError:
 
 setup_event_loop()
 
+# Imports after event loop setup - this is required for Windows compatibility
 from mcp.server.fastmcp import FastMCP, Context
 from sentence_transformers import CrossEncoder
 from contextlib import asynccontextmanager
@@ -63,10 +65,10 @@ knowledge_graphs_path = Path(__file__).resolve().parent.parent / "knowledge_grap
 sys.path.append(str(knowledge_graphs_path))
 
 # Import knowledge graph modules
-from knowledge_graph_validator import KnowledgeGraphValidator  # noqa: E402
-from parse_repo_into_neo4j import DirectNeo4jExtractor  # noqa: E402
-from ai_script_analyzer import AIScriptAnalyzer  # noqa: E402
-from hallucination_reporter import HallucinationReporter  # noqa: E402
+from knowledge_graph_validator import KnowledgeGraphValidator
+from parse_repo_into_neo4j import DirectNeo4jExtractor
+from ai_script_analyzer import AIScriptAnalyzer
+from hallucination_reporter import HallucinationReporter
 
 try:
     from .utils import (
@@ -81,7 +83,6 @@ try:
     )
     from .utils.github_processor import (
         GitHubRepoManager,
-        MarkdownDiscovery,
         GitHubMetadataExtractor,
         MultiFileDiscovery,
         PythonProcessor,

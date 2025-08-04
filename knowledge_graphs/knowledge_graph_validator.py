@@ -11,10 +11,6 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
 from neo4j import AsyncGraphDatabase
-
-# Global semaphore to prevent concurrent Neo4j initialization
-_neo4j_init_semaphore = asyncio.Semaphore(1)
-
 from ai_script_analyzer import (
     AnalysisResult,
     ImportInfo,
@@ -23,6 +19,9 @@ from ai_script_analyzer import (
     FunctionCall,
     ClassInstantiation,
 )
+
+# Global semaphore to prevent concurrent Neo4j initialization
+_neo4j_init_semaphore = asyncio.Semaphore(1)
 
 logger = logging.getLogger(__name__)
 

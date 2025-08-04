@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for DeepInfra embedding provider.
 
 Tests DeepInfra API configuration, embedding creation, error handling,

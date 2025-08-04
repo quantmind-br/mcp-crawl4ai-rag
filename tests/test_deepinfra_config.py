@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
 """
 Teste rápido da configuração DeepInfra Qwen3-Embedding-0.6B
 

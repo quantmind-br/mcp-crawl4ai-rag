@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Tests for enhanced reranking functionality.
 
 Tests the new reranking enhancements including configurable model selection,
@@ -100,7 +101,7 @@ class TestConfigurableModelSelection:
         mock_cross_encoder.return_value = mock_model
 
         async def test_lifespan():
-            async with crawl4ai_lifespan(None) as context:
+            async with crawl4ai_lifespan(None):
                 # Verify CrossEncoder was called with default model name
                 mock_cross_encoder.assert_called_with(
                     "cross-encoder/ms-marco-MiniLM-L-6-v2",  # Default model name
@@ -137,7 +138,7 @@ class TestModelWarming:
         mock_cross_encoder.return_value = mock_model
 
         async def test_lifespan():
-            async with crawl4ai_lifespan(None) as context:
+            async with crawl4ai_lifespan(None):
                 # Verify predict was called for warming with 3 samples
                 mock_model.predict.assert_called_once()
                 call_args = mock_model.predict.call_args[0][0]  # Get the pairs argument
@@ -169,7 +170,7 @@ class TestModelWarming:
         mock_cross_encoder.return_value = mock_model
 
         async def test_lifespan():
-            async with crawl4ai_lifespan(None) as context:
+            async with crawl4ai_lifespan(None):
                 # Verify predict was NOT called for warming
                 mock_model.predict.assert_not_called()
 

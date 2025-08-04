@@ -534,7 +534,7 @@ class Neo4jCodeAnalyzer:
                         try:
                             slice_name = self._get_name(node.slice)
                             return f"{base}[{slice_name}]"
-                        except:
+                        except Exception:
                             return f"{base}[Any]"
                 return base
             elif isinstance(node, ast.Constant):

@@ -1,4 +1,5 @@
 """
+# ruff: noqa: E402
 Integration tests for flexible API configuration system.
 
 Tests the new configurable OpenAI client system with different providers,
