@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Unit tests for EmbeddingCache with Redis integration.
 
 Tests the core functionality of the Redis-based embedding cache with mocked Redis operations.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -30,6 +31,7 @@ class TestCircuitBreaker:
 
     def test_init_default_values(self):
         """Test circuit breaker initialization with default values."""
+
         breaker = CircuitBreaker()
 
         assert breaker.failure_threshold == 5
@@ -40,6 +42,7 @@ class TestCircuitBreaker:
 
     def test_init_custom_values(self):
         """Test circuit breaker initialization with custom values."""
+
         breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
 
         assert breaker.failure_threshold == 3
@@ -48,6 +51,7 @@ class TestCircuitBreaker:
 
     def test_successful_call_closed_state(self):
         """Test successful function call in closed state."""
+
         breaker = CircuitBreaker()
         mock_func = Mock(return_value="success")
 
@@ -60,6 +64,7 @@ class TestCircuitBreaker:
 
     def test_failed_call_threshold_not_reached(self):
         """Test failed call that doesn't reach failure threshold."""
+
         breaker = CircuitBreaker(failure_threshold=3)
         mock_func = Mock(side_effect=Exception("Redis error"))
 
@@ -72,6 +77,7 @@ class TestCircuitBreaker:
 
     def test_failed_call_opens_circuit(self):
         """Test that circuit opens after reaching failure threshold."""
+
         breaker = CircuitBreaker(failure_threshold=2)
         mock_func = Mock(side_effect=Exception("Redis error"))
 
@@ -86,6 +92,7 @@ class TestCircuitBreaker:
 
     def test_call_in_open_state_without_recovery(self):
         """Test call in open state before recovery timeout."""
+
         breaker = CircuitBreaker(failure_threshold=1, recovery_timeout=60)
         mock_func = Mock(side_effect=Exception("Redis error"))
 
@@ -104,6 +111,7 @@ class TestCircuitBreaker:
     @patch("embedding_cache.time.time")
     def test_call_in_open_state_with_recovery(self, mock_time):
         """Test call in open state after recovery timeout."""
+
         breaker = CircuitBreaker(failure_threshold=1, recovery_timeout=60)
         mock_func = Mock(return_value="success")
 
@@ -123,6 +131,7 @@ class TestCircuitBreaker:
 
     def test_half_open_to_closed_on_success(self):
         """Test transition from half-open to closed on successful call."""
+
         breaker = CircuitBreaker()
         breaker.state = CircuitState.HALF_OPEN
         mock_func = Mock(return_value="success")
@@ -135,6 +144,7 @@ class TestCircuitBreaker:
 
     def test_half_open_to_open_on_failure(self):
         """Test transition from half-open to open on failed call."""
+
         breaker = CircuitBreaker(failure_threshold=1)
         breaker.state = CircuitState.HALF_OPEN
         breaker.failure_count = 0  # Reset for half-open state
@@ -153,6 +163,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_init_default_config(self, mock_redis_class):
         """Test cache initialization with default configuration."""
+
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
         mock_redis_class.return_value = mock_redis_instance
@@ -169,6 +180,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_init_custom_config(self, mock_redis_class):
         """Test cache initialization with custom configuration."""
+
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
         mock_redis_class.return_value = mock_redis_instance
@@ -183,6 +195,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_init_redis_connection_failure(self, mock_redis_class):
         """Test graceful handling of Redis connection failure."""
+
         mock_redis_instance = Mock()
         mock_redis_instance.ping.side_effect = Exception("Connection failed")
         mock_redis_class.return_value = mock_redis_instance
@@ -193,6 +206,7 @@ class TestEmbeddingCache:
 
     def test_generate_cache_key(self):
         """Test cache key generation."""
+
         cache = EmbeddingCache.__new__(EmbeddingCache)  # Skip __init__
 
         key1 = cache._generate_cache_key("hello world", "text-embedding-3-small")
@@ -214,6 +228,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_no_redis(self, mock_redis_class):
         """Test get_batch when Redis is not available."""
+
         mock_redis_class.return_value.ping.side_effect = Exception("No Redis")
         cache = EmbeddingCache()
 
@@ -224,6 +239,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_empty_texts(self, mock_redis_class):
         """Test get_batch with empty text list."""
+
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
         mock_redis_class.return_value = mock_redis_instance
@@ -236,6 +252,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_cache_hits(self, mock_redis_class):
         """Test get_batch with cache hits."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -260,6 +277,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_cache_misses(self, mock_redis_class):
         """Test get_batch with cache misses."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -278,6 +296,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_mixed_hits_misses(self, mock_redis_class):
         """Test get_batch with mixed cache hits and misses."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -301,6 +320,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_get_batch_deserialization_error(self, mock_redis_class):
         """Test get_batch handling deserialization errors gracefully."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -319,6 +339,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_set_batch_no_redis(self, mock_redis_class):
         """Test set_batch when Redis is not available."""
+
         mock_redis_class.return_value.ping.side_effect = Exception("No Redis")
         cache = EmbeddingCache()
 
@@ -328,6 +349,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_set_batch_empty_embeddings(self, mock_redis_class):
         """Test set_batch with empty embeddings."""
+
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
         mock_redis_class.return_value = mock_redis_instance
@@ -341,6 +363,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_set_batch_success(self, mock_redis_class):
         """Test successful set_batch operation."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -361,6 +384,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_set_batch_serialization_error(self, mock_redis_class):
         """Test set_batch handling serialization errors gracefully."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -383,6 +407,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_health_check_no_redis(self, mock_redis_class):
         """Test health check when Redis client is not initialized."""
+
         mock_redis_class.return_value.ping.side_effect = Exception("No Redis")
         cache = EmbeddingCache()
 
@@ -395,6 +420,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_health_check_success(self, mock_redis_class):
         """Test successful health check."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -416,6 +442,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_health_check_failure(self, mock_redis_class):
         """Test health check with Redis operation failure."""
+
         # Setup mock Redis
         mock_redis_instance = Mock()
         mock_redis_instance.ping.side_effect = Exception("Redis down")
@@ -430,6 +457,7 @@ class TestEmbeddingCache:
     @patch("embedding_cache.redis.Redis")
     def test_circuit_breaker_integration(self, mock_redis_class):
         """Test circuit breaker integration with Redis operations."""
+
         # Setup mock Redis that fails
         mock_redis_instance = Mock()
         mock_redis_instance.ping.return_value = True
@@ -464,6 +492,7 @@ class TestGlobalFunctions:
     @patch.dict(os.environ, {"USE_REDIS_CACHE": "false"})
     def test_get_embedding_cache_disabled(self):
         """Test get_embedding_cache when caching is disabled."""
+
         result = get_embedding_cache()
         assert result is None
 
@@ -471,6 +500,7 @@ class TestGlobalFunctions:
     @patch("embedding_cache.EmbeddingCache")
     def test_get_embedding_cache_enabled_success(self, mock_cache_class):
         """Test get_embedding_cache when caching is enabled and succeeds."""
+
         mock_cache_instance = Mock()
         mock_cache_class.return_value = mock_cache_instance
 
@@ -488,6 +518,7 @@ class TestGlobalFunctions:
     @patch("embedding_cache.EmbeddingCache")
     def test_get_embedding_cache_initialization_failure(self, mock_cache_class):
         """Test get_embedding_cache when cache initialization fails."""
+
         mock_cache_class.side_effect = Exception("Redis unavailable")
 
         # Clear global cache
@@ -510,30 +541,35 @@ class TestGlobalFunctions:
     )
     def test_validate_redis_config_success(self):
         """Test successful Redis configuration validation."""
+
         # Should not raise exception
         validate_redis_config()
 
     @patch.dict(os.environ, {"REDIS_PORT": "invalid"})
     def test_validate_redis_config_invalid_port(self):
         """Test Redis configuration validation with invalid port."""
+
         with pytest.raises(ValueError, match="Invalid Redis port"):
             validate_redis_config()
 
     @patch.dict(os.environ, {"REDIS_PORT": "70000"})
     def test_validate_redis_config_port_out_of_range(self):
         """Test Redis configuration validation with port out of range."""
+
         with pytest.raises(ValueError, match="Invalid Redis port"):
             validate_redis_config()
 
     @patch.dict(os.environ, {"REDIS_EMBEDDING_TTL": "-1"})
     def test_validate_redis_config_invalid_ttl(self):
         """Test Redis configuration validation with invalid TTL."""
+
         with pytest.raises(ValueError, match="Invalid Redis TTL"):
             validate_redis_config()
 
     @patch.dict(os.environ, {"REDIS_EMBEDDING_TTL": "not_a_number"})
     def test_validate_redis_config_non_numeric_ttl(self):
         """Test Redis configuration validation with non-numeric TTL."""
+
         with pytest.raises(ValueError, match="Invalid Redis TTL"):
             validate_redis_config()
 

@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Integration tests for Redis embedding cache with real Redis instance.
 
 These tests require a running Redis instance and test actual Redis operations.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -32,6 +33,7 @@ create_embeddings_batch = utils_module.create_embeddings_batch
 # Check if Redis is available
 def is_redis_available() -> bool:
     """Check if Redis is available for testing."""
+
     try:
         r = redis.Redis(host="localhost", port=6379, db=0, socket_timeout=2)
         r.ping()
@@ -49,6 +51,7 @@ class TestRedisIntegration:
 
     def setup_method(self):
         """Setup for each test method."""
+
         # Use a test-specific Redis database to avoid conflicts
         self.test_db = 15  # Use DB 15 for testing
         self.cache = EmbeddingCache(host="localhost", port=6379, db=self.test_db)
@@ -59,6 +62,7 @@ class TestRedisIntegration:
 
     def teardown_method(self):
         """Cleanup after each test method."""
+
         # Clean up test database
         if self.cache and self.cache.redis:
             self.cache.redis.flushdb()
@@ -66,11 +70,13 @@ class TestRedisIntegration:
 
     def test_redis_connection(self):
         """Test basic Redis connection."""
+
         assert self.cache.redis is not None
         assert self.cache.redis.ping() is True
 
     def test_health_check_real_redis(self):
         """Test health check with real Redis."""
+
         health = self.cache.health_check()
 
         assert health["status"] == "healthy"
@@ -83,6 +89,7 @@ class TestRedisIntegration:
 
     def test_cache_key_generation_consistency(self):
         """Test that cache keys are generated consistently."""
+
         text = "test embedding text"
         model = "text-embedding-3-small"
 
@@ -94,6 +101,7 @@ class TestRedisIntegration:
 
     def test_single_embedding_cache_cycle(self):
         """Test complete cache cycle with single embedding."""
+
         text = "This is a test text for embedding"
         model = "text-embedding-3-small"
         embedding = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -112,6 +120,7 @@ class TestRedisIntegration:
 
     def test_batch_embedding_cache_cycle(self):
         """Test complete cache cycle with multiple embeddings."""
+
         texts = ["text1", "text2", "text3"]
         model = "test-model"
         embeddings = {
@@ -136,6 +145,7 @@ class TestRedisIntegration:
 
     def test_partial_cache_hits(self):
         """Test scenario with partial cache hits."""
+
         texts = ["cached_text", "new_text"]
         model = "test-model"
         cached_embedding = [0.1, 0.2, 0.3]
@@ -154,6 +164,7 @@ class TestRedisIntegration:
 
     def test_ttl_expiration(self):
         """Test that cached embeddings expire after TTL."""
+
         text = "expiring text"
         model = "test-model"
         embedding = [0.1, 0.2, 0.3]
@@ -174,6 +185,7 @@ class TestRedisIntegration:
 
     def test_different_models_different_keys(self):
         """Test that different models use different cache keys."""
+
         text = "same text"
         model1 = "model-1"
         model2 = "model-2"
@@ -194,6 +206,7 @@ class TestRedisIntegration:
 
     def test_unicode_text_handling(self):
         """Test caching with Unicode text."""
+
         texts = ["Hello 世界", "café résumé", "🌟✨🎉"]
         model = "test-model"
         embeddings = {
@@ -214,6 +227,7 @@ class TestRedisIntegration:
 
     def test_large_embedding_handling(self):
         """Test caching with large embeddings."""
+
         text = "large embedding test"
         model = "large-model"
         # Create a large embedding (3072 dimensions like text-embedding-3-large)
@@ -230,6 +244,7 @@ class TestRedisIntegration:
 
     def test_concurrent_access_simulation(self):
         """Test cache behavior under simulated concurrent access."""
+
         import threading
         import queue
 
@@ -276,6 +291,7 @@ class TestRedisIntegration:
 
     def test_memory_usage_with_many_embeddings(self):
         """Test cache memory usage with many embeddings."""
+
         model = "memory-test-model"
         batch_size = 100
         embedding_dim = 1536
@@ -302,6 +318,7 @@ class TestRedisIntegration:
 
     def test_redis_error_recovery(self):
         """Test cache behavior during Redis errors and recovery."""
+
         text = "error_recovery_test"
         model = "error-model"
         embedding = [0.1, 0.2, 0.3]
@@ -331,6 +348,7 @@ class TestIntegrationWithEmbeddingFunction:
 
     def setup_method(self):
         """Setup for each test method."""
+
         # Set up environment for caching
         os.environ["USE_REDIS_CACHE"] = "true"
         os.environ["REDIS_HOST"] = "localhost"
@@ -350,6 +368,7 @@ class TestIntegrationWithEmbeddingFunction:
 
     def teardown_method(self):
         """Cleanup after each test method."""
+
         # Clean up test database
         test_redis = redis.Redis(host="localhost", port=6379, db=14)
         test_redis.flushdb()
@@ -368,6 +387,7 @@ class TestIntegrationWithEmbeddingFunction:
     )
     def test_embedding_function_with_cache_disabled(self):
         """Test embedding function behavior with cache disabled."""
+
         os.environ["USE_REDIS_CACHE"] = "false"
 
         # Clear global cache to force reinitialization
@@ -385,6 +405,7 @@ class TestIntegrationWithEmbeddingFunction:
 
     def test_embedding_function_with_cache_enabled_no_api(self):
         """Test embedding function with cache enabled but no API key."""
+
         # This test doesn't require API key - tests cache behavior
         texts = ["Test cache behavior"]
 
@@ -402,6 +423,7 @@ class TestIntegrationWithEmbeddingFunction:
 
     def test_cache_global_singleton_behavior(self):
         """Test that cache uses singleton pattern correctly."""
+
         cache1 = get_embedding_cache()
         cache2 = get_embedding_cache()
 
@@ -411,6 +433,7 @@ class TestIntegrationWithEmbeddingFunction:
 
     def test_configuration_validation_integration(self):
         """Test configuration validation with real environment."""
+
         # Should not raise exception with valid config
         validate_redis_config()
 

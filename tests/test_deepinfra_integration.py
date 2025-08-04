@@ -1,10 +1,10 @@
 """
-# ruff: noqa: E402
 Integration tests for DeepInfra embedding provider.
 
 Tests DeepInfra API configuration, embedding creation, error handling,
 and integration with the existing flexible API system.
 """
+# ruff: noqa: E402
 
 import pytest
 import os

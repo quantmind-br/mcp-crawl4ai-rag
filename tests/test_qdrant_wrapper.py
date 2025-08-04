@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Unit tests for QdrantClientWrapper.
 
 Tests the core functionality of the Qdrant client wrapper that replaced Supabase.
 """
+# ruff: noqa: E402
 
 import pytest
 import sys
@@ -24,6 +25,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_init_default_config(self, mock_qdrant_client):
         """Test initialization with default configuration."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -42,6 +44,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_init_custom_config(self, mock_qdrant_client):
         """Test initialization with custom configuration."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -57,6 +60,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_generate_point_id(self, mock_qdrant_client):
         """Test point ID generation consistency."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -79,6 +83,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_normalize_search_results(self, mock_qdrant_client):
         """Test search result normalization."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -113,6 +118,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_health_check_healthy(self, mock_qdrant_client):
         """Test health check when system is healthy."""
+
         # Setup mocks
         mock_client_instance = Mock()
         mock_collections = Mock()
@@ -145,6 +151,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_health_check_unhealthy(self, mock_qdrant_client):
         """Test health check when system is unhealthy."""
+
         # Setup mock client that works for initialization but fails for health check
         mock_client_instance = Mock()
         mock_client_instance.get_collections.side_effect = [
@@ -166,6 +173,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_update_source_info(self, mock_qdrant_client):
         """Test source information update."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -191,6 +199,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_search_documents_no_filter(self, mock_qdrant_client):
         """Test document search without filters."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -228,6 +237,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_search_documents_with_filters(self, mock_qdrant_client):
         """Test document search with metadata and source filters."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -255,6 +265,7 @@ class TestQdrantClientWrapper:
     @patch("qdrant_wrapper.QdrantClient")
     def test_keyword_search_documents(self, mock_qdrant_client):
         """Test keyword search functionality."""
+
         # Setup mock
         mock_client_instance = Mock()
         mock_client_instance.get_collections.return_value = Mock()
@@ -287,6 +298,7 @@ class TestUtilityFunctions:
     @patch("qdrant_wrapper.QdrantClientWrapper")
     def test_get_qdrant_client(self, mock_wrapper):
         """Test Qdrant client factory function."""
+
         # Setup mock
         mock_instance = Mock()
         mock_wrapper.return_value = mock_instance
@@ -301,6 +313,7 @@ class TestUtilityFunctions:
     @patch("qdrant_wrapper.QdrantClientWrapper")
     def test_get_qdrant_client_failure(self, mock_wrapper):
         """Test Qdrant client factory function with failure."""
+
         # Setup mock to raise exception
         mock_wrapper.side_effect = Exception("Connection failed")
 

@@ -1,10 +1,11 @@
 """
-# ruff: noqa: E402
+
 Integration tests for smart_crawl_github multi-file type support.
 
 Tests the complete workflow from repository cloning through multi-file processing
 to storage in the vector database.
 """
+# ruff: noqa: E402
 
 import pytest
 import json
@@ -28,12 +29,14 @@ class TestSmartCrawlGitHubIntegration:
     @pytest.fixture
     def mock_context(self):
         """Create a mock MCP context."""
+
         context = Mock(spec=Context)
         return context
 
     @pytest.fixture
     def sample_repo_structure(self):
         """Create a temporary repository with multiple file types."""
+
         temp_dir = tempfile.mkdtemp(prefix="test_repo_")
 
         # Create directory structure
@@ -43,6 +46,7 @@ class TestSmartCrawlGitHubIntegration:
 
         # Create README.md
         readme_content = """# Test Repository
+
 
 This is a test repository for integration testing.
 
@@ -59,18 +63,22 @@ npm install
 python -m pip install -r requirements.txt
 ```
 """
+
         with open(os.path.join(temp_dir, "README.md"), "w") as f:
             f.write(readme_content)
 
         # Create Python file with docstrings
         python_content = '''"""
+
 Test Python module for integration testing.
 
 This module demonstrates docstring extraction capabilities.
 """
 
+
 def calculate_sum(a: int, b: int) -> int:
     """
+
     Calculate the sum of two integers.
     
     Args:
@@ -80,21 +88,26 @@ def calculate_sum(a: int, b: int) -> int:
     Returns:
         The sum of a and b
     """
+
     return a + b
 
 class DataProcessor:
     """
+
     A class for processing data with various methods.
     
     This class demonstrates class-level documentation.
     """
+
     
     def __init__(self, name: str):
         """Initialize the processor with a name."""
+
         self.name = name
     
     async def process_async(self, data: List[str]) -> Dict[str, Any]:
         """
+
         Process data asynchronously.
         
         Args:
@@ -103,6 +116,7 @@ class DataProcessor:
         Returns:
             Processed data as dictionary
         """
+
         return {"processed": len(data), "name": self.name}
 '''
         with open(os.path.join(temp_dir, "src", "processor.py"), "w") as f:
@@ -110,6 +124,7 @@ class DataProcessor:
 
         # Create TypeScript file with JSDoc
         typescript_content = """
+
 /**
  * User interface definition with comprehensive documentation.
  * @interface User
@@ -170,6 +185,7 @@ export function validateEmail(email: string): boolean {
     return emailRegex.test(email);
 }
 """
+
         with open(os.path.join(temp_dir, "src", "user-service.ts"), "w") as f:
             f.write(typescript_content)
 
@@ -188,6 +204,7 @@ export function validateEmail(email: string): boolean {
 
         # Create docker-compose.yml
         docker_compose = """version: '3.8'
+
 services:
   app:
     build: .
@@ -215,11 +232,13 @@ services:
 volumes:
   postgres_data:
 """
+
         with open(os.path.join(temp_dir, "config", "docker-compose.yml"), "w") as f:
             f.write(docker_compose)
 
         # Create pyproject.toml
         pyproject_content = """[project]
+
 name = "test-python-project"
 version = "0.1.0"
 description = "Test Python project for integration testing"
@@ -252,11 +271,13 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 """
+
         with open(os.path.join(temp_dir, "pyproject.toml"), "w") as f:
             f.write(pyproject_content)
 
         # Create API documentation
         api_docs = """# API Documentation
+
 
 ## User Management API
 
@@ -290,6 +311,7 @@ Create a new user.
 }
 ```
 """
+
         with open(os.path.join(temp_dir, "docs", "api.md"), "w") as f:
             f.write(api_docs)
 
@@ -311,6 +333,7 @@ Create a new user.
         sample_repo_structure,
     ):
         """Test complete workflow with multiple file types."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_manager.clone_repository.return_value = sample_repo_structure
@@ -407,6 +430,7 @@ Create a new user.
         sample_repo_structure,
     ):
         """Test backward compatibility with default markdown-only behavior."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_manager.clone_repository.return_value = sample_repo_structure
@@ -462,6 +486,7 @@ Create a new user.
         sample_repo_structure,
     ):
         """Test processing single specific file type."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_manager.clone_repository.return_value = sample_repo_structure
@@ -513,6 +538,7 @@ Create a new user.
         self, mock_extractor_class, mock_manager_class, mock_context
     ):
         """Test error handling with invalid repository."""
+
         # Setup mock to raise error
         mock_manager = Mock()
         mock_manager.clone_repository.side_effect = ValueError(
@@ -547,14 +573,17 @@ Create a new user.
         sample_repo_structure,
     ):
         """Test processing with mixed valid and problematic files."""
+
         # Create problematic files in the sample repo
 
         # Add invalid Python file (syntax error)
         invalid_python = """
+
 def broken_function(
     # Missing closing parenthesis and invalid syntax
     return "this will fail"
 """
+
         with open(os.path.join(sample_repo_structure, "src", "broken.py"), "w") as f:
             f.write(invalid_python)
 
@@ -622,6 +651,7 @@ def broken_function(
         sample_repo_structure,
     ):
         """Test that generated metadata follows expected structure."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_manager.clone_repository.return_value = sample_repo_structure
@@ -712,6 +742,7 @@ def broken_function(
         sample_repo_structure,
     ):
         """Test that chunking works correctly with multi-file content."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_manager.clone_repository.return_value = sample_repo_structure

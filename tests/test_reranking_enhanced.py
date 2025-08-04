@@ -1,10 +1,11 @@
 """
-# ruff: noqa: E402
+
 Tests for enhanced reranking functionality.
 
 Tests the new reranking enhancements including configurable model selection,
 model warming, and health check functionality as implemented in the PRP.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -48,6 +49,7 @@ class TestConfigurableModelSelection:
         self, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test that custom model name from environment is used."""
+
         # Import here to get the patched environment
         from crawl4ai_mcp import crawl4ai_lifespan
 
@@ -85,6 +87,7 @@ class TestConfigurableModelSelection:
         self, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test that default model name is used when no custom name is set."""
+
         # Ensure RERANKING_MODEL_NAME is not set
         os.environ.pop("RERANKING_MODEL_NAME", None)
 
@@ -124,6 +127,7 @@ class TestModelWarming:
         self, mock_cleanup, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test that model warming works with custom sample count."""
+
         from crawl4ai_mcp import crawl4ai_lifespan
 
         # Mock device
@@ -157,6 +161,7 @@ class TestModelWarming:
         self, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test that model warming is skipped when set to 0."""
+
         from crawl4ai_mcp import crawl4ai_lifespan
 
         # Mock device
@@ -185,6 +190,7 @@ class TestModelWarming:
         self, mock_cleanup, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test that model warming errors are handled gracefully."""
+
         from crawl4ai_mcp import crawl4ai_lifespan
 
         # Mock device
@@ -211,6 +217,7 @@ class TestHealthCheckReranking:
 
     def test_health_check_with_valid_model(self):
         """Test health check with a working CrossEncoder model."""
+
         # Mock CrossEncoder model
         mock_model = Mock()
         mock_model.predict = Mock(return_value=[0.7, 0.8])
@@ -235,6 +242,7 @@ class TestHealthCheckReranking:
 
     def test_health_check_with_no_model(self):
         """Test health check when no model is provided and reranking is disabled."""
+
         with patch.dict(os.environ, {"USE_RERANKING": "false"}):
             result = health_check_reranking_model(None)
 
@@ -244,6 +252,7 @@ class TestHealthCheckReranking:
 
     def test_health_check_with_invalid_model_type(self):
         """Test health check with invalid model type."""
+
         invalid_model = "not a crossencoder"
 
         result = health_check_reranking_model(invalid_model)
@@ -254,6 +263,7 @@ class TestHealthCheckReranking:
 
     def test_health_check_inference_failure(self):
         """Test health check when model inference fails."""
+
         mock_model = Mock()
         mock_model.predict = Mock(side_effect=RuntimeError("Inference failed"))
         mock_model.device = "cpu"
@@ -268,6 +278,7 @@ class TestHealthCheckReranking:
 
     def test_health_check_invalid_inference_output(self):
         """Test health check when model returns invalid output."""
+
         mock_model = Mock()
         mock_model.predict = Mock(
             return_value="invalid output"
@@ -289,6 +300,7 @@ class TestMCPHealthCheckTool:
     @pytest.mark.asyncio
     async def test_health_check_reranking_tool_success(self):
         """Test the MCP health check tool with successful reranking model."""
+
         from crawl4ai_mcp import health_check_reranking
 
         # Mock context with reranking model
@@ -330,6 +342,7 @@ class TestMCPHealthCheckTool:
     @pytest.mark.asyncio
     async def test_health_check_reranking_tool_no_model(self):
         """Test the MCP health check tool when no reranking model is available."""
+
         from crawl4ai_mcp import health_check_reranking
 
         # Mock context without reranking model
@@ -348,6 +361,7 @@ class TestMCPHealthCheckTool:
     @pytest.mark.asyncio
     async def test_health_check_reranking_tool_exception(self):
         """Test the MCP health check tool handles exceptions gracefully."""
+
         from crawl4ai_mcp import health_check_reranking
 
         # Mock context that will cause an exception
@@ -390,6 +404,7 @@ class TestIntegrationWithExistingSystem:
         self, mock_cleanup, mock_get_kwargs, mock_get_device, mock_cross_encoder
     ):
         """Test the full workflow with all enhancements enabled."""
+
         from crawl4ai_mcp import crawl4ai_lifespan, rerank_results
 
         # Mock device
@@ -449,6 +464,7 @@ class TestEnvironmentConfiguration:
     @patch.dict(os.environ, {"USE_RERANKING": "false"})
     def test_reranking_disabled_no_enhancements(self):
         """Test that when reranking is disabled, no enhancements are loaded."""
+
         from crawl4ai_mcp import crawl4ai_lifespan
 
         async def test_disabled():
@@ -460,6 +476,7 @@ class TestEnvironmentConfiguration:
 
     def test_default_environment_values(self):
         """Test that default values are used when environment variables are not set."""
+
         # Clear relevant environment variables
         env_vars_to_clear = ["RERANKING_MODEL_NAME", "RERANKING_WARMUP_SAMPLES"]
         original_values = {}

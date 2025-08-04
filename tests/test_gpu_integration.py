@@ -1,10 +1,11 @@
 """
-# ruff: noqa: E402
+
 Integration tests for CrossEncoder GPU acceleration functionality.
 
 Tests CrossEncoder GPU initialization, CPU fallback scenarios, memory cleanup,
 and integration with the MCP server following the existing test infrastructure.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -35,6 +36,7 @@ class TestCrossEncoderGPUInitialization:
         self, mock_get_gpu_pref, mock_get_kwargs, mock_get_device, mock_crossencoder
     ):
         """Test successful CrossEncoder initialization with GPU."""
+
         # Mock device detection
         mock_device = Mock()
         mock_device.__str__ = Mock(return_value="cuda:0")
@@ -63,6 +65,7 @@ class TestCrossEncoderGPUInitialization:
         self, mock_get_gpu_pref, mock_get_device, mock_crossencoder
     ):
         """Test CrossEncoder initialization when CPU is forced."""
+
         # Mock CPU device
         mock_device = Mock()
         mock_device.__str__ = Mock(return_value="cpu")
@@ -84,6 +87,7 @@ class TestCrossEncoderGPUInitialization:
         self, mock_print, mock_get_device, mock_crossencoder
     ):
         """Test CrossEncoder initialization failure handling."""
+
         # Mock device detection success but CrossEncoder initialization failure
         mock_device = Mock()
         mock_device.__str__ = Mock(return_value="cuda:0")
@@ -110,6 +114,7 @@ class TestRerankingWithGPU:
 
     def test_rerank_results_with_gpu_model(self):
         """Test rerank_results function with GPU-enabled model."""
+
         # Mock CrossEncoder model
         mock_model = Mock()
         mock_model.predict.return_value = [0.9, 0.7, 0.8]  # Relevance scores
@@ -145,6 +150,7 @@ class TestRerankingWithGPU:
 
     def test_rerank_results_empty_input(self):
         """Test rerank_results with empty input."""
+
         mock_model = Mock()
 
         result = rerank_results(mock_model, "query", [])
@@ -154,6 +160,7 @@ class TestRerankingWithGPU:
 
     def test_rerank_results_no_model(self):
         """Test rerank_results with None model (fallback case)."""
+
         results = [{"content": "Document 1", "id": "doc1"}]
 
         result = rerank_results(None, "query", results)
@@ -162,6 +169,7 @@ class TestRerankingWithGPU:
 
     def test_rerank_results_model_error_handling(self):
         """Test rerank_results handles model prediction errors."""
+
         mock_model = Mock()
         mock_model.predict.side_effect = RuntimeError("Model prediction failed")
 
@@ -180,6 +188,7 @@ class TestMemoryManagement:
     @patch("crawl4ai_mcp.cleanup_gpu_memory")
     def test_memory_cleanup_called_after_reranking(self, mock_cleanup):
         """Test that GPU memory cleanup is called after reranking."""
+
         mock_model = Mock()
         mock_model.predict.return_value = [0.8]
 
@@ -192,6 +201,7 @@ class TestMemoryManagement:
     @patch("crawl4ai_mcp.cleanup_gpu_memory")
     def test_memory_cleanup_called_even_on_error(self, mock_cleanup):
         """Test that memory cleanup is attempted even when reranking fails."""
+
         mock_model = Mock()
         mock_model.predict.side_effect = RuntimeError("Prediction error")
 
@@ -211,6 +221,7 @@ class TestDeviceHealthCheck:
     @patch("utils.torch")
     def test_health_check_gpu_available_and_working(self, mock_torch):
         """Test health check when GPU is available and working."""
+
         # Mock CUDA availability and operations
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.get_device_name.return_value = "NVIDIA GeForce RTX 3080"
@@ -236,6 +247,7 @@ class TestDeviceHealthCheck:
     @patch("utils.torch")
     def test_health_check_mps_available_and_working(self, mock_torch):
         """Test health check when MPS (Apple Silicon) is available."""
+
         # Mock MPS availability, no CUDA
         mock_torch.cuda.is_available.return_value = False
         mock_torch.backends.mps.is_available.return_value = True
@@ -257,6 +269,7 @@ class TestDeviceHealthCheck:
     @patch("utils.torch")
     def test_health_check_gpu_operations_fail(self, mock_torch):
         """Test health check when GPU is detected but operations fail."""
+
         # Mock CUDA available but operations fail
         mock_torch.cuda.is_available.return_value = True
         mock_torch.randn.side_effect = RuntimeError("CUDA out of memory")
@@ -270,6 +283,7 @@ class TestDeviceHealthCheck:
     @patch("utils.torch")
     def test_health_check_no_gpu_available(self, mock_torch):
         """Test health check when no GPU is available."""
+
         # Mock no GPU availability
         mock_torch.cuda.is_available.return_value = False
         mock_torch.backends.mps.is_available.return_value = False
@@ -296,6 +310,7 @@ class TestEnvironmentConfiguration:
     )
     def test_environment_configuration_parsing(self):
         """Test that environment variables are correctly parsed."""
+
         assert os.getenv("USE_RERANKING") == "true"
         assert os.getenv("USE_GPU_ACCELERATION") == "true"
         assert os.getenv("GPU_PRECISION") == "float16"
@@ -304,6 +319,7 @@ class TestEnvironmentConfiguration:
     @patch.dict(os.environ, {"USE_RERANKING": "false"})
     def test_reranking_disabled_no_gpu_init(self):
         """Test that GPU initialization is skipped when reranking is disabled."""
+
         # This test would verify that CrossEncoder is not initialized
         # when USE_RERANKING is false, regardless of GPU settings
         assert os.getenv("USE_RERANKING") == "false"
@@ -316,6 +332,7 @@ class TestBackwardCompatibility:
     @patch("device_manager.torch")
     def test_cpu_only_environment_compatibility(self, mock_torch):
         """Test that CPU-only environments continue to work."""
+
         # Mock no GPU availability
         mock_torch.cuda.is_available.return_value = False
         hasattr_mock = Mock(return_value=False)
@@ -331,6 +348,7 @@ class TestBackwardCompatibility:
     @patch.dict(os.environ, {}, clear=True)  # Clear all environment variables
     def test_default_configuration_behavior(self):
         """Test behavior with default configuration (no env vars set)."""
+
         # Should use default values when environment variables are not set
         assert os.getenv("USE_GPU_ACCELERATION", "auto") == "auto"
         assert os.getenv("GPU_PRECISION", "float32") == "float32"
@@ -342,6 +360,7 @@ class TestRerankingIntegration:
 
     def test_reranking_preserves_original_fields(self):
         """Test that reranking preserves all original result fields."""
+
         mock_model = Mock()
         mock_model.predict.return_value = [0.9, 0.7]
 
@@ -373,6 +392,7 @@ class TestRerankingIntegration:
 
     def test_reranking_custom_content_key(self):
         """Test reranking with custom content key."""
+
         mock_model = Mock()
         mock_model.predict.return_value = [0.8]
 

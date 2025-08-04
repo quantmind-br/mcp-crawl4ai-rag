@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Unit tests for smart_crawl_github MCP tool.
 
 Tests the complete GitHub repository crawling functionality.
 """
+# ruff: noqa: E402
 
 import pytest
 import sys
@@ -23,6 +24,7 @@ class TestSmartCrawlGitHub:
 
     def setup_method(self):
         """Setup test method with common fixtures."""
+
         self.mock_context = Mock()
         self.mock_qdrant_client = Mock()
         self.mock_context.request_context.lifespan_context.qdrant_client = (
@@ -32,6 +34,7 @@ class TestSmartCrawlGitHub:
     @pytest.mark.asyncio
     async def test_invalid_github_url(self):
         """Test with invalid GitHub URL."""
+
         result = await smart_crawl_github(
             ctx=self.mock_context, repo_url="https://gitlab.com/user/repo"
         )
@@ -44,6 +47,7 @@ class TestSmartCrawlGitHub:
     @pytest.mark.asyncio
     async def test_empty_url(self):
         """Test with empty URL."""
+
         result = await smart_crawl_github(ctx=self.mock_context, repo_url="")
 
         response = json.loads(result)
@@ -58,6 +62,7 @@ class TestSmartCrawlGitHub:
         self, mock_extractor_cls, mock_discovery_cls, mock_manager_cls
     ):
         """Test when no markdown files are found in repository."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_discovery = Mock()
@@ -102,6 +107,7 @@ class TestSmartCrawlGitHub:
         mock_manager_cls,
     ):
         """Test successful GitHub repository crawling."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_discovery = Mock()
@@ -206,6 +212,7 @@ class TestSmartCrawlGitHub:
         mock_manager_cls,
     ):
         """Test crawling with code examples extraction enabled."""
+
         # Setup environment variable
         mock_getenv.side_effect = (
             lambda key, default=None: "true" if key == "USE_AGENTIC_RAG" else default
@@ -273,6 +280,7 @@ class TestSmartCrawlGitHub:
     @patch("crawl4ai_mcp.GitHubRepoManager")
     async def test_clone_failure(self, mock_manager_cls):
         """Test when repository cloning fails."""
+
         mock_manager = Mock()
         mock_manager_cls.return_value = mock_manager
         mock_manager.clone_repository.side_effect = RuntimeError("Clone failed")
@@ -294,6 +302,7 @@ class TestSmartCrawlGitHub:
         self, mock_extractor_cls, mock_discovery_cls, mock_manager_cls
     ):
         """Test when metadata extraction fails."""
+
         mock_manager = Mock()
         mock_discovery = Mock()
         mock_extractor = Mock()
@@ -319,6 +328,7 @@ class TestSmartCrawlGitHub:
     @pytest.mark.asyncio
     async def test_custom_parameters(self):
         """Test with custom parameters."""
+
         with (
             patch("crawl4ai_mcp.GitHubRepoManager") as mock_manager_cls,
             patch("crawl4ai_mcp.MarkdownDiscovery") as mock_discovery_cls,
@@ -400,6 +410,7 @@ class TestSmartCrawlGitHub:
         mock_manager_cls,
     ):
         """Test that file list is truncated in response when there are many files."""
+
         # Setup mocks
         mock_manager = Mock()
         mock_discovery = Mock()
@@ -451,6 +462,7 @@ class TestSmartCrawlGitHub:
     @patch("crawl4ai_mcp.GitHubRepoManager")
     async def test_cleanup_on_exception(self, mock_manager_cls):
         """Test that cleanup is called even when an exception occurs."""
+
         mock_manager = Mock()
         mock_manager_cls.return_value = mock_manager
         mock_manager.clone_repository.side_effect = Exception("Unexpected error")
@@ -473,6 +485,7 @@ class TestSmartCrawlGitHubIntegration:
 
     def setup_method(self):
         """Setup test method with real components."""
+
         self.mock_context = Mock()
         self.mock_qdrant_client = Mock()
         self.mock_context.request_context.lifespan_context.qdrant_client = (
@@ -500,6 +513,7 @@ class TestSmartCrawlGitHubIntegration:
         mock_mkdtemp,
     ):
         """Test end-to-end workflow with realistic file system simulation."""
+
         # Setup file system simulation
         mock_mkdtemp.return_value = "/tmp/github_clone_test"
         mock_subprocess.return_value = Mock(returncode=0, stderr="")
@@ -516,6 +530,7 @@ class TestSmartCrawlGitHubIntegration:
         # Setup file contents
         readme_content = """# Test Repository
 
+
 This is a test repository for demonstration purposes.
 
 ## Features
@@ -529,6 +544,7 @@ pip install test-package
 """
 
         guide_content = """# User Guide
+
 
 This guide explains how to use the test package.
 

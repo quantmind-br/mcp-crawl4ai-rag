@@ -1,10 +1,11 @@
 """
-# ruff: noqa: E402
+
 Tests for device management functionality.
 
 Tests device detection, fallback mechanisms, error handling, and GPU memory management
 following the patterns established in conftest.py.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -34,6 +35,7 @@ class TestDeviceDetection:
 
     def test_cpu_device_forced(self):
         """CPU device always works when explicitly requested."""
+
         with patch("device_manager.TORCH_AVAILABLE", True):
             with patch("device_manager.torch") as mock_torch:
                 mock_torch.device.return_value = Mock()
@@ -44,6 +46,7 @@ class TestDeviceDetection:
 
     def test_cpu_fallback_when_torch_unavailable(self):
         """Falls back to CPU when PyTorch is not available."""
+
         with patch("device_manager.TORCH_AVAILABLE", False):
             with patch("device_manager.torch", None):
                 device = get_optimal_device(preference="auto")
@@ -54,6 +57,7 @@ class TestDeviceDetection:
     @patch("device_manager.torch")
     def test_gpu_detection_when_cuda_available(self, mock_torch):
         """GPU detection when CUDA is available and working."""
+
         # Mock CUDA availability
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.get_device_name.return_value = "Test GPU"
@@ -78,6 +82,7 @@ class TestDeviceDetection:
     @patch("device_manager.torch")
     def test_fallback_to_cpu_when_gpu_fails(self, mock_torch):
         """Fallback to CPU when GPU operations fail."""
+
         # Mock CUDA availability but operations fail
         mock_torch.cuda.is_available.return_value = True
         mock_torch.randn.side_effect = RuntimeError("GPU operation failed")
@@ -100,6 +105,7 @@ class TestDeviceDetection:
     @patch("device_manager.torch")
     def test_mps_detection_when_available(self, mock_torch):
         """MPS detection on Apple Silicon when available."""
+
         # Mock MPS availability
         mock_torch.cuda.is_available.return_value = False
         mock_torch.backends.mps.is_available.return_value = True
@@ -122,6 +128,7 @@ class TestDeviceConfiguration:
 
     def test_device_config_creation(self):
         """DeviceConfig dataclass creation works correctly."""
+
         config = DeviceConfig(
             device_type="cuda", device_index=0, precision="float16", memory_fraction=0.8
         )
@@ -133,6 +140,7 @@ class TestDeviceConfiguration:
 
     def test_device_info_creation(self):
         """DeviceInfo dataclass creation works correctly."""
+
         info = DeviceInfo(
             device="cuda:0", name="Test GPU", memory_total=8.0, is_available=True
         )
@@ -144,6 +152,7 @@ class TestDeviceConfiguration:
 
     def test_gpu_preference_from_env(self):
         """GPU preference correctly reads from environment variables."""
+
         test_cases = [
             ("true", "auto"),
             ("false", "cpu"),
@@ -165,6 +174,7 @@ class TestModelKwargs:
     @patch("device_manager.torch")
     def test_float32_precision_no_kwargs(self, mock_torch):
         """Float32 precision returns empty model_kwargs."""
+
         mock_device = Mock()
         mock_device.type = "cuda"
 
@@ -175,6 +185,7 @@ class TestModelKwargs:
     @patch("device_manager.torch")
     def test_float16_precision_on_gpu(self, mock_torch):
         """Float16 precision on GPU returns correct torch_dtype."""
+
         mock_device = Mock()
         mock_device.type = "cuda"
         mock_torch.float16 = "float16_value"
@@ -186,6 +197,7 @@ class TestModelKwargs:
     @patch("device_manager.torch")
     def test_bfloat16_precision_on_gpu(self, mock_torch):
         """BFloat16 precision on GPU returns correct torch_dtype."""
+
         mock_device = Mock()
         mock_device.type = "cuda"
         mock_torch.bfloat16 = "bfloat16_value"
@@ -197,6 +209,7 @@ class TestModelKwargs:
     @patch("device_manager.torch")
     def test_precision_on_cpu_ignored(self, mock_torch):
         """Precision settings ignored on CPU device."""
+
         mock_device = Mock()
         mock_device.type = "cpu"
 
@@ -211,6 +224,7 @@ class TestMemoryManagement:
     @patch("device_manager.torch")
     def test_cleanup_gpu_memory_when_available(self, mock_torch):
         """GPU memory cleanup called when CUDA available."""
+
         mock_torch.cuda.is_available.return_value = True
 
         cleanup_gpu_memory()
@@ -221,6 +235,7 @@ class TestMemoryManagement:
     @patch("device_manager.torch")
     def test_cleanup_gpu_memory_when_unavailable(self, mock_torch):
         """GPU memory cleanup safe when CUDA unavailable."""
+
         mock_torch.cuda.is_available.return_value = False
 
         # Should not raise exception
@@ -231,6 +246,7 @@ class TestMemoryManagement:
     @patch("device_manager.TORCH_AVAILABLE", False)
     def test_cleanup_gpu_memory_no_torch(self):
         """GPU memory cleanup safe when PyTorch unavailable."""
+
         # Should not raise exception
         cleanup_gpu_memory()
 
@@ -241,6 +257,7 @@ class TestDeviceInfo:
     @patch("device_manager.TORCH_AVAILABLE", False)
     def test_device_info_no_torch(self):
         """Device info when PyTorch not available."""
+
         info = get_device_info()
 
         expected = {
@@ -257,6 +274,7 @@ class TestDeviceInfo:
     @patch("device_manager.torch")
     def test_device_info_cuda_available(self, mock_torch):
         """Device info when CUDA is available."""
+
         # Mock CUDA availability, no MPS
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.device_count.return_value = 2
@@ -293,6 +311,7 @@ class TestDeviceInfo:
     @patch("device_manager.torch")
     def test_device_info_mps_available(self, mock_torch):
         """Device info when MPS is available."""
+
         # Mock MPS availability, no CUDA
         mock_torch.cuda.is_available.return_value = False
         mock_torch.backends.mps.is_available.return_value = True
@@ -316,6 +335,7 @@ class TestDeviceDetectionWithFallback:
     @patch("device_manager.torch")
     def test_device_detection_with_config(self, mock_torch):
         """Device detection with custom configuration."""
+
         # Mock CUDA availability
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.get_device_name.return_value = "Test GPU"
@@ -358,6 +378,7 @@ class TestDeviceDetectionWithFallback:
     )
     def test_device_detection_from_env(self, mock_torch):
         """Device detection using environment variables."""
+
         # Mock CPU fallback
         mock_torch.cuda.is_available.return_value = False
         cpu_device = Mock()
@@ -379,6 +400,7 @@ class TestErrorHandling:
     @patch("device_manager.torch")
     def test_gpu_operations_exception_handling(self, mock_torch):
         """GPU operations exceptions are handled gracefully."""
+
         mock_torch.cuda.is_available.return_value = True
         mock_torch.randn.side_effect = RuntimeError("Out of memory")
 
@@ -398,6 +420,7 @@ class TestErrorHandling:
     @patch("device_manager.torch")
     def test_device_info_partial_failure(self, mock_torch):
         """Device info gathering handles partial failures."""
+
         # Mock CUDA available but some operations fail, no MPS
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.device_count.return_value = 2
@@ -425,6 +448,7 @@ class TestErrorHandling:
 
     def test_unknown_precision_warning(self):
         """Unknown precision values are handled with warning."""
+
         mock_device = Mock()
         mock_device.type = "cuda"
 

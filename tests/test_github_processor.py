@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Unit tests for GitHub processor utilities.
 
 Tests the GitHubRepoManager, MarkdownDiscovery, and GitHubMetadataExtractor classes.
 """
+# ruff: noqa: E402
 
 import pytest
 import os
@@ -34,12 +35,14 @@ class TestGitHubRepoManager:
 
     def test_init(self):
         """Test initialization of GitHubRepoManager."""
+
         manager = GitHubRepoManager()
         assert manager.temp_dirs == []
         assert manager.logger is not None
 
     def test_is_valid_github_url(self):
         """Test GitHub URL validation."""
+
         manager = GitHubRepoManager()
 
         # Valid URLs
@@ -55,6 +58,7 @@ class TestGitHubRepoManager:
 
     def test_normalize_clone_url(self):
         """Test URL normalization for git clone."""
+
         manager = GitHubRepoManager()
 
         assert (
@@ -78,6 +82,7 @@ class TestGitHubRepoManager:
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
         """Test successful repository cloning."""
+
         # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_clone"
         mock_subprocess.return_value = Mock(returncode=0, stderr="")
@@ -110,6 +115,7 @@ class TestGitHubRepoManager:
     @patch("utils.github_processor.subprocess.run")
     def test_clone_repository_invalid_url(self, mock_subprocess, mock_mkdtemp):
         """Test cloning with invalid URL."""
+
         mock_mkdtemp.return_value = "/tmp/test_clone"
 
         manager = GitHubRepoManager()
@@ -121,6 +127,7 @@ class TestGitHubRepoManager:
     @patch("utils.github_processor.subprocess.run")
     def test_clone_repository_git_failure(self, mock_subprocess, mock_mkdtemp):
         """Test cloning when git command fails."""
+
         mock_mkdtemp.return_value = "/tmp/test_clone"
         mock_subprocess.return_value = Mock(returncode=1, stderr="Repository not found")
 
@@ -137,6 +144,7 @@ class TestGitHubRepoManager:
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
         """Test cloning when repository is too large."""
+
         # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_clone"
         mock_subprocess.return_value = Mock(returncode=0, stderr="")
@@ -154,6 +162,7 @@ class TestGitHubRepoManager:
     @patch("os.path.exists")
     def test_cleanup(self, mock_exists, mock_rmtree):
         """Test cleanup of temporary directories."""
+
         mock_exists.return_value = True
 
         manager = GitHubRepoManager()
@@ -170,6 +179,7 @@ class TestMarkdownDiscovery:
 
     def test_init(self):
         """Test initialization of MarkdownDiscovery."""
+
         discovery = MarkdownDiscovery()
         assert discovery.logger is not None
         assert discovery.EXCLUDED_DIRS is not None
@@ -177,6 +187,7 @@ class TestMarkdownDiscovery:
 
     def test_is_markdown_file(self):
         """Test markdown file detection."""
+
         discovery = MarkdownDiscovery()
 
         # Valid markdown files
@@ -192,6 +203,7 @@ class TestMarkdownDiscovery:
 
     def test_should_exclude_dir(self):
         """Test directory exclusion logic."""
+
         discovery = MarkdownDiscovery()
 
         # Excluded directories
@@ -206,6 +218,7 @@ class TestMarkdownDiscovery:
 
     def test_should_exclude_file(self):
         """Test file exclusion logic."""
+
         discovery = MarkdownDiscovery()
 
         # Excluded files
@@ -219,6 +232,7 @@ class TestMarkdownDiscovery:
 
     def test_is_readme_file(self):
         """Test README file detection."""
+
         discovery = MarkdownDiscovery()
 
         assert discovery._is_readme_file("README.md") is True
@@ -228,6 +242,7 @@ class TestMarkdownDiscovery:
 
     def test_file_priority_key(self):
         """Test file priority calculation."""
+
         discovery = MarkdownDiscovery()
 
         readme_file = {"is_readme": True, "word_count": 1000}
@@ -245,6 +260,7 @@ class TestMarkdownDiscovery:
     @patch("builtins.open", new_callable=mock_open)
     def test_discover_markdown_files(self, mock_file, mock_stat, mock_walk):
         """Test markdown file discovery."""
+
         # Setup mocks
         mock_walk.return_value = [
             ("/repo", ["docs", ".git"], ["README.md", "script.py"]),
@@ -273,11 +289,13 @@ class TestGitHubMetadataExtractor:
 
     def test_init(self):
         """Test initialization of GitHubMetadataExtractor."""
+
         extractor = GitHubMetadataExtractor()
         assert extractor.logger is not None
 
     def test_parse_repo_info(self):
         """Test repository information parsing."""
+
         extractor = GitHubMetadataExtractor()
 
         # Test various URL formats
@@ -297,6 +315,7 @@ class TestGitHubMetadataExtractor:
     @patch("utils.github_processor.os.path.exists")
     def test_extract_package_info_nodejs(self, mock_exists, mock_file):
         """Test package.json extraction."""
+
         # Setup mocks
         mock_exists.side_effect = lambda path: path.endswith("package.json")
         package_json = {
@@ -322,13 +341,16 @@ class TestGitHubMetadataExtractor:
     @patch("utils.github_processor.os.path.exists")
     def test_extract_package_info_python(self, mock_exists, mock_file):
         """Test pyproject.toml extraction."""
+
         # Setup mocks
         mock_exists.side_effect = lambda path: path.endswith("pyproject.toml")
         toml_content = """
+
         [project]
         name = "test-package"
         description = "A Python test package"
         """
+
         mock_file.return_value.read.return_value = toml_content
 
         extractor = GitHubMetadataExtractor()
@@ -342,9 +364,11 @@ class TestGitHubMetadataExtractor:
     @patch("utils.github_processor.os.path.exists")
     def test_extract_readme_info(self, mock_exists, mock_file):
         """Test README extraction."""
+
         # Setup mocks
         mock_exists.side_effect = lambda path: path.endswith("README.md")
         readme_content = """# Test Project
+
         
         This is a test project for demonstration.
         
@@ -352,6 +376,7 @@ class TestGitHubMetadataExtractor:
         - Feature 1
         - Feature 2
         """
+
         mock_file.return_value.read.return_value = readme_content
 
         extractor = GitHubMetadataExtractor()
@@ -362,6 +387,7 @@ class TestGitHubMetadataExtractor:
     @patch("utils.github_processor.subprocess.run")
     def test_extract_git_info(self, mock_subprocess):
         """Test Git information extraction."""
+
         # Setup mock
         mock_subprocess.return_value = Mock(
             returncode=0, stdout="abc123|Initial commit|2024-01-15 10:30:00 +0000"
@@ -376,6 +402,7 @@ class TestGitHubMetadataExtractor:
 
     def test_extract_repo_metadata_integration(self):
         """Test complete repository metadata extraction."""
+
         extractor = GitHubMetadataExtractor()
 
         with (
@@ -411,6 +438,7 @@ class TestValidationFunctions:
 
     def test_validate_github_url_valid(self):
         """Test validation of valid GitHub URLs."""
+
         valid_urls = [
             "https://github.com/user/repo",
             "https://github.com/user/repo.git",
@@ -427,6 +455,7 @@ class TestValidationFunctions:
 
     def test_validate_github_url_invalid(self):
         """Test validation of invalid GitHub URLs."""
+
         invalid_urls = [
             ("", "URL must be a non-empty string"),
             ("not-a-url", "URL must use http or https scheme"),
@@ -453,6 +482,7 @@ class TestValidationFunctions:
 
     def test_normalize_github_url(self):
         """Test GitHub URL normalization."""
+
         test_cases = [
             ("https://github.com/user/repo", "https://github.com/user/repo.git"),
             ("https://github.com/user/repo.git", "https://github.com/user/repo.git"),
@@ -469,6 +499,7 @@ class TestValidationFunctions:
 
     def test_normalize_github_url_invalid(self):
         """Test normalization with invalid URLs."""
+
         with pytest.raises(ValueError, match="Invalid GitHub URL"):
             normalize_github_url("https://gitlab.com/user/repo")
 
@@ -478,15 +509,19 @@ class TestPythonProcessor:
 
     def test_process_file_with_docstrings(self):
         """Test processing Python file with docstrings."""
+
         processor = PythonProcessor()
 
         python_content = '''"""
+
 Module docstring for testing.
 This module contains test functions and classes.
 """
 
+
 def test_function(arg1: str, arg2: int) -> bool:
     """
+
     Test function with parameters and return type.
     
     Args:
@@ -496,21 +531,26 @@ def test_function(arg1: str, arg2: int) -> bool:
     Returns:
         Boolean result
     """
+
     return True
 
 class TestClass:
     """
+
     Test class for demonstration.
     
     This class shows how docstrings are extracted.
     """
+
     
     def method(self, param: str) -> None:
         """Method with docstring."""
+
         pass
 
 async def async_function():
     """Async function docstring."""
+
     pass
 '''
 
@@ -552,9 +592,11 @@ async def async_function():
 
     def test_process_file_syntax_error(self):
         """Test processing Python file with syntax error."""
+
         processor = PythonProcessor()
 
         invalid_python = """
+
 def invalid_syntax(
     # Missing closing parenthesis
     pass
@@ -573,9 +615,11 @@ def invalid_syntax(
 
     def test_process_file_no_docstrings(self):
         """Test processing Python file without docstrings."""
+
         processor = PythonProcessor()
 
         python_content = """
+
 def function_without_docstring():
     return True
 
@@ -598,6 +642,7 @@ class ClassWithoutDocstring:
     @patch("os.path.getsize")
     def test_process_file_too_large(self, mock_getsize):
         """Test processing Python file that's too large."""
+
         processor = PythonProcessor()
         mock_getsize.return_value = 2_000_000  # 2MB - over 1MB limit
 
@@ -610,9 +655,11 @@ class TestTypeScriptProcessor:
 
     def test_process_file_with_jsdoc(self):
         """Test processing TypeScript file with JSDoc comments."""
+
         processor = TypeScriptProcessor()
 
         typescript_content = """
+
 /**
  * Calculates the area of a rectangle.
  * @param width - The width of the rectangle
@@ -686,6 +733,7 @@ export interface User {
 
     def test_process_file_minified(self):
         """Test processing minified TypeScript file."""
+
         processor = TypeScriptProcessor()
 
         # Minified content (long single line)
@@ -704,9 +752,11 @@ export interface User {
 
     def test_process_file_no_jsdoc(self):
         """Test processing TypeScript file without JSDoc."""
+
         processor = TypeScriptProcessor()
 
         typescript_content = """
+
 function normalFunction(): void {
     console.log("No JSDoc here");
 }
@@ -735,9 +785,11 @@ class TestConfigProcessor:
 
     def test_process_json_file(self):
         """Test processing JSON configuration file."""
+
         processor = ConfigProcessor()
 
         json_content = """
+
 {
     "name": "test-app",
     "version": "1.0.0",
@@ -769,9 +821,11 @@ class TestConfigProcessor:
 
     def test_process_yaml_file(self):
         """Test processing YAML configuration file."""
+
         processor = ConfigProcessor()
 
         yaml_content = """
+
 version: '3.8'
 services:
   web:
@@ -805,9 +859,11 @@ services:
 
     def test_process_toml_file(self):
         """Test processing TOML configuration file."""
+
         processor = ConfigProcessor()
 
         toml_content = """
+
 [project]
 name = "my-python-project"
 version = "0.1.0"
@@ -840,6 +896,7 @@ build-backend = "setuptools.build_meta"
     @patch("os.path.getsize")
     def test_process_file_too_large(self, mock_getsize):
         """Test processing config file that's too large."""
+
         processor = ConfigProcessor()
         mock_getsize.return_value = 150_000  # 150KB - over 100KB limit
 
@@ -848,6 +905,7 @@ build-backend = "setuptools.build_meta"
 
     def test_process_empty_file(self):
         """Test processing empty configuration file."""
+
         processor = ConfigProcessor()
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -866,9 +924,11 @@ class TestMarkdownProcessor:
 
     def test_process_markdown_file(self):
         """Test processing markdown file."""
+
         processor = MarkdownProcessor()
 
         markdown_content = """# Test Project
+
 
 This is a test markdown file with various content.
 
@@ -908,6 +968,7 @@ This concludes our test markdown file.
 
     def test_process_empty_markdown(self):
         """Test processing empty or very short markdown file."""
+
         processor = MarkdownProcessor()
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
@@ -926,6 +987,7 @@ class TestMultiFileDiscovery:
 
     def test_init(self):
         """Test initialization of MultiFileDiscovery."""
+
         discovery = MultiFileDiscovery()
         assert discovery.logger is not None
         assert discovery.SUPPORTED_EXTENSIONS is not None
@@ -936,6 +998,7 @@ class TestMultiFileDiscovery:
 
     def test_is_supported_file(self):
         """Test file type support detection."""
+
         discovery = MultiFileDiscovery()
 
         # Test Python files
@@ -964,6 +1027,7 @@ class TestMultiFileDiscovery:
     @patch("builtins.open", new_callable=mock_open)
     def test_discover_files_multi_type(self, mock_file, mock_stat, mock_walk):
         """Test discovering multiple file types."""
+
         # Setup mocks
         mock_walk.return_value = [
             ("/repo", ["src", "docs"], ["README.md", "package.json", "script.py"]),
@@ -998,6 +1062,7 @@ class TestMultiFileDiscovery:
     @patch("utils.github_processor.os.walk")
     def test_discover_files_empty_result(self, mock_walk):
         """Test discovering files with no matches."""
+
         mock_walk.return_value = [("/repo", [], ["script.js", "style.css"])]
 
         discovery = MultiFileDiscovery()
@@ -1010,6 +1075,7 @@ class TestMultiFileDiscovery:
     @patch("builtins.open")
     def test_discover_files_binary_filtering(self, mock_file, mock_stat, mock_walk):
         """Test filtering out binary files."""
+
         mock_walk.return_value = [("/repo", [], ["data.json"])]
         mock_stat.return_value = Mock(st_size=1000)
 
@@ -1028,6 +1094,7 @@ class TestMultiFileDiscovery:
     @patch("utils.github_processor.os.stat")
     def test_discover_files_size_limits(self, mock_stat, mock_walk):
         """Test file size limits by type."""
+
         mock_walk.return_value = [("/repo", [], ["large.py", "large.json"])]
 
         discovery = MultiFileDiscovery()

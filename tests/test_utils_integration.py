@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Integration tests for utils.py with Qdrant wrapper.
 
 Tests the integration between utils functions and QdrantClientWrapper.
 """
+# ruff: noqa: E402
 
 import pytest
 import sys
@@ -35,6 +36,7 @@ class TestUtilsIntegration:
     @patch("utils.get_qdrant_client")
     def test_get_supabase_client_returns_qdrant(self, mock_get_qdrant):
         """Test that get_supabase_client returns Qdrant client (legacy compatibility)."""
+
         # Setup
         mock_client = Mock(spec=QdrantClientWrapper)
         mock_get_qdrant.return_value = mock_client
@@ -52,6 +54,7 @@ class TestUtilsIntegration:
         self, mock_wrapper_class, mock_create_embedding
     ):
         """Test document search integration with Qdrant."""
+
         # Setup mocks
         mock_client = Mock()
         mock_client.search_documents.return_value = [
@@ -76,6 +79,7 @@ class TestUtilsIntegration:
         self, mock_wrapper_class, mock_create_embedding
     ):
         """Test code examples search integration with Qdrant."""
+
         # Setup mocks
         mock_client = Mock()
         mock_client.search_code_examples.return_value = [
@@ -104,6 +108,7 @@ class TestUtilsIntegration:
         self, mock_wrapper_class, mock_create_embeddings
     ):
         """Test document addition integration with Qdrant."""
+
         # Setup mocks
         mock_client = Mock()
         mock_client.add_documents_to_qdrant.return_value = [
@@ -137,6 +142,7 @@ class TestUtilsIntegration:
         self, mock_wrapper_class, mock_create_embeddings
     ):
         """Test code examples addition integration with Qdrant."""
+
         # Setup mocks
         mock_client = Mock()
         mock_client.add_code_examples_to_qdrant.return_value = [
@@ -173,6 +179,7 @@ class TestUtilsIntegration:
     @patch("utils.QdrantClientWrapper")
     def test_update_source_info_integration(self, mock_wrapper_class):
         """Test source info update integration."""
+
         # Setup mock
         mock_client = Mock()
         mock_client.update_source_info.return_value = None
@@ -193,6 +200,7 @@ class TestEmbeddingFunctions:
     @patch("utils.openai.embeddings.create")
     def test_create_embeddings_batch_success(self, mock_openai_create):
         """Test successful batch embedding creation."""
+
         # Setup mock
         mock_response = Mock()
         mock_response.data = [
@@ -219,6 +227,7 @@ class TestEmbeddingFunctions:
         self, mock_openai_create, mock_sleep
     ):
         """Test batch embedding creation with fallback to individual."""
+
         # Setup mock to fail on all batch attempts (3 retries), then succeed on individual calls
         mock_openai_create.side_effect = [
             Exception("Batch failed"),  # 1st batch attempt fails
@@ -246,6 +255,7 @@ class TestEmbeddingFunctions:
     @patch("utils.create_embeddings_batch")
     def test_create_embedding_single(self, mock_batch):
         """Test single embedding creation."""
+
         # Setup mock
         mock_batch.return_value = [[0.1] * get_embedding_dimensions()]
 
@@ -259,6 +269,7 @@ class TestEmbeddingFunctions:
     @patch("utils.create_embeddings_batch")
     def test_create_embedding_failure(self, mock_batch):
         """Test single embedding creation failure."""
+
         # Setup mock to fail
         mock_batch.side_effect = Exception("Failed")
 
@@ -275,7 +286,9 @@ class TestCodeExtraction:
 
     def test_extract_code_blocks_basic(self):
         """Test basic code block extraction."""
+
         markdown = """
+
         Some text before
         
         ```python
@@ -297,7 +310,9 @@ class TestCodeExtraction:
 
     def test_extract_code_blocks_no_language(self):
         """Test code block extraction without language specifier."""
+
         markdown = """
+
         ```
         function test() {
             console.log("test");
@@ -313,7 +328,9 @@ class TestCodeExtraction:
 
     def test_extract_code_blocks_min_length_filter(self):
         """Test that short code blocks are filtered out."""
+
         markdown = """
+
         ```python
         x = 1
         ```

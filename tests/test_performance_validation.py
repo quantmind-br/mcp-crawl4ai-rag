@@ -1,9 +1,10 @@
 """
-# ruff: noqa: E402
+
 Performance validation tests for multi-file processing.
 
 Tests processing speed, memory usage, and error handling performance.
 """
+# ruff: noqa: E402
 
 import pytest
 import time
@@ -30,15 +31,18 @@ class TestPerformanceValidation:
 
     def test_python_processor_performance(self):
         """Test Python processor performance with realistic file."""
+
         processor = PythonProcessor()
 
         # Create a moderately sized Python file with multiple docstrings
         base_content = '''"""
+
 Large Python module for performance testing.
 
 This module contains multiple classes and functions to test
 the performance of AST-based docstring extraction.
 """
+
 import os
 import sys
 from typing import List, Dict, Any, Optional, Union
@@ -49,19 +53,23 @@ from typing import List, Dict, Any, Optional, Union
         class_and_function_template = '''
 class TestClass{i}:
     """
+
     Test class number {i}.
     
     This class demonstrates performance with multiple methods
     and comprehensive docstrings for testing purposes.
     """
+
     
     def __init__(self, name: str, value: int = 0):
         """Initialize the test class with name and value."""
+
         self.name = name
         self.value = value
     
     def process_data(self, data: List[str]) -> Dict[str, Any]:
         """
+
         Process a list of strings and return statistics.
         
         Args:
@@ -73,6 +81,7 @@ class TestClass{i}:
         Raises:
             ValueError: When data is empty or invalid
         """
+
         if not data:
             raise ValueError("Data cannot be empty")
         
@@ -84,6 +93,7 @@ class TestClass{i}:
     
     async def async_method(self, items: List[Any]) -> Optional[Dict[str, Union[str, int]]]:
         """
+
         Asynchronously process items with complex type annotations.
         
         This method demonstrates complex type annotations and async processing
@@ -95,6 +105,7 @@ class TestClass{i}:
         Returns:
             Optional dictionary with processed results, or None if no items
         """
+
         if not items:
             return None
         
@@ -111,6 +122,7 @@ class TestClass{i}:
 
 def utility_function_{i}(param1: str, param2: int = 42) -> bool:
     """
+
     Utility function number {i} for testing performance.
     
     Args:
@@ -120,6 +132,7 @@ def utility_function_{i}(param1: str, param2: int = 42) -> bool:
     Returns:
         Boolean result of processing
     """
+
     return len(param1) > param2
 
 '''
@@ -159,10 +172,12 @@ def utility_function_{i}(param1: str, param2: int = 42) -> bool:
 
     def test_typescript_processor_performance(self):
         """Test TypeScript processor performance with realistic file."""
+
         processor = TypeScriptProcessor()
 
         # Create a TypeScript file with multiple JSDoc comments
         base_typescript_content = """
+
 /**
  * Performance test TypeScript module.
  * @module PerformanceTest
@@ -171,6 +186,7 @@ def utility_function_{i}(param1: str, param2: int = 42) -> bool:
 """
 
         typescript_template = """
+
 /**
  * Interface definition for test data {i}.
  * @interface TestData{i}
@@ -258,6 +274,7 @@ export function validateData{i}(data: TestData{i}): boolean {{
 
     def test_multifile_discovery_performance(self):
         """Test MultiFileDiscovery performance with many files."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create multiple directories and files
             file_count = 0
@@ -308,6 +325,7 @@ export function validateData{i}(data: TestData{i}): boolean {{
 
     def test_error_handling_performance(self):
         """Test performance when handling files with errors."""
+
         processors = [
             PythonProcessor(),
             TypeScriptProcessor(),
@@ -376,6 +394,7 @@ export function validateData{i}(data: TestData{i}): boolean {{
 
     def test_memory_efficiency_estimate(self):
         """Test memory efficiency with moderately sized content."""
+
         # This is a basic test since we can't easily measure memory in unit tests
         processor = PythonProcessor()
 
@@ -385,6 +404,7 @@ export function validateData{i}(data: TestData{i}): boolean {{
         )
 
         python_content = f"""
+
 {large_docstring}
 
 def test_function():
