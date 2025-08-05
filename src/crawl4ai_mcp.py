@@ -204,6 +204,180 @@ def validate_github_url(repo_url: str) -> Dict[str, Any]:
 
 
 # Create a dataclass for our application context
+# Global singleton for reranking model to avoid multiple initializations
+class RerankingModelSingleton:
+    """Singleton class to manage reranking model initialization."""
+    _instance = None
+    _model = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RerankingModelSingleton, cls).__new__(cls)
+        return cls._instance
+
+    def get_model(self):
+        """Get or initialize the reranking model."""
+        if not self._initialized:
+            self._initialize_model()
+        return self._model
+
+    def _initialize_model(self):
+        """Initialize the reranking model only once."""
+        if self._initialized:
+            return
+
+        reranking_enabled = os.getenv("USE_RERANKING", "false") == "true"
+        if not reranking_enabled:
+            self._model = None
+            self._initialized = True
+            return
+
+        try:
+            # Device detection with configuration
+            device = get_optimal_device(
+                preference=get_gpu_preference(),
+                gpu_index=int(os.getenv("GPU_DEVICE_INDEX", "0")),
+            )
+
+            # Precision configuration for GPU
+            precision = os.getenv("GPU_PRECISION", "float32")
+            model_kwargs = get_model_kwargs_for_device(device, precision)
+
+            # Initialize CrossEncoder with device-aware settings
+            model_name = os.getenv(
+                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
+            self._model = CrossEncoder(
+                model_name,
+                device=str(device),
+                model_kwargs=model_kwargs,
+            )
+
+            logging.info(f"CrossEncoder loaded on device: {device}")
+
+            # Warm up the model with dummy predictions if enabled
+            warmup_samples = int(os.getenv("RERANKING_WARMUP_SAMPLES", "5"))
+            if warmup_samples > 0:
+                try:
+                    dummy_pairs = [["warmup query", "warmup document"]] * warmup_samples
+                    _ = self._model.predict(dummy_pairs)
+                    cleanup_gpu_memory()
+                    logging.info(
+                        f"Reranking model warmed up with {warmup_samples} samples"
+                    )
+                except Exception as warmup_error:
+                    print(f"Model warmup failed (continuing anyway): {warmup_error}")
+
+        except Exception as e:
+            print(f"Failed to load reranking model: {e}")
+            self._model = None
+
+        self._initialized = True
+
+    def is_available(self):
+        """Check if reranking model is available."""
+        return self.get_model() is not None
+
+
+# Global singleton for knowledge graph components to avoid multiple initializations
+class KnowledgeGraphSingleton:
+    """Singleton class to manage knowledge graph components initialization."""
+    _instance = None
+    _knowledge_validator = None
+    _repo_extractor = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(KnowledgeGraphSingleton, cls).__new__(cls)
+        return cls._instance
+
+    def get_components(self):
+        """Get or initialize the knowledge graph components."""
+        if not self._initialized:
+            self._initialize_components()
+        return self._knowledge_validator, self._repo_extractor
+
+    def _initialize_components(self):
+        """Initialize the knowledge graph components only once."""
+        if self._initialized:
+            return
+
+        knowledge_graph_enabled = os.getenv("USE_KNOWLEDGE_GRAPH", "false") == "true"
+        
+        if not knowledge_graph_enabled:
+            self._knowledge_validator = None
+            self._repo_extractor = None
+            self._initialized = True
+            return
+
+        neo4j_uri = os.getenv("NEO4J_URI")
+        neo4j_user = os.getenv("NEO4J_USER")
+        neo4j_password = os.getenv("NEO4J_PASSWORD")
+
+        if not (neo4j_uri and neo4j_user and neo4j_password):
+            print("Neo4j credentials not configured - knowledge graph tools will be unavailable")
+            self._knowledge_validator = None
+            self._repo_extractor = None
+            self._initialized = True
+            return
+
+        try:
+            print("Initializing knowledge graph components...")
+
+            # Initialize knowledge graph validator
+            self._knowledge_validator = KnowledgeGraphValidator(
+                neo4j_uri, neo4j_user, neo4j_password
+            )
+            # Note: async initialization will be handled in get_components_async
+            print("- Knowledge graph validator initialized")
+
+            # Initialize repository extractor
+            self._repo_extractor = DirectNeo4jExtractor(
+                neo4j_uri, neo4j_user, neo4j_password
+            )
+            # Note: async initialization will be handled in get_components_async
+            print("- Repository extractor initialized")
+
+        except Exception as e:
+            print(f"Failed to initialize Neo4j components: {format_neo4j_error(e)}")
+            self._knowledge_validator = None
+            self._repo_extractor = None
+
+        self._initialized = True
+
+    async def get_components_async(self):
+        """Get components and ensure async initialization is complete."""
+        validator, extractor = self.get_components()
+        
+        # Perform async initialization if components exist and not yet initialized
+        if validator is not None and not hasattr(validator, '_async_initialized'):
+            await validator.initialize()
+            validator._async_initialized = True
+            
+        if extractor is not None and not hasattr(extractor, '_async_initialized'):
+            await extractor.initialize()
+            extractor._async_initialized = True
+            
+        return validator, extractor
+
+    async def close_components(self):
+        """Close knowledge graph components."""
+        if self._knowledge_validator:
+            try:
+                await self._knowledge_validator.close()
+                print("✓ Knowledge graph validator closed")
+            except Exception as e:
+                print(f"Error closing knowledge validator: {e}")
+                
+        if self._repo_extractor:
+            try:
+                await self._repo_extractor.close()
+                print("✓ Repository extractor closed")
+            except Exception as e:
+                print(f"Error closing repository extractor: {e}")
+
 @dataclass
 class Crawl4AIContext:
     """Context for the Crawl4AI MCP server."""
@@ -262,91 +436,13 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             "Server will continue but embedding functionality may not work correctly."
         )
 
-    # Initialize cross-encoder model for reranking if enabled
-    reranking_model = None
-    if os.getenv("USE_RERANKING", "false") == "true":
-        try:
-            # Device detection with configuration
-            device = get_optimal_device(
-                preference=get_gpu_preference(),
-                gpu_index=int(os.getenv("GPU_DEVICE_INDEX", "0")),
-            )
+    # Get reranking model from singleton (initialized only once)
+    reranking_singleton = RerankingModelSingleton()
+    reranking_model = reranking_singleton.get_model()
 
-            # Precision configuration for GPU
-            precision = os.getenv("GPU_PRECISION", "float32")
-            model_kwargs = get_model_kwargs_for_device(device, precision)
-
-            # Initialize CrossEncoder with device-aware settings
-            model_name = os.getenv(
-                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            )
-            reranking_model = CrossEncoder(
-                model_name,
-                device=str(device),
-                model_kwargs=model_kwargs,
-            )
-
-            logging.info(f"CrossEncoder loaded on device: {device}")
-
-            # Warm up the model with dummy predictions if enabled
-            warmup_samples = int(os.getenv("RERANKING_WARMUP_SAMPLES", "5"))
-            if warmup_samples > 0:
-                try:
-                    dummy_pairs = [["warmup query", "warmup document"]] * warmup_samples
-                    _ = reranking_model.predict(dummy_pairs)
-                    cleanup_gpu_memory()
-                    logging.info(
-                        f"Reranking model warmed up with {warmup_samples} samples"
-                    )
-                except Exception as warmup_error:
-                    print(f"Model warmup failed (continuing anyway): {warmup_error}")
-
-        except Exception as e:
-            print(f"Failed to load reranking model: {e}")
-            reranking_model = None
-
-    # Initialize Neo4j components if configured and enabled
-    knowledge_validator = None
-    repo_extractor = None
-
-    # Check if knowledge graph functionality is enabled
-    knowledge_graph_enabled = os.getenv("USE_KNOWLEDGE_GRAPH", "false") == "true"
-
-    if knowledge_graph_enabled:
-        neo4j_uri = os.getenv("NEO4J_URI")
-        neo4j_user = os.getenv("NEO4J_USER")
-        neo4j_password = os.getenv("NEO4J_PASSWORD")
-
-        if neo4j_uri and neo4j_user and neo4j_password:
-            try:
-                print("Initializing knowledge graph components...")
-
-                # Initialize knowledge graph validator
-                knowledge_validator = KnowledgeGraphValidator(
-                    neo4j_uri, neo4j_user, neo4j_password
-                )
-                await knowledge_validator.initialize()
-                print("- Knowledge graph validator initialized")
-
-                # Initialize repository extractor
-                repo_extractor = DirectNeo4jExtractor(
-                    neo4j_uri, neo4j_user, neo4j_password
-                )
-                await repo_extractor.initialize()
-                print("- Repository extractor initialized")
-
-            except Exception as e:
-                print(f"Failed to initialize Neo4j components: {format_neo4j_error(e)}")
-                knowledge_validator = None
-                repo_extractor = None
-        else:
-            print(
-                "Neo4j credentials not configured - knowledge graph tools will be unavailable"
-            )
-    else:
-        print(
-            "Knowledge graph functionality disabled - set USE_KNOWLEDGE_GRAPH=true to enable"
-        )
+    # Get knowledge graph components from singleton (initialized only once)
+    kg_singleton = KnowledgeGraphSingleton()
+    knowledge_validator, repo_extractor = await kg_singleton.get_components_async()
 
     try:
         yield Crawl4AIContext(
@@ -359,18 +455,8 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     finally:
         # Clean up all components
         await crawler.__aexit__(None, None, None)
-        if knowledge_validator:
-            try:
-                await knowledge_validator.close()
-                print("✓ Knowledge graph validator closed")
-            except Exception as e:
-                print(f"Error closing knowledge validator: {e}")
-        if repo_extractor:
-            try:
-                await repo_extractor.close()
-                print("✓ Repository extractor closed")
-            except Exception as e:
-                print(f"Error closing repository extractor: {e}")
+        # Knowledge graph components cleanup is handled by the singleton
+        await kg_singleton.close_components()
 
 
 # Initialize FastMCP server

@@ -21,6 +21,7 @@ except ImportError:
         # Fallback for when utils.py is loaded through complex import paths
         import sys
         import os
+
         current_dir = os.path.dirname(os.path.abspath(__file__))
         sys.path.insert(0, current_dir)
         from embedding_config import get_embedding_dimensions
@@ -48,44 +49,47 @@ except ImportError:
 class SparseVectorEncoder:
     """
     Singleton encoder for generating BM25 sparse vectors using FastEmbed.
-    
+
     Handles lazy loading and training of the FastBM25 encoder to avoid
     unnecessary initialization overhead.
     """
-    
+
     _instance = None
-    _encoder = None  
+    _encoder = None
     _trained = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def _ensure_encoder(self):
         """Lazy load the FastEmbed sparse text embedding model."""
         if self._encoder is None:
             try:
                 from fastembed import SparseTextEmbedding
+
                 logging.info("Initializing FastBM25 sparse encoder (Qdrant/bm25)")
                 self._encoder = SparseTextEmbedding(model_name="Qdrant/bm25")
             except ImportError as e:
                 logging.error(f"FastEmbed not available: {e}")
-                raise ImportError("FastEmbed is required for sparse vectors. Install with: pip install fastembed")
+                raise ImportError(
+                    "FastEmbed is required for sparse vectors. Install with: pip install fastembed"
+                )
             except Exception as e:
                 logging.error(f"Failed to initialize FastBM25 encoder: {e}")
                 raise
-    
+
     def encode(self, text: str) -> SparseVectorConfig:
         """
         Generate sparse vector for the given text using BM25.
-        
+
         Args:
             text: Input text to encode
-            
+
         Returns:
             SparseVectorConfig: Sparse vector with indices and values
-            
+
         Raises:
             ImportError: If FastEmbed is not available
             ValueError: If text is empty or encoding fails
@@ -93,9 +97,9 @@ class SparseVectorEncoder:
         if not text or not text.strip():
             # Return empty sparse vector for empty text
             return SparseVectorConfig(indices=[], values=[])
-        
+
         self._ensure_encoder()
-        
+
         try:
             # CRITICAL: Handle encoder training on first use
             if not self._trained:
@@ -104,41 +108,41 @@ class SparseVectorEncoder:
                 _ = list(self._encoder.embed([text]))
                 self._trained = True
                 logging.info("BM25 encoder training completed")
-            
+
             # Generate sparse embedding
             sparse_embeddings = list(self._encoder.embed([text]))
             if not sparse_embeddings:
                 logging.warning("FastBM25 encoder returned no embeddings")
                 return SparseVectorConfig(indices=[], values=[])
-            
+
             sparse_embedding = sparse_embeddings[0]
-            
+
             # Convert to SparseVectorConfig format
             return SparseVectorConfig(
                 indices=sparse_embedding.indices.tolist(),
-                values=sparse_embedding.values.tolist()
+                values=sparse_embedding.values.tolist(),
             )
-            
+
         except Exception as e:
             logging.error(f"Failed to encode sparse vector: {e}")
             # Graceful fallback: return empty sparse vector
             return SparseVectorConfig(indices=[], values=[])
-    
+
     def encode_batch(self, texts: List[str]) -> List[SparseVectorConfig]:
         """
         Generate sparse vectors for multiple texts in batch.
-        
+
         Args:
             texts: List of input texts to encode
-            
+
         Returns:
             List[SparseVectorConfig]: List of sparse vectors
         """
         if not texts:
             return []
-        
+
         self._ensure_encoder()
-        
+
         try:
             # Handle training on first batch
             if not self._trained:
@@ -146,23 +150,25 @@ class SparseVectorEncoder:
                 _ = list(self._encoder.embed(texts[:1]))  # Train on first text
                 self._trained = True
                 logging.info("BM25 encoder training completed")
-            
+
             # Generate embeddings for all texts
             sparse_embeddings = list(self._encoder.embed(texts))
-            
+
             results = []
             for i, sparse_embedding in enumerate(sparse_embeddings):
                 if sparse_embedding is None:
                     logging.warning(f"Empty embedding for text {i}")
                     results.append(SparseVectorConfig(indices=[], values=[]))
                 else:
-                    results.append(SparseVectorConfig(
-                        indices=sparse_embedding.indices.tolist(),
-                        values=sparse_embedding.values.tolist()
-                    ))
-            
+                    results.append(
+                        SparseVectorConfig(
+                            indices=sparse_embedding.indices.tolist(),
+                            values=sparse_embedding.values.tolist(),
+                        )
+                    )
+
             return results
-            
+
         except Exception as e:
             logging.error(f"Failed to encode sparse vector batch: {e}")
             # Graceful fallback: return empty sparse vectors
@@ -176,12 +182,12 @@ _sparse_encoder = SparseVectorEncoder()
 def create_sparse_embedding(text: str) -> SparseVectorConfig:
     """
     Create a sparse vector embedding for the given text using BM25.
-    
+
     This is a convenience function that uses the global sparse encoder instance.
-    
+
     Args:
         text: Input text to encode
-        
+
     Returns:
         SparseVectorConfig: Sparse vector configuration
     """
@@ -191,10 +197,10 @@ def create_sparse_embedding(text: str) -> SparseVectorConfig:
 def create_sparse_embeddings_batch(texts: List[str]) -> List[SparseVectorConfig]:
     """
     Create sparse vector embeddings for multiple texts using BM25.
-    
+
     Args:
         texts: List of input texts to encode
-        
+
     Returns:
         List[SparseVectorConfig]: List of sparse vector configurations
     """
@@ -226,9 +232,9 @@ def get_chat_client():
 
     # Log configuration for debugging (without exposing API key)
     if base_url:
-        print(f"DEBUG: Using custom chat API endpoint: {base_url}")
+        logging.debug(f"Using custom chat API endpoint: {base_url}")
     else:
-        print("DEBUG: Using default OpenAI API endpoint")
+        logging.debug("Using default OpenAI API endpoint")
 
     # Create client with optional base_url
     if base_url:
@@ -292,9 +298,9 @@ def get_chat_fallback_client():
 
     # Log configuration for debugging (without exposing API key)
     if base_url:
-        print(f"DEBUG: Using fallback chat API endpoint: {base_url}")
+        logging.debug(f"Using fallback chat API endpoint: {base_url}")
     else:
-        print("DEBUG: Using default OpenAI API endpoint for fallback chat")
+        logging.debug("Using default OpenAI API endpoint for fallback chat")
 
     # Create client with optional base_url
     if base_url:
@@ -332,9 +338,9 @@ def get_embeddings_fallback_client():
 
     # Log configuration for debugging (without exposing API key)
     if base_url:
-        print(f"DEBUG: Using fallback embeddings API endpoint: {base_url}")
+        logging.debug(f"Using fallback embeddings API endpoint: {base_url}")
     else:
-        print("DEBUG: Using default OpenAI API endpoint for fallback embeddings")
+        logging.debug("Using default OpenAI API endpoint for fallback embeddings")
 
     # Create client with optional base_url
     if base_url:
@@ -607,7 +613,9 @@ def get_supabase_client():
     return get_qdrant_client()
 
 
-def create_embeddings_batch(texts: List[str]) -> Union[List[List[float]], Tuple[List[List[float]], List[SparseVectorConfig]]]:
+def create_embeddings_batch(
+    texts: List[str],
+) -> Union[List[List[float]], Tuple[List[List[float]], List[SparseVectorConfig]]]:
     """
     Create embeddings for multiple texts with Redis caching support and optional sparse vectors.
 
@@ -691,7 +699,9 @@ def create_embeddings_batch(texts: List[str]) -> Union[List[List[float]], Tuple[
         except Exception as e:
             logging.error(f"Failed to create sparse vectors: {e}")
             # Fallback to empty sparse vectors to maintain consistency
-            final_sparse_vectors = [SparseVectorConfig(indices=[], values=[]) for _ in texts]
+            final_sparse_vectors = [
+                SparseVectorConfig(indices=[], values=[]) for _ in texts
+            ]
 
     # Return appropriate format based on hybrid search mode
     if use_hybrid_search:
@@ -791,7 +801,8 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
     """
     Generate contextual information for a chunk within a document to improve retrieval.
 
-    Uses the chat model configured via CHAT_MODEL environment variable with explicit fallback configuration.
+    Uses the chat model configured via CHAT_MODEL environment variable with robust fallback logic
+    for handling API errors like rate limits (429), server errors (500/503), and overload scenarios.
 
     Args:
         full_document: The complete document text
@@ -811,20 +822,19 @@ def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, 
         print("Warning: No chat model configured. Set CHAT_MODEL environment variable.")
         return chunk, False
 
-    try:
-        # Optimize prompt for better token efficiency
-        # Reduce document size for better context generation
-        doc_limit = 15000 if "gemini" in model_choice.lower() else 25000
+    # Optimize prompt for better token efficiency
+    # Reduce document size for better context generation
+    doc_limit = 15000 if "gemini" in model_choice.lower() else 25000
 
-        # Create a more concise prompt for Gemini models
-        if "gemini" in model_choice.lower():
-            prompt = f"""Document excerpt: {full_document[:doc_limit]}
+    # Create a more concise prompt for Gemini models
+    if "gemini" in model_choice.lower():
+        prompt = f"""Document excerpt: {full_document[:doc_limit]}
 
 Chunk to contextualize: {chunk}
 
 Provide 1-2 sentences of context for this chunk within the document. Be concise."""
-        else:
-            prompt = f"""<document> 
+    else:
+        prompt = f"""<document> 
 {full_document[:doc_limit]} 
 </document>
 Here is the chunk we want to situate within the whole document 
@@ -833,15 +843,16 @@ Here is the chunk we want to situate within the whole document
 </chunk> 
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else."""
 
-        # Get adaptive client that can fallback to different provider
-        client, actual_model, is_fallback = get_adaptive_chat_client()
+    # Adjust max_tokens based on model being used
+    max_tokens = 150 if "gemini" in model_choice.lower() else 200
 
-        # Adjust max_tokens based on actual model being used
-        max_tokens = 150 if "gemini" in actual_model.lower() else 200
+    try:
+        # PATTERN: Get primary client explicitly (not adaptive client)
+        client = get_chat_client()
 
-        # Call the API to generate contextual information
+        # PATTERN: Make API call with existing prompt logic
         response = client.chat.completions.create(
-            model=actual_model,
+            model=model_choice,
             messages=[
                 {
                     "role": "system",
@@ -905,10 +916,103 @@ Please give a short succinct context to situate this chunk within the overall do
 
         return contextual_text, True
 
-    except Exception as e:
+    except (
+        openai.APIStatusError,
+        openai.RateLimitError,
+        openai.InternalServerError,
+    ) as primary_error:
+        # CRITICAL: Log specific error type and attempt fallback
         print(
-            f"Error generating contextual embedding with model {model_choice}: {e}. Using original chunk instead."
+            f"Primary model {model_choice} failed ({type(primary_error).__name__}): {primary_error}"
         )
+        print("Attempting fallback model...")
+
+        try:
+            # PATTERN: Try fallback client with same prompt structure
+            fallback_client = get_chat_fallback_client()
+            fallback_model = os.getenv("CHAT_FALLBACK_MODEL") or "gpt-4o-mini"
+
+            # Adjust max_tokens based on fallback model being used
+            fallback_max_tokens = 150 if "gemini" in fallback_model.lower() else 200
+
+            response = fallback_client.chat.completions.create(
+                model=fallback_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that provides concise contextual information.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+                max_tokens=fallback_max_tokens,
+            )
+
+            # Validate response structure
+            if not response.choices:
+                print(
+                    f"Warning: Fallback API returned no choices. Model: {fallback_model}"
+                )
+                return chunk, False
+
+            choice = response.choices[0]
+
+            # Check if response was truncated due to length
+            if choice.finish_reason == "length" and choice.message.content is None:
+                print(
+                    f"Warning: Fallback model {fallback_model} hit token limit before generating content. Trying shorter prompt."
+                )
+
+                # Retry with much shorter prompt
+                short_prompt = f"Context for '{chunk[:100]}...' in document about: {full_document[:500]}... \nProvide brief context (1 sentence):"
+
+                response = fallback_client.chat.completions.create(
+                    model=fallback_model,
+                    messages=[{"role": "user", "content": short_prompt}],
+                    temperature=0.3,
+                    max_tokens=50,
+                )
+
+                if response.choices and response.choices[0].message.content:
+                    choice = response.choices[0]
+                else:
+                    print(
+                        f"Warning: Even shorter prompt failed for fallback model {fallback_model}. Using original chunk."
+                    )
+                    return chunk, False
+
+            # Extract the generated context with null check
+            content = choice.message.content
+            if content is None:
+                print(
+                    f"Warning: Fallback API returned None content for contextual embedding. Model: {fallback_model}"
+                )
+                print(f"Finish reason: {choice.finish_reason}")
+                return chunk, False
+
+            context = content.strip()
+            if not context:
+                print(
+                    f"Warning: Fallback API returned empty content for contextual embedding. Model: {fallback_model}"
+                )
+                return chunk, False
+
+            # Combine the context with the original chunk
+            contextual_text = f"{context}\n---\n{chunk}"
+
+            # PATTERN: Process response identically
+            print(f"Fallback model {fallback_model} succeeded")
+            return contextual_text, True
+
+        except Exception as fallback_error:
+            # PATTERN: Log both errors and gracefully degrade
+            print(f"Fallback model also failed: {fallback_error}")
+            print("Using original chunk without contextual enhancement")
+            return chunk, False
+
+    except Exception as e:
+        # PATTERN: Handle non-API errors (network, etc.)
+        print(f"Non-API error generating contextual embedding: {e}")
         return chunk, False
 
 
@@ -1011,10 +1115,14 @@ def add_documents_to_supabase(
 
         # Create embeddings for the batch (supports both dense and sparse vectors)
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
-        
+
         if use_hybrid_search:
-            batch_embeddings, batch_sparse_vectors = create_embeddings_batch(contextual_contents)
-            logging.info(f"Created {len(batch_embeddings)} dense and {len(batch_sparse_vectors)} sparse vectors for batch")
+            batch_embeddings, batch_sparse_vectors = create_embeddings_batch(
+                contextual_contents
+            )
+            logging.info(
+                f"Created {len(batch_embeddings)} dense and {len(batch_sparse_vectors)} sparse vectors for batch"
+            )
         else:
             batch_embeddings = create_embeddings_batch(contextual_contents)
             batch_sparse_vectors = None
@@ -1025,24 +1133,26 @@ def add_documents_to_supabase(
         for i, point in enumerate(points_batch):
             if use_hybrid_search:
                 # Create PointStruct with named vectors (dense + sparse)
-                
+
                 qdrant_points.append(
                     PointStruct(
                         id=point["id"],
                         vector={
                             "text-dense": batch_embeddings[i],
-                            "text-sparse": batch_sparse_vectors[i].to_qdrant_sparse_vector()
+                            "text-sparse": batch_sparse_vectors[
+                                i
+                            ].to_qdrant_sparse_vector(),
                         },
-                        payload=point["payload"]
+                        payload=point["payload"],
                     )
                 )
             else:
                 # Create PointStruct with single vector (legacy mode)
                 qdrant_points.append(
                     PointStruct(
-                        id=point["id"], 
-                        vector=batch_embeddings[i], 
-                        payload=point["payload"]
+                        id=point["id"],
+                        vector=batch_embeddings[i],
+                        payload=point["payload"],
                     )
                 )
 
@@ -1280,22 +1390,26 @@ def add_code_examples_to_supabase(
     for batch_idx, points_batch in enumerate(point_batches):
         # Create embeddings for combined text (code + summary)
         combined_texts = [point["combined_text"] for point in points_batch]
-        
+
         # Support both dense and sparse vectors for hybrid search
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
-        
+
         if use_hybrid_search:
             embeddings, sparse_vectors = create_embeddings_batch(combined_texts)
-            logging.info(f"Created {len(embeddings)} dense and {len(sparse_vectors)} sparse vectors for code examples batch")
+            logging.info(
+                f"Created {len(embeddings)} dense and {len(sparse_vectors)} sparse vectors for code examples batch"
+            )
         else:
             embeddings = create_embeddings_batch(combined_texts)
             sparse_vectors = None
-            logging.info(f"Created {len(embeddings)} dense vectors for code examples batch")
+            logging.info(
+                f"Created {len(embeddings)} dense vectors for code examples batch"
+            )
 
         # Check if embeddings are valid (not all zeros)
         valid_embeddings = []
         valid_sparse_vectors = [] if use_hybrid_search else None
-        
+
         for i, embedding in enumerate(embeddings):
             if embedding and not all(v == 0.0 for v in embedding):
                 valid_embeddings.append(embedding)
@@ -1308,7 +1422,7 @@ def add_code_examples_to_supabase(
                 # Try to create a single embedding as fallback
                 single_embedding = create_embedding(combined_texts[i])
                 valid_embeddings.append(single_embedding)
-                
+
                 if use_hybrid_search:
                     # Create fallback sparse vector
                     try:
@@ -1316,31 +1430,35 @@ def add_code_examples_to_supabase(
                         valid_sparse_vectors.append(fallback_sparse)
                     except Exception as e:
                         logging.error(f"Failed to create fallback sparse vector: {e}")
-                        valid_sparse_vectors.append(SparseVectorConfig(indices=[], values=[]))
+                        valid_sparse_vectors.append(
+                            SparseVectorConfig(indices=[], values=[])
+                        )
 
         # Create PointStruct objects with appropriate vector configuration
         qdrant_points = []
         for i, point in enumerate(points_batch):
             if use_hybrid_search:
                 # Create PointStruct with named vectors (dense + sparse)
-                
+
                 qdrant_points.append(
                     PointStruct(
                         id=point["id"],
                         vector={
                             "text-dense": valid_embeddings[i],
-                            "text-sparse": valid_sparse_vectors[i].to_qdrant_sparse_vector()
+                            "text-sparse": valid_sparse_vectors[
+                                i
+                            ].to_qdrant_sparse_vector(),
                         },
-                        payload=point["payload"]
+                        payload=point["payload"],
                     )
                 )
             else:
                 # Create PointStruct with single vector (legacy mode)
                 qdrant_points.append(
                     PointStruct(
-                        id=point["id"], 
-                        vector=valid_embeddings[i], 
-                        payload=point["payload"]
+                        id=point["id"],
+                        vector=valid_embeddings[i],
+                        payload=point["payload"],
                     )
                 )
 

@@ -149,7 +149,7 @@ def configure_http_client_limits():
     }
 
     logger.debug(f"HTTP client configuration: {current_config}")
-    print(f"DEBUG: HTTP client config - {current_config}")
+    logging.debug(f"HTTP client config - {current_config}")
 
 
 def setup_event_loop() -> Optional[str]:
@@ -185,7 +185,7 @@ def setup_event_loop() -> Optional[str]:
                     f"Applied Windows ConnectionResetError fix: "
                     f"Changed event loop policy from {original_policy} to {new_policy}"
                 )
-                print(f"DEBUG: Applied Windows event loop fix - using {new_policy}")
+                logging.debug(f"Applied Windows event loop fix - using {new_policy}")
                 return new_policy
 
             elif playwright_detected:
@@ -201,8 +201,8 @@ def setup_event_loop() -> Optional[str]:
                         f"Changed from {original_policy} to {new_policy}. "
                         f"ConnectionResetError may still occur but functionality is preserved."
                     )
-                    print(
-                        f"DEBUG: Playwright detected - using {new_policy} for subprocess support. "
+                    logging.debug(
+                        f"Playwright detected - using {new_policy} for subprocess support. "
                         f"ConnectionResetError may still occur."
                     )
                     return new_policy
@@ -210,27 +210,21 @@ def setup_event_loop() -> Optional[str]:
                     logger.warning(
                         "Playwright detected but WindowsProactorEventLoopPolicy not available"
                     )
-                    print(
-                        "DEBUG: Playwright detected but ProactorEventLoop not available"
-                    )
+                    logging.debug("Playwright detected but ProactorEventLoop not available")
             else:
                 # Windows but SelectorEventLoop not suitable and no Playwright
                 logger.info(
                     f"Windows detected but SelectorEventLoop not suitable, "
                     f"using default policy: {original_policy}"
                 )
-                print(
-                    f"DEBUG: Windows detected, using default policy: {original_policy}"
-                )
+                logging.debug(f"Windows detected, using default policy: {original_policy}")
         else:
             # Non-Windows platform
             current_policy = get_current_event_loop_policy()
             logger.debug(
                 f"Non-Windows platform detected, using default policy: {current_policy}"
             )
-            print(
-                f"DEBUG: Non-Windows platform, using default event loop policy: {current_policy}"
-            )
+            logging.debug(f"Non-Windows platform, using default event loop policy: {current_policy}")
 
         return None
 
@@ -240,7 +234,7 @@ def setup_event_loop() -> Optional[str]:
         print(f"ERROR: {error_msg}")
 
         # For safety, continue with default policy rather than failing
-        print("DEBUG: Continuing with default event loop policy")
+        logging.debug("Continuing with default event loop policy")
         return None
 
 

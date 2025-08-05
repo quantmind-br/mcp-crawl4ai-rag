@@ -30,6 +30,12 @@ try:
     health_check_reranking_model = getattr(utils_module, 'health_check_reranking_model', None)
     cleanup_gpu_memory = getattr(utils_module, 'cleanup_gpu_memory', None)
     get_chat_client = getattr(utils_module, 'get_chat_client', None)
+    get_chat_fallback_client = getattr(utils_module, 'get_chat_fallback_client', None)
+    get_embeddings_fallback_client = getattr(utils_module, 'get_embeddings_fallback_client', None)
+    get_adaptive_chat_client = getattr(utils_module, 'get_adaptive_chat_client', None)
+    validate_chat_fallback_config = getattr(utils_module, 'validate_chat_fallback_config', None)
+    validate_embeddings_fallback_config = getattr(utils_module, 'validate_embeddings_fallback_config', None)
+    get_effective_fallback_config = getattr(utils_module, 'get_effective_fallback_config', None)
     create_embeddings_batch = getattr(utils_module, 'create_embeddings_batch', None)
     create_embedding = getattr(utils_module, 'create_embedding', None)
     add_documents_to_supabase = getattr(utils_module, 'add_documents_to_supabase', None)
@@ -57,7 +63,7 @@ try:
     
     
 except Exception as e:
-    print(f"DEBUG: Error loading utils.py module: {e}")
+    logging.debug(f"Error loading utils.py module: {e}")
     import traceback
     traceback.print_exc()
     # If we can't load from utils.py, define minimal stubs
@@ -89,6 +95,12 @@ __all__ = [
     "health_check_reranking_model",
     "cleanup_gpu_memory",
     "get_chat_client",
+    "get_chat_fallback_client",
+    "get_embeddings_fallback_client",
+    "get_adaptive_chat_client",
+    "validate_chat_fallback_config",
+    "validate_embeddings_fallback_config",
+    "get_effective_fallback_config",
     "create_embeddings_batch",
     "create_embedding",
     "add_documents_to_supabase",
