@@ -1,66 +1,44 @@
 # Code Style and Conventions
 
-## Formatting Standards
-- **Line Length**: 120 characters (soft limit)
-- **Formatter**: Prefer `ruff format` (or black defaults)
-- **Trailing Commas**: Required in multi-line literals
-- **Blank Lines**: Between logical groups for readability
-
-## Import Organization
-- **Grouping**: stdlib, third-party, local (with blank lines between)
-- **Style**: One import per line, avoid deep relatives beyond package root
-- **`__all__`**: Keep minimal, only export public API
-- **Relative Imports**: Avoid going beyond package root
-
-## Type Annotations
-- **Public Functions**: Must be annotated with types
-- **Type Hints**: Use `Optional`, `Dict`, `List`, `Tuple` from typing
-- **Data Structures**: Prefer `@dataclass` for simple structs
-- **MCP Tools**: Return JSON strings (not objects)
+## Code Style
+- **Linter**: ruff >=0.12.7 for code quality and formatting
+- **Python Version**: 3.12+ with modern Python features
+- **Import Style**: Absolute imports with try/except for relative imports
+- **Docstrings**: Module-level docstrings with detailed descriptions
 
 ## Naming Conventions
-- **Functions/Variables**: `snake_case`
-- **Classes**: `PascalCase`
-- **Constants/Env Vars**: `UPPER_CASE`
-- **Private Helpers**: Prefix with underscore `_private_function`
+- **Classes**: PascalCase (e.g., `QdrantClientWrapper`, `GitHubRepoManager`)
+- **Functions**: snake_case (e.g., `get_optimal_device`, `create_embeddings_batch`)
+- **Variables**: snake_case (e.g., `embedding_dimensions`, `qdrant_client`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `TORCH_AVAILABLE`, `COLLECTIONS`)
+- **Private/Internal**: Leading underscore (e.g., `_qdrant_client_instance`, `_create_embeddings_api_call`)
 
-## Error Handling
-- **Security**: Never print or log secrets/API keys
-- **Exception Scope**: Catch broad exceptions only at tool boundaries
-- **Return Format**: Structured JSON `{"success": false, "error": "..."}`
-- **Logging**: Use `logging` module, not print statements (except CLI tools)
+## Code Organization
+- **Imports**: External imports first, then try/except blocks for relative imports
+- **Error Handling**: Use tenacity for retrying operations, comprehensive exception handling
+- **Async Patterns**: All MCP tools are async with proper context management
+- **Type Hints**: Extensive use of typing with List, Dict, Any, Optional
 
-## Async/Concurrency
-- **Preferred Pattern**: `async/await` with `@mcp.tool()` decorators
-- **Tool Handlers**: Avoid blocking calls in MCP tool handlers
-- **Parallel Processing**: Use `concurrent.futures` for CPU-bound tasks
+## File Structure Patterns
+- **Main Module**: `src/crawl4ai_mcp.py` - Primary MCP server with all tools
+- **Utilities**: `src/utils/` - Helper functions and client wrappers
+- **Configuration**: Environment-based with `.env` files and validation
+- **Tests**: Comprehensive test suite with mocking for external services
 
-## Configuration Management
-- **Environment**: Load `.env` via dotenv on startup
-- **Feature Flags**: Support boolean flags (USE_CONTEXTUAL_EMBEDDINGS, etc.)
-- **API Compatibility**: Support OpenAI-compatible providers via base URL
-- **Validation**: Validate and sanitize URLs/paths for security
+## Documentation Style
+- **Module Docstrings**: Detailed purpose and functionality descriptions
+- **Function Docstrings**: Parameters, return values, and usage examples
+- **Inline Comments**: Explanatory comments for complex logic
+- **README**: Comprehensive setup, configuration, and usage documentation
 
-## RAG & AI Patterns
-- **Default Embeddings**: OpenAI text-embedding-3-small
-- **Vector Database**: Use QdrantClientWrapper for all operations
-- **Search Strategy**: Prefer hybrid search when enabled
-- **Reranking**: Use CrossEncoder when USE_RERANKING=true
+## Error Handling Patterns
+- **Graceful Fallbacks**: GPU → CPU, primary API → fallback API
+- **Validation**: Input validation with clear error messages
+- **Logging**: Structured logging with appropriate levels
+- **Windows Compatibility**: Special handling for ConnectionResetError issues
 
-## Testing Guidelines
-- **Network Isolation**: Mock QdrantClient and OpenAI API calls
-- **Deterministic**: Tests should be repeatable and predictable
-- **Location**: Unit tests in `tests/` directory
-- **Async Testing**: Use pytest-asyncio for async test functions
-
-## Security & Access Control
-- **API Keys**: Never log or expose in error messages
-- **File Access**: Guard behind appropriate feature flags
-- **Network Access**: Validate URLs before making requests
-- **Input Sanitization**: Always validate user inputs
-
-## CLI & Entry Points
-- **Script Execution**: `uv run path/to/script.py` for single scripts
-- **Module Entry**: `uv run -m src` for main server
-- **Health Endpoint**: Available at `/health` when using SSE transport
-- **Error Handling**: Return proper exit codes from scripts
+## Testing Conventions
+- **Test Organization**: Test files mirror source structure (`test_*.py`)
+- **Mocking**: Extensive use of unittest.mock for external dependencies
+- **Environment Setup**: conftest.py with automatic test environment configuration
+- **Coverage**: Multiple test categories (unit, integration, performance)

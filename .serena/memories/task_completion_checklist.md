@@ -1,110 +1,59 @@
 # Task Completion Checklist
 
-## Pre-Development Setup
-- [ ] Ensure Docker services are running (`setup.bat`)
-- [ ] Verify `.env` file is configured with API keys
-- [ ] Activate virtual environment (`.venv\Scripts\activate`)
-- [ ] Install dependencies (`uv pip install -e .`)
+## Code Quality and Testing
+- [ ] **Run linting**: `uv run ruff check` and `uv run ruff format`
+- [ ] **Run tests**: `uv run pytest` for all test suites
+- [ ] **Test specific modules**: Run relevant test files for modified components
+- [ ] **Integration tests**: `uv run pytest tests/integration_test.py` for full system tests
+- [ ] **Performance validation**: `uv run pytest tests/performance_benchmark.py` if performance-related
 
-## During Development
+## Configuration and Environment
+- [ ] **Environment variables**: Verify `.env` configuration is correct
+- [ ] **Docker services**: Ensure Qdrant, Neo4j, Redis are running (`docker-compose ps`)
+- [ ] **API keys**: Validate API configuration and fallback settings
+- [ ] **Dependencies**: Run `uv sync` if new dependencies were added
 
-### Code Changes
-- [ ] Follow naming conventions (snake_case, PascalCase, UPPER_CASE)
-- [ ] Add type annotations to public functions
-- [ ] Use `@dataclass` for simple data structures
-- [ ] Return JSON strings from MCP tools
-- [ ] Handle errors with structured JSON responses
-- [ ] Avoid blocking calls in async MCP tool handlers
+## Functionality Testing
+- [ ] **MCP server startup**: Test server starts without errors (`start.bat` or `uv run -m src`)
+- [ ] **MCP tools**: Verify all relevant MCP tools work correctly
+- [ ] **GPU acceleration**: Test GPU functionality if reranking/GPU features modified
+- [ ] **Windows compatibility**: Verify Windows-specific fixes work correctly
 
-### Security & Best Practices
-- [ ] Never log or print API keys/secrets
-- [ ] Validate and sanitize all user inputs
-- [ ] Use logging module instead of print statements
-- [ ] Guard file/network access behind appropriate flags
-- [ ] Test with mocked external services
+## Documentation and Communication
+- [ ] **Code comments**: Add/update inline documentation for complex logic
+- [ ] **Type hints**: Ensure all new functions have proper type annotations
+- [ ] **Error handling**: Implement graceful error handling with appropriate logging
+- [ ] **Changelog**: Document significant changes in commit messages
 
-## Code Quality Gates (Run Before Commit)
+## Specific Component Checks
 
-### 1. Testing
-```bash
-pytest -q                                    # All tests must pass
-pytest tests/test_specific_feature.py -v    # Feature-specific tests
-```
+### Vector Database Changes
+- [ ] **Qdrant collections**: Verify collection schemas are correct
+- [ ] **Embedding dimensions**: Check dimension consistency
+- [ ] **Hybrid search**: Test sparse/dense vector functionality if applicable
 
-### 2. Linting
-```bash
-ruff check .                                 # No linting errors
-ruff check . --fix                          # Auto-fix what's possible
-```
+### API Client Changes  
+- [ ] **Fallback mechanisms**: Test primary and fallback API configurations
+- [ ] **Rate limiting**: Verify retry logic with tenacity
+- [ ] **Multi-provider**: Test different API providers if modified
 
-### 3. Formatting
-```bash
-ruff format .                                # Apply consistent formatting
-```
+### Knowledge Graph Changes
+- [ ] **Neo4j connection**: Test connection and query functionality
+- [ ] **Repository parsing**: Verify GitHub repository processing
+- [ ] **Hallucination detection**: Test AI script validation if applicable
 
-### 4. Type Checking
-```bash
-mypy .                                       # No type errors
-mypy src/specific_module.py                  # Module-specific checking
-```
+### Device Management Changes
+- [ ] **GPU detection**: Test automatic GPU/CPU fallback
+- [ ] **Memory cleanup**: Verify GPU memory is properly cleaned up
+- [ ] **Device configuration**: Test different GPU precision settings
 
-### 5. Combined Quality Check
-```bash
-ruff check . && ruff format . && mypy .     # All quality checks
-```
+## Pre-Commit Validation
+- [ ] **No syntax errors**: Python files parse correctly
+- [ ] **Import resolution**: All imports resolve correctly
+- [ ] **Environment compatibility**: Works with minimal .env configuration
+- [ ] **Docker compatibility**: Services start cleanly with docker-compose
 
-## Integration Testing
-
-### Local Services
-- [ ] Qdrant accessible at `http://localhost:6333`
-- [ ] Neo4j accessible at `http://localhost:7474` (if knowledge graph enabled)
-- [ ] Server starts successfully (`uv run -m src`)
-- [ ] Health endpoint responds (`curl http://localhost:8051/health`)
-
-### MCP Tools Testing
-- [ ] Test basic crawling functionality
-- [ ] Verify vector search operations
-- [ ] Check RAG query responses
-- [ ] Validate error handling and edge cases
-
-## Documentation Updates
-- [ ] Update README.md if adding new features
-- [ ] Add/update docstrings for new functions
-- [ ] Update `.env.example` for new environment variables
-- [ ] Update CRUSH.md for new commands or patterns
-
-## Performance Considerations
-- [ ] Check memory usage during large crawling operations
-- [ ] Verify GPU acceleration works (if using reranking)
-- [ ] Test with different RAG strategy combinations
-- [ ] Monitor API rate limits and costs
-
-## Final Validation
-- [ ] All tests pass: `pytest -q`
-- [ ] No linting errors: `ruff check .`
-- [ ] Code properly formatted: `ruff format .`
-- [ ] No type errors: `mypy .`
-- [ ] Server starts without errors
-- [ ] Basic MCP functionality works
-- [ ] Environment variables properly configured
-- [ ] Documentation updated where necessary
-
-## Optional: Knowledge Graph Features
-If using knowledge graph functionality:
-- [ ] Neo4j service running and accessible
-- [ ] Repository parsing works correctly
-- [ ] Hallucination detection functions properly
-- [ ] Graph queries return expected results
-
-## Windows-Specific Checks
-- [ ] `.bat` scripts work correctly
-- [ ] Paths use proper Windows format where needed
-- [ ] Port conflicts resolved (8051, 6333, 7474, 7687)
-- [ ] Environment variables properly loaded from `.env`
-
-## Notes
-- Always test with realistic data volumes
-- Consider testing with different API providers
-- Verify error handling with network/service failures
-- Test RAG quality with domain-specific content
-- Monitor costs when using external APIs
+## Windows-Specific Validation
+- [ ] **Event loop fix**: Windows ConnectionResetError handling works
+- [ ] **Batch scripts**: setup.bat and start.bat execute successfully
+- [ ] **PyTorch CUDA**: GPU acceleration works on Windows if applicable

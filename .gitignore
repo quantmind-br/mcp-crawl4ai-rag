@@ -284,12 +284,6 @@ crawled_data/
 crawl_results/
 
 # AI Development Tools
-.claude/
-.crush/
-.serena/
-.serena/cache/
-.serena/memories/
-.noxic/
 
 # Backup files
 *.backup

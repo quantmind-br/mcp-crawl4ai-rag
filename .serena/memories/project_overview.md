@@ -1,24 +1,34 @@
-# Project Overview: MCP Crawl4AI RAG Server
+# Project Overview
 
 ## Purpose
-A powerful MCP (Model Context Protocol) server that integrates web crawling and RAG (Retrieval-Augmented Generation) capabilities for AI agents and coding assistants. The server provides tools to crawl websites, store content in vector databases, and perform semantic search over crawled content.
+**Crawl4AI RAG MCP Server** is an advanced web crawling and RAG (Retrieval Augmented Generation) system that provides AI agents and coding assistants with intelligent capabilities through the Model Context Protocol (MCP).
+
+## Core Functionality
+- **Web Crawling**: Uses Crawl4AI for intelligent web scraping with automatic content extraction
+- **GitHub Integration**: Clone and index repositories with multi-file type support
+- **Vector Search**: Qdrant vector database for semantic search and document storage
+- **Knowledge Graph**: Optional Neo4j integration for AI hallucination detection
+- **RAG Strategies**: Multiple configurable strategies including hybrid search, reranking, and contextual embeddings
 
 ## Key Features
-- **Smart URL Detection**: Automatically handles different URL types (webpages, sitemaps, text files)
-- **Recursive Crawling**: Follows internal links to discover content
-- **Parallel Processing**: Efficiently crawls multiple pages simultaneously
-- **Content Chunking**: Intelligently splits content by headers and size
-- **Vector Search**: Performs RAG over crawled content with optional source filtering
-- **Advanced RAG Strategies**: Contextual embeddings, hybrid search, agentic RAG, reranking
-- **Knowledge Graph**: AI hallucination detection using Neo4j (optional)
+- **Smart URL Detection**: Automatically detects sitemaps, text files, or regular webpages
+- **Multi-Provider API Support**: OpenAI, DeepInfra, Azure OpenAI with fallback configurations
+- **GPU Acceleration**: Optional GPU support for reranking models
+- **Caching**: Redis-based embedding cache for performance
+- **Hybrid Search**: Combines semantic and keyword search using FastBM25
+- **AI Hallucination Detection**: Validates AI-generated code against knowledge graphs
 
-## Target Integration
-- Primary goal: Integration into [Archon](https://github.com/coleam00/Archon) as a knowledge engine
-- Compatible with Claude Desktop, Windsurf, and other MCP clients
-- Supports both SSE and stdio transport protocols
+## Architecture
+- **MCP Server**: FastMCP-based async server with SSE/stdio transport
+- **Vector Database**: Qdrant for semantic search and storage
+- **Web Crawler**: Crawl4AI with smart URL detection and GitHub integration
+- **Knowledge Graph**: Neo4j for code structure analysis
+- **Device Manager**: Automatic GPU/CPU detection and fallback
+- **Event Loop Fix**: Windows compatibility layer for ConnectionResetError issues
 
-## Core Domains
-- **Web Crawling**: Using Crawl4AI for intelligent content extraction
-- **Vector Storage**: Qdrant for embeddings and semantic search
-- **Knowledge Graphs**: Neo4j for code analysis and hallucination detection
-- **AI Integration**: OpenAI-compatible APIs for embeddings and chat
+## Technology Stack
+- **Language**: Python 3.12+
+- **Framework**: FastMCP (Model Context Protocol)
+- **Databases**: Qdrant (vector), Neo4j (knowledge graph), Redis (cache)
+- **AI APIs**: OpenAI, DeepInfra, Azure OpenAI (multi-provider support)
+- **Dependencies**: crawl4ai, qdrant-client, fastembed, sentence-transformers, PyTorch
