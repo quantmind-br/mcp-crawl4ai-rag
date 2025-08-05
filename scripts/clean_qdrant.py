@@ -29,11 +29,24 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
 
 # Configure logging
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level_value = getattr(logging, log_level, logging.INFO)
+
+# Configure basic logging format
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=log_level_value,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True,  # Force reconfiguration even if basicConfig was called before
 )
+
+# Ensure root logger level is set correctly
+logging.getLogger().setLevel(log_level_value)
 logger = logging.getLogger(__name__)
 
 

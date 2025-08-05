@@ -37,6 +37,32 @@ import concurrent.futures
 import sys
 import logging
 
+# Load environment variables first
+load_dotenv()
+
+# Configure logging level from environment variable
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level_value = getattr(logging, log_level, logging.INFO)
+
+# Configure basic logging format
+logging.basicConfig(
+    level=log_level_value,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,  # Force reconfiguration even if basicConfig was called before
+)
+
+# Ensure root logger level is set correctly (for cases where basicConfig was already called)
+logging.getLogger().setLevel(log_level_value)
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
+
+# Log the current configuration for debugging
+logger.debug(f"Logging configured with level: {log_level} ({log_level_value})")
+logger.debug(f"Root logger effective level: {logging.getLogger().getEffectiveLevel()}")
+logger.debug(f"This module logger effective level: {logger.getEffectiveLevel()}")
+
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -207,6 +233,7 @@ def validate_github_url(repo_url: str) -> Dict[str, Any]:
 # Global singleton for reranking model to avoid multiple initializations
 class RerankingModelSingleton:
     """Singleton class to manage reranking model initialization."""
+
     _instance = None
     _model = None
     _initialized = False
@@ -254,7 +281,7 @@ class RerankingModelSingleton:
                 model_kwargs=model_kwargs,
             )
 
-            logging.info(f"CrossEncoder loaded on device: {device}")
+            logger.info(f"CrossEncoder loaded on device: {device}")
 
             # Warm up the model with dummy predictions if enabled
             warmup_samples = int(os.getenv("RERANKING_WARMUP_SAMPLES", "5"))
@@ -263,14 +290,16 @@ class RerankingModelSingleton:
                     dummy_pairs = [["warmup query", "warmup document"]] * warmup_samples
                     _ = self._model.predict(dummy_pairs)
                     cleanup_gpu_memory()
-                    logging.info(
+                    logger.info(
                         f"Reranking model warmed up with {warmup_samples} samples"
                     )
                 except Exception as warmup_error:
-                    print(f"Model warmup failed (continuing anyway): {warmup_error}")
+                    logger.warning(
+                        f"Model warmup failed (continuing anyway): {warmup_error}"
+                    )
 
         except Exception as e:
-            print(f"Failed to load reranking model: {e}")
+            logger.error(f"Failed to load reranking model: {e}")
             self._model = None
 
         self._initialized = True
@@ -283,6 +312,7 @@ class RerankingModelSingleton:
 # Global singleton for knowledge graph components to avoid multiple initializations
 class KnowledgeGraphSingleton:
     """Singleton class to manage knowledge graph components initialization."""
+
     _instance = None
     _knowledge_validator = None
     _repo_extractor = None
@@ -305,7 +335,7 @@ class KnowledgeGraphSingleton:
             return
 
         knowledge_graph_enabled = os.getenv("USE_KNOWLEDGE_GRAPH", "false") == "true"
-        
+
         if not knowledge_graph_enabled:
             self._knowledge_validator = None
             self._repo_extractor = None
@@ -317,31 +347,35 @@ class KnowledgeGraphSingleton:
         neo4j_password = os.getenv("NEO4J_PASSWORD")
 
         if not (neo4j_uri and neo4j_user and neo4j_password):
-            print("Neo4j credentials not configured - knowledge graph tools will be unavailable")
+            logger.warning(
+                "Neo4j credentials not configured - knowledge graph tools will be unavailable"
+            )
             self._knowledge_validator = None
             self._repo_extractor = None
             self._initialized = True
             return
 
         try:
-            print("Initializing knowledge graph components...")
+            logger.info("Initializing knowledge graph components...")
 
             # Initialize knowledge graph validator
             self._knowledge_validator = KnowledgeGraphValidator(
                 neo4j_uri, neo4j_user, neo4j_password
             )
             # Note: async initialization will be handled in get_components_async
-            print("- Knowledge graph validator initialized")
+            logger.debug("- Knowledge graph validator initialized")
 
             # Initialize repository extractor
             self._repo_extractor = DirectNeo4jExtractor(
                 neo4j_uri, neo4j_user, neo4j_password
             )
             # Note: async initialization will be handled in get_components_async
-            print("- Repository extractor initialized")
+            logger.debug("- Repository extractor initialized")
 
         except Exception as e:
-            print(f"Failed to initialize Neo4j components: {format_neo4j_error(e)}")
+            logger.error(
+                f"Failed to initialize Neo4j components: {format_neo4j_error(e)}"
+            )
             self._knowledge_validator = None
             self._repo_extractor = None
 
@@ -350,16 +384,16 @@ class KnowledgeGraphSingleton:
     async def get_components_async(self):
         """Get components and ensure async initialization is complete."""
         validator, extractor = self.get_components()
-        
+
         # Perform async initialization if components exist and not yet initialized
-        if validator is not None and not hasattr(validator, '_async_initialized'):
+        if validator is not None and not hasattr(validator, "_async_initialized"):
             await validator.initialize()
             validator._async_initialized = True
-            
-        if extractor is not None and not hasattr(extractor, '_async_initialized'):
+
+        if extractor is not None and not hasattr(extractor, "_async_initialized"):
             await extractor.initialize()
             extractor._async_initialized = True
-            
+
         return validator, extractor
 
     async def close_components(self):
@@ -367,16 +401,17 @@ class KnowledgeGraphSingleton:
         if self._knowledge_validator:
             try:
                 await self._knowledge_validator.close()
-                print("✓ Knowledge graph validator closed")
+                logger.debug("✓ Knowledge graph validator closed")
             except Exception as e:
-                print(f"Error closing knowledge validator: {e}")
-                
+                logger.error(f"Error closing knowledge validator: {e}")
+
         if self._repo_extractor:
             try:
                 await self._repo_extractor.close()
-                print("✓ Repository extractor closed")
+                logger.debug("✓ Repository extractor closed")
             except Exception as e:
-                print(f"Error closing repository extractor: {e}")
+                logger.error(f"Error closing repository extractor: {e}")
+
 
 @dataclass
 class Crawl4AIContext:
@@ -407,13 +442,10 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     crawler = AsyncWebCrawler(config=browser_config)
     await crawler.__aenter__()
 
-    # Initialize Qdrant client with late import to avoid circular dependencies
-    try:
-        from .qdrant_wrapper import QdrantClientWrapper
-    except ImportError:
-        pass
-    
-    qdrant_client = get_supabase_client()  # Legacy function name, returns QdrantClientWrapper
+    # Initialize Qdrant client
+    qdrant_client = (
+        get_supabase_client()
+    )  # Legacy function name, returns QdrantClientWrapper
 
     # Validate embeddings configuration and dimensions
     try:
@@ -429,10 +461,10 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             )
         validate_embeddings_config()
         embedding_dims = get_embedding_dimensions()
-        print(f"OK Embedding setup validated - dimensions: {embedding_dims}")
+        logger.info(f"OK Embedding setup validated - dimensions: {embedding_dims}")
     except Exception as e:
-        print(f"WARNING Embedding configuration validation failed: {e}")
-        print(
+        logger.warning(f"Embedding configuration validation failed: {e}")
+        logger.warning(
             "Server will continue but embedding functionality may not work correctly."
         )
 
@@ -491,14 +523,20 @@ def rerank_results(
         return results
 
     try:
+        logger.debug(
+            f"Starting reranking with {len(results)} results for query: '{query[:50]}...'"
+        )
+
         # Extract content from results
         texts = [result.get(content_key, "") for result in results]
 
         # Create pairs of [query, document] for the cross-encoder
         pairs = [[query, text] for text in texts]
+        logger.debug(f"Created {len(pairs)} query-document pairs for reranking")
 
         # Get relevance scores from the cross-encoder
         scores = model.predict(pairs)
+        logger.debug(f"Generated rerank scores: {[f'{s:.4f}' for s in scores[:5]]}")
 
         # Add scores to results and sort by score (descending)
         for i, result in enumerate(results):
@@ -506,13 +544,16 @@ def rerank_results(
 
         # Sort by rerank score
         reranked = sorted(results, key=lambda x: x.get("rerank_score", 0), reverse=True)
+        logger.debug(
+            f"Reranked results - top score: {reranked[0].get('rerank_score', 0):.4f}"
+        )
 
         # Clean up GPU memory after processing (critical for long-running processes)
         cleanup_gpu_memory()
 
         return reranked
     except Exception as e:
-        print(f"Error during reranking: {e}")
+        logger.error(f"Error during reranking: {e}")
         return results
 
 
@@ -560,7 +601,7 @@ def parse_sitemap(sitemap_url: str) -> List[str]:
             tree = ElementTree.fromstring(resp.content)
             urls = [loc.text for loc in tree.findall(".//{*}loc")]
         except Exception as e:
-            print(f"Error parsing sitemap XML: {e}")
+            logger.warning(f"Error parsing sitemap XML: {e}")
 
     return urls
 
@@ -648,71 +689,6 @@ def process_code_example(args):
     """
     code, context_before, context_after = args
     return generate_code_example_summary(code, context_before, context_after)
-
-
-@mcp.tool()
-async def health_check_reranking(ctx: Context) -> str:
-    """
-    Perform comprehensive health check for the reranking model functionality.
-
-    This tool validates that the reranking model is loaded correctly and can perform
-    inference operations. It tests model loading, device allocation, and inference
-    capability with dummy data.
-
-    Returns:
-        JSON string with health check results including model availability,
-        device information, inference test results, and performance metrics.
-    """
-    import json
-    from utils import health_check_reranking_model
-
-    try:
-        # Get the reranking model from the lifespan context
-        reranking_model = None
-        if (
-            hasattr(ctx, "request_context")
-            and hasattr(ctx.request_context, "lifespan_context")
-            and hasattr(ctx.request_context.lifespan_context, "reranking_model")
-        ):
-            reranking_model = ctx.request_context.lifespan_context.reranking_model
-
-        # Perform health check
-        health_status = health_check_reranking_model(reranking_model)
-
-        # Add overall status
-        overall_status = (
-            "healthy"
-            if health_status.get("inference_test_passed", False)
-            else "unhealthy"
-        )
-        health_status["overall_status"] = overall_status
-
-        # Add configuration information
-        health_status["configuration"] = {
-            "use_reranking_enabled": os.getenv("USE_RERANKING", "false"),
-            "model_name_config": os.getenv(
-                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            ),
-            "warmup_samples_config": os.getenv("RERANKING_WARMUP_SAMPLES", "5"),
-            "gpu_device_index": os.getenv("GPU_DEVICE_INDEX", "0"),
-            "gpu_precision": os.getenv("GPU_PRECISION", "float32"),
-        }
-
-        return json.dumps(health_status, indent=2)
-
-    except Exception as e:
-        error_status = {
-            "overall_status": "error",
-            "model_available": False,
-            "error_message": f"Health check failed with exception: {str(e)}",
-            "configuration": {
-                "use_reranking_enabled": os.getenv("USE_RERANKING", "false"),
-                "model_name_config": os.getenv(
-                    "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-                ),
-            },
-        }
-        return json.dumps(error_status, indent=2)
 
 
 @mcp.tool()
@@ -1495,11 +1471,16 @@ async def perform_rag_query(
         JSON string with the search results
     """
     try:
+        logger.debug(f"Starting RAG query: '{query}' with source filter: {source}")
+
         # Get the Qdrant client from the context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
 
         # Check if hybrid search is enabled
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false") == "true"
+        logger.debug(
+            f"Using {'hybrid' if use_hybrid_search else 'dense vector'} search mode"
+        )
 
         # Prepare filter if source is provided and not empty
         filter_metadata = None
@@ -1507,6 +1488,7 @@ async def perform_rag_query(
         if source and source.strip():
             filter_metadata = {"source": source}
             source_filter = source.strip()
+            logger.debug(f"Applied source filter: {source_filter}")
 
         if use_hybrid_search:
             # Native Qdrant hybrid search using search_batch with RRF
@@ -1517,7 +1499,7 @@ async def perform_rag_query(
                 filter_metadata=filter_metadata,
                 source_filter=source_filter,
                 rrf_k=60,  # Default RRF parameter
-                dense_weight=0.5  # Equal weight for dense and sparse
+                dense_weight=0.5,  # Equal weight for dense and sparse
             )
         else:
             # Standard dense vector search only
@@ -1528,15 +1510,20 @@ async def perform_rag_query(
                 filter_metadata=filter_metadata,
             )
 
+        logger.debug(f"Search returned {len(results)} initial results")
+
         # Apply reranking if enabled
         use_reranking = os.getenv("USE_RERANKING", "false") == "true"
         if use_reranking and ctx.request_context.lifespan_context.reranking_model:
+            logger.debug("Applying reranking to search results")
             results = rerank_results(
                 ctx.request_context.lifespan_context.reranking_model,
                 query,
                 results,
                 content_key="content",
             )
+        else:
+            logger.debug("Reranking disabled or model unavailable")
 
         # Format the results
         formatted_results = []
@@ -1626,9 +1613,11 @@ async def search_code_examples(
                 query_embedding=None,  # Will be created automatically
                 match_count=match_count,
                 filter_metadata=filter_metadata,
-                source_filter=source_id.strip() if source_id and source_id.strip() else None,
+                source_filter=source_id.strip()
+                if source_id and source_id.strip()
+                else None,
                 rrf_k=60,  # Default RRF parameter
-                dense_weight=0.5  # Equal weight for dense and sparse
+                dense_weight=0.5,  # Equal weight for dense and sparse
             )
         else:
             # Standard dense vector search only
@@ -1757,7 +1746,9 @@ async def check_ai_script_hallucinations(ctx: Context, script_path: str) -> str:
         analysis_result = analyzer.analyze_script(script_path)
 
         if analysis_result.errors:
-            print(f"Analysis warnings for {script_path}: {analysis_result.errors}")
+            logger.warning(
+                f"Analysis warnings for {script_path}: {analysis_result.errors}"
+            )
 
         # Step 2: Validate against knowledge graph
         validation_result = await knowledge_validator.validate_script(analysis_result)
@@ -2365,9 +2356,9 @@ async def parse_github_repository(ctx: Context, repo_url: str) -> str:
         repo_name = validation["repo_name"]
 
         # Parse the repository (this includes cloning, analysis, and Neo4j storage)
-        print(f"Starting repository analysis for: {repo_name}")
+        logger.info(f"Starting repository analysis for: {repo_name}")
         await repo_extractor.analyze_repository(repo_url)
-        print(f"Repository analysis completed for: {repo_name}")
+        logger.info(f"Repository analysis completed for: {repo_name}")
 
         # Query Neo4j for statistics about the parsed repository
         async with repo_extractor.driver.session() as session:
@@ -2471,7 +2462,7 @@ async def crawl_markdown_file(
     if result.success and result.markdown:
         return [{"url": url, "markdown": result.markdown}]
     else:
-        print(f"Failed to crawl {url}: {result.error_message}")
+        logger.warning(f"Failed to crawl {url}: {result.error_message}")
         return []
 
 

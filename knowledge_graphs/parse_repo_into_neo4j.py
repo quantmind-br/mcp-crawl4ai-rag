@@ -23,15 +23,26 @@ import ast
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
 
+# Load environment variables first
+load_dotenv()
+
 # Global semaphore to prevent concurrent Neo4j initialization
 _neo4j_init_semaphore = asyncio.Semaphore(1)
 
 # Configure logging
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level_value = getattr(logging, log_level, logging.INFO)
+
+# Configure basic logging format
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level_value,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,  # Force reconfiguration even if basicConfig was called before
 )
+
+# Ensure root logger level is set correctly
+logging.getLogger().setLevel(log_level_value)
 logger = logging.getLogger(__name__)
 
 
