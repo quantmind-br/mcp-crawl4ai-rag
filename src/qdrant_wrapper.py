@@ -392,109 +392,9 @@ class QdrantClientWrapper:
                 "error": str(e)
             }
 
-    def _create_collection_backup(self, collection_name: str) -> Dict[str, Any]:
-        """
-        Create a backup of collection data before migration.
-        
-        Args:
-            collection_name: Name of collection to backup
-            
-        Returns:
-            dict: Backup metadata with point count and backup timestamp
-        """
-        try:
-            backup_timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            backup_name = f"{collection_name}_backup_{backup_timestamp}"
-            
-            # Get all points from source collection
-            logging.info(f"Creating backup {backup_name} for collection {collection_name}")
-            
-            all_points = []
-            offset = None
-            batch_size = 1000
-            
-            # Scroll through all points in batches
-            while True:
-                scroll_result = self.client.scroll(
-                    collection_name=collection_name,
-                    limit=batch_size,
-                    offset=offset,
-                    with_payload=True,
-                    with_vectors=True
-                )
-                
-                points, next_offset = scroll_result
-                if not points:
-                    break
-                    
-                all_points.extend(points)
-                offset = next_offset
-                
-                if next_offset is None:
-                    break
-            
-            # Get source collection configuration
-            source_info = self.client.get_collection(collection_name)
-            backup_config = source_info.config.params
-            
-            # Create backup collection with same configuration
-            self.client.create_collection(
-                collection_name=backup_name,
-                vectors_config=backup_config.vectors,
-                sparse_vectors_config=getattr(backup_config, 'sparse_vectors', None)
-            )
-            
-            # Copy points to backup collection in batches  
-            if all_points:
-                for i in range(0, len(all_points), batch_size):
-                    batch = all_points[i:i + batch_size]
-                    backup_points = []
-                    
-                    for point in batch:
-                        backup_points.append(
-                            PointStruct(
-                                id=point.id,
-                                vector=point.vector,
-                                payload=point.payload
-                            )
-                        )
-                    
-                    self.client.upsert(
-                        collection_name=backup_name,
-                        points=backup_points,
-                        wait=True
-                    )
-            
-            backup_info = {
-                "backup_name": backup_name,
-                "source_collection": collection_name,
-                "point_count": len(all_points),
-                "backup_timestamp": backup_timestamp,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            logging.info(f"Successfully created backup {backup_name} with {len(all_points)} points")
-            return backup_info
-            
-        except Exception as e:
-            logging.error(f"Failed to create backup for collection {collection_name}: {e}")
-            raise Exception(f"Backup creation failed: {e}")
 
-    def _restore_collection_from_backup(self, backup_name: str, target_collection: str) -> bool:
-        """
-        Restore a collection from backup.
-        
-        Args:
-            backup_name: Name of the backup collection
-            target_collection: Name of the target collection to restore to
-            
-        Returns:
-            bool: True if restore successful, False otherwise
-        """
-        try:
-            if not self._collection_exists(backup_name):
-                logging.error(f"Backup collection {backup_name} does not exist")
-                return False
+
+
                 
             # Delete target collection if it exists
             if self._collection_exists(target_collection):
@@ -563,58 +463,7 @@ class QdrantClientWrapper:
             logging.error(f"Failed to restore collection from backup {backup_name}: {e}")
             return False
 
-    def _migrate_collection_with_confirmation(
-        self, collection_name: str, expected_config: Dict[str, Any], validation: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Migrate collection with user warnings and confirmation prompts.
-        
-        Args:
-            collection_name: Name of collection to migrate
-            expected_config: Expected collection configuration
-            validation: Schema validation results
-            
-        Returns:
-            dict: Migration results and status
-        """
-        migration_result = {
-            "success": False,
-            "backup_created": False,
-            "backup_name": None,
-            "migration_performed": False,
-            "rollback_available": False,
-            "error": None
-        }
-        
-        try:
-            # Display migration warnings
-            migration_type = validation.get("migration_type", "unknown")
-            current_schema = validation.get("current_schema", "unknown")
-            expected_schema = validation.get("expected_schema", "unknown")
-            
-            logging.warning("=" * 80)
-            logging.warning("COLLECTION MIGRATION REQUIRED")
-            logging.warning("=" * 80)
-            logging.warning(f"Collection: {collection_name}")
-            logging.warning(f"Migration Type: {migration_type}")
-            logging.warning(f"Current Schema: {current_schema}")
-            logging.warning(f"Expected Schema: {expected_schema}")
-            
-            if validation.get("data_loss_warning", False):
-                logging.warning("")
-                logging.warning("⚠️  DATA LOSS WARNING ⚠️")
-                logging.warning("This migration will DELETE all existing data in the collection!")
-                logging.warning("A backup will be created automatically before migration.")
-                logging.warning("")
-            
-            # Check if AUTO_MIGRATE environment variable is set
-            auto_migrate = os.getenv("AUTO_MIGRATE_COLLECTIONS", "false").lower() == "true"
-            
-            if not auto_migrate:
-                logging.warning("Migration is DISABLED by default for safety.")
-                logging.warning("To enable automatic migration, set: AUTO_MIGRATE_COLLECTIONS=true")
-                logging.warning("Collection will remain in current state.")
-                return migration_result
+
                 
             logging.info("AUTO_MIGRATE_COLLECTIONS=true detected, proceeding with migration...")
             
@@ -657,16 +506,15 @@ class QdrantClientWrapper:
                     
         return migration_result
 
-    def _perform_schema_migration(
-        self, collection_name: str, expected_config: Dict[str, Any], migration_type: str
+    def _recreate_collection(
+        self, collection_name: str, expected_config: Dict[str, Any]
     ) -> bool:
         """
-        Perform the actual schema migration.
+        Perform the actual schema migration by recreating the collection.
         
         Args:
             collection_name: Name of collection to migrate
             expected_config: Expected collection configuration
-            migration_type: Type of migration to perform
             
         Returns:
             bool: True if migration successful, False otherwise
@@ -679,59 +527,22 @@ class QdrantClientWrapper:
             
             # Create new collection with expected configuration
             vectors_config = expected_config["vectors_config"]
-            sparse_vectors_config = expected_config.get("sparse_vectors_config", None)
+            sparse_vectors_config = expected_config.get("sparse_vectors_config")
             
-            if sparse_vectors_config:
-                # Create hybrid collection with named vectors
-                self.client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=vectors_config,
-                    sparse_vectors_config=sparse_vectors_config
-                )
-                logging.info(f"Created hybrid collection {collection_name} with named vectors")
-            else:
-                # Create legacy collection with single vector
-                self.client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=vectors_config
-                )
-                logging.info(f"Created legacy collection {collection_name} with single vector")
-                
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=vectors_config,
+                sparse_vectors_config=sparse_vectors_config
+            )
+            
+            logging.info(f"Created new collection {collection_name} with updated schema")
             return True
             
         except Exception as e:
             logging.error(f"Schema migration failed for {collection_name}: {e}")
             return False
 
-    def _recreate_collection_safely(
-        self, collection_name: str, vectors_config: VectorParams
-    ):
-        """
-        Safely recreate a collection with new dimensions.
 
-        Args:
-            collection_name: Name of collection to recreate
-            vectors_config: New vector configuration
-        """
-        try:
-            # Delete existing collection if it exists
-            if self._collection_exists(collection_name):
-                logging.warning(
-                    f"Deleting collection {collection_name} due to dimension mismatch"
-                )
-                self.client.delete_collection(collection_name)
-
-            # Create new collection with updated configuration
-            self.client.create_collection(
-                collection_name=collection_name, vectors_config=vectors_config
-            )
-            logging.info(
-                f"Recreated collection {collection_name} with dimensions: {vectors_config.size}"
-            )
-
-        except Exception as e:
-            logging.error(f"Failed to recreate collection {collection_name}: {e}")
-            raise
 
     def _ensure_collections_exist(self):
         """Initialize collections with comprehensive schema validation and migration support."""
@@ -745,16 +556,13 @@ class QdrantClientWrapper:
                 logging.info(f"Schema validation for {name}: {validation}")
 
                 if validation.get("needs_migration", False):
-                    # Collection requires migration due to schema or dimension changes
-                    migration_result = self._migrate_collection_with_confirmation(name, config, validation)
-                    
-                    if migration_result["success"]:
-                        logging.info(f"✅ Collection {name} successfully migrated")
-                    else:
-                        if migration_result["error"]:
-                            logging.error(f"❌ Migration failed for {name}: {migration_result['error']}")
-                        else:
-                            logging.warning(f"⚠️ Migration skipped for {name} (AUTO_MIGRATE_COLLECTIONS not enabled)")
+                    logging.warning("=" * 80)
+                    logging.warning(f"!! SCHEMA MISMATCH DETECTED FOR COLLECTION: {name} !!")
+                    logging.warning(f"Current Schema: {validation.get('current_schema', 'unknown')}, Expected Schema: {validation.get('expected_schema', 'unknown')}")
+                    logging.warning("This can happen if you changed the embedding model or enabled/disabled hybrid search.")
+                    logging.warning("The collection will be recreated, and ALL EXISTING DATA WILL BE LOST.")
+                    logging.warning("=" * 80)
+                    self._recreate_collection(name, config)
                 else:
                     logging.info(f"✅ Collection {name} schema validated successfully - no migration needed")
                     

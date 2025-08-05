@@ -18,14 +18,13 @@ def run_with_environment(command):
     """Run command with hybrid search environment."""
     env = os.environ.copy()
     env["USE_HYBRID_SEARCH"] = "true"
-    env["AUTO_MIGRATE_COLLECTIONS"] = "true"
     
     result = subprocess.run(
         command,
         env=env,
         capture_output=True,
         text=True,
-        cwd=Path(__file__).parent
+        cwd=Path(__file__).parent.parent  # Move to project root
     )
     
     return result
@@ -36,9 +35,13 @@ def test_imports():
     print("🔍 Testing module imports...")
     
     try:
-        import src.qdrant_wrapper
-        import src.sparse_vector_types
-        from src.qdrant_wrapper import QdrantClientWrapper
+        # Add src to path for imports
+        project_root = Path(__file__).parent.parent
+        sys.path.insert(0, str(project_root / "src"))
+        
+        import qdrant_wrapper
+        import sparse_vector_types
+        from qdrant_wrapper import QdrantClientWrapper
         
         # Test wrapper initialization
         wrapper = QdrantClientWrapper(device="cpu")
@@ -55,7 +58,11 @@ def test_configuration():
     print("⚙️  Testing configuration...")
     
     try:
-        from src.qdrant_wrapper import get_hybrid_collections_config
+        # Add src to path for imports
+        project_root = Path(__file__).parent.parent
+        sys.path.insert(0, str(project_root / "src"))
+        
+        from qdrant_wrapper import get_hybrid_collections_config
         config = get_hybrid_collections_config()
         
         assert "crawled_pages" in config
@@ -107,8 +114,12 @@ def run_performance_benchmarks():
     print("🚀 Running performance benchmarks...")
     
     try:
+        # Add src to path for imports
+        project_root = Path(__file__).parent.parent
+        sys.path.insert(0, str(project_root / "src"))
+        
         # Test with minimal setup
-        from src.qdrant_wrapper import get_collections_config, get_hybrid_collections_config
+        from qdrant_wrapper import get_collections_config, get_hybrid_collections_config
         
         legacy_config = get_collections_config()
         hybrid_config = get_hybrid_collections_config()
@@ -216,7 +227,11 @@ def generate_test_report(results):
     report.append("📋 CONFIGURATION QUICK CHECK:")
     
     try:
-        from src.qdrant_wrapper import get_hybrid_collections_config
+        # Add src to path for imports
+        project_root = Path(__file__).parent.parent
+        sys.path.insert(0, str(project_root / "src"))
+        
+        from qdrant_wrapper import get_hybrid_collections_config
         config = get_hybrid_collections_config()
         
         for collection_name, cfg in config.items():

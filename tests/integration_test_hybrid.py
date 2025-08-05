@@ -36,7 +36,7 @@ class TestHybridSearchIntegration:
         """Setup test Qdrant wrapper."""
         # Use test configuration
         os.environ["USE_HYBRID_SEARCH"] = "true"
-        os.environ["AUTO_MIGRATE_COLLECTIONS"] = "true"
+
         
         wrapper = QdrantClientWrapper(device="cpu")
         yield wrapper
