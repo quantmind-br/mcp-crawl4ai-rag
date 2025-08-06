@@ -605,10 +605,9 @@ def get_effective_fallback_config():
     return config
 
 
-def get_supabase_client():
+def get_vector_db_client():
     """
-    DEPRECATED: Legacy function name maintained for compatibility.
-    Returns Qdrant client wrapper instead.
+    Gets the configured Qdrant client wrapper. This is a convenience function that wraps get_qdrant_client().
     """
     return get_qdrant_client()
 
@@ -1033,7 +1032,7 @@ def process_chunk_with_context(args):
     return generate_contextual_embedding(full_document, content)
 
 
-def add_documents_to_supabase(
+def add_documents_to_vector_db(
     client: QdrantClientWrapper,
     urls: List[str],
     chunk_numbers: List[int],
@@ -1043,10 +1042,7 @@ def add_documents_to_supabase(
     batch_size: int = 100,
 ) -> None:
     """
-    Add documents to Qdrant crawled_pages collection.
-    LEGACY FUNCTION NAME: Maintained for compatibility.
-
-    Args:
+    Add documents to Qdrant crawled_pages collection.    Args:
         client: Qdrant client wrapper
         urls: List of URLs
         chunk_numbers: List of chunk numbers
@@ -1354,7 +1350,7 @@ Based on the code example and its surrounding context, provide a concise summary
         return "Code example for demonstration purposes."
 
 
-def add_code_examples_to_supabase(
+def add_code_examples_to_vector_db(
     client: QdrantClientWrapper,
     urls: List[str],
     chunk_numbers: List[int],
@@ -1364,10 +1360,7 @@ def add_code_examples_to_supabase(
     batch_size: int = 100,
 ):
     """
-    Add code examples to Qdrant code_examples collection.
-    LEGACY FUNCTION NAME: Maintained for compatibility.
-
-    Args:
+    Add code examples to Qdrant code_examples collection.    Args:
         client: Qdrant client wrapper
         urls: List of URLs
         chunk_numbers: List of chunk numbers

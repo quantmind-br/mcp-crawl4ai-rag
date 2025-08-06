@@ -53,7 +53,7 @@ mock_hallucination_reporter.HallucinationReporter = Mock
 class TestMCPServerIntegration:
     """Test MCP server integration with Qdrant."""
 
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_context_initialization(self, mock_get_client):
         """Test that context initializes with Qdrant client."""
         # Setup mock
@@ -71,7 +71,7 @@ class TestMCPServerIntegration:
         assert hasattr(context, "qdrant_client")
 
     @patch("crawl4ai_mcp.search_documents")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_perform_rag_query_integration(self, mock_get_client, mock_search):
         """Test RAG query with Qdrant integration."""
         # Setup mocks
@@ -110,7 +110,7 @@ class TestMCPServerIntegration:
         mock_search.assert_called_once_with(mock_client, "What is Python?", 5, None)
 
     @patch("crawl4ai_mcp.search_code_examples")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_search_code_examples_integration(self, mock_get_client, mock_search):
         """Test code examples search with Qdrant integration."""
         # Setup mocks
@@ -150,7 +150,7 @@ class TestMCPServerIntegration:
             mock_client, "hello world function", 3, None, None
         )
 
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_get_available_sources_integration(self, mock_get_client):
         """Test getting available sources from Qdrant."""
         # Setup mock
@@ -181,8 +181,8 @@ class TestMCPServerIntegration:
         mock_client.get_available_sources.assert_called_once()
 
     @patch("crawl4ai_mcp.AsyncWebCrawler")
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
+    @patch('crawl4ai_mcp.get_vector_db_client')
     async def test_crawl_integration_mock(
         self, mock_get_client, mock_add_docs, mock_crawler_class
     ):
@@ -228,7 +228,7 @@ class TestHybridSearch:
     """Test hybrid search functionality with Qdrant."""
 
     @patch("crawl4ai_mcp.search_documents")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_hybrid_search_vector_only(self, mock_get_client, mock_search_docs):
         """Test hybrid search with only vector search."""
         # Setup mocks
@@ -260,7 +260,7 @@ class TestHybridSearch:
         assert len(result["results"]) == 1
 
     @patch("crawl4ai_mcp.search_documents")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_hybrid_search_with_keyword_results(
         self, mock_get_client, mock_search_docs
     ):
@@ -302,7 +302,7 @@ class TestHybridSearch:
 class TestErrorHandling:
     """Test error handling in MCP server."""
 
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_qdrant_connection_error(self, mock_get_client):
         """Test handling of Qdrant connection errors."""
         # Setup mock to raise connection error
@@ -323,7 +323,7 @@ class TestErrorHandling:
             assert "Qdrant" in str(e)
 
     @patch("crawl4ai_mcp.search_documents")
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_search_error_handling(self, mock_get_client, mock_search):
         """Test error handling in search operations."""
         # Setup mocks

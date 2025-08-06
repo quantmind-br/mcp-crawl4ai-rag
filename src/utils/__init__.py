@@ -25,7 +25,9 @@ try:
     spec.loader.exec_module(utils_module)
     # Extract the functions we need
     get_embeddings_client = getattr(utils_module, 'get_embeddings_client', None)
-    get_supabase_client = getattr(utils_module, 'get_supabase_client', None)
+    get_vector_db_client = getattr(utils_module, 'get_vector_db_client', None)
+    get_qdrant_client = getattr(utils_module, 'get_qdrant_client', None)
+    QdrantClientWrapper = getattr(utils_module, 'QdrantClientWrapper', None)
     health_check_gpu_acceleration = getattr(utils_module, 'health_check_gpu_acceleration', None)
     health_check_reranking_model = getattr(utils_module, 'health_check_reranking_model', None)
     cleanup_gpu_memory = getattr(utils_module, 'cleanup_gpu_memory', None)
@@ -38,10 +40,10 @@ try:
     get_effective_fallback_config = getattr(utils_module, 'get_effective_fallback_config', None)
     create_embeddings_batch = getattr(utils_module, 'create_embeddings_batch', None)
     create_embedding = getattr(utils_module, 'create_embedding', None)
-    add_documents_to_supabase = getattr(utils_module, 'add_documents_to_supabase', None)
+    add_documents_to_vector_db = getattr(utils_module, 'add_documents_to_vector_db', None)
     search_documents = getattr(utils_module, 'search_documents', None)
     extract_code_blocks = getattr(utils_module, 'extract_code_blocks', None)
-    add_code_examples_to_supabase = getattr(utils_module, 'add_code_examples_to_supabase', None)
+    add_code_examples_to_vector_db = getattr(utils_module, 'add_code_examples_to_vector_db', None)
     search_code_examples = getattr(utils_module, 'search_code_examples', None)
     update_source_info = getattr(utils_module, 'update_source_info', None)
     extract_source_summary = getattr(utils_module, 'extract_source_summary', None)
@@ -70,8 +72,8 @@ except Exception as e:
     def get_embeddings_client():
         raise NotImplementedError("get_embeddings_client not available")
 
-    def get_supabase_client():
-        raise NotImplementedError("get_supabase_client not available")
+    def get_vector_db_client():
+        raise NotImplementedError("get_vector_db_client not available")
 
     def health_check_gpu_acceleration():
         raise NotImplementedError("health_check_gpu_acceleration not available")
@@ -90,7 +92,9 @@ __all__ = [
     "validate_github_url",
     # Backward compatibility exports
     "get_embeddings_client",
-    "get_supabase_client",
+    "get_vector_db_client",
+    "get_qdrant_client", 
+    "QdrantClientWrapper",
     "health_check_gpu_acceleration",
     "health_check_reranking_model",
     "cleanup_gpu_memory",
@@ -103,10 +107,10 @@ __all__ = [
     "get_effective_fallback_config",
     "create_embeddings_batch",
     "create_embedding",
-    "add_documents_to_supabase",
+    "add_documents_to_vector_db",
     "search_documents",
     "extract_code_blocks",
-    "add_code_examples_to_supabase",
+    "add_code_examples_to_vector_db",
     "search_code_examples",
     "update_source_info",
     "extract_source_summary",

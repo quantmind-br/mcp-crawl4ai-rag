@@ -1,109 +1,81 @@
-# Suggested Commands
+# Essential Commands for Development
 
-## Setup and Installation
+## Setup & Installation
 ```bash
-# Install dependencies
+# Install dependencies and setup environment
 uv sync
 
-# Setup Docker services (Windows)
-setup.bat
-# or (Linux/Mac)
-docker-compose up -d
+# Start Docker services (Qdrant + Neo4j + Redis)
+setup.bat          # Windows
+# or: docker-compose up -d
 
-# Configure environment
+# Configure environment from example
 cp .env.example .env
 # Edit .env with your API keys
-
-# Start MCP server (Windows)
-start.bat
-# or (Linux/Mac)
-uv run -m src
 ```
 
-## Development Commands
+## Development Workflow
+```bash
+# Start the MCP server
+start.bat          # Windows (includes all checks)
+# or: uv run -m src
+
+# Direct server start
+uv run run_server.py
+```
+
+## Testing Commands
 ```bash
 # Run all tests
 uv run pytest
 
-# Run specific test categories
-uv run pytest tests/test_mcp_basic.py          # Basic MCP functionality
-uv run pytest tests/test_qdrant_wrapper.py     # Vector database tests
-uv run pytest tests/test_deepinfra_config.py   # API configuration tests
-uv run pytest tests/test_github_processor.py   # Knowledge graph tests
-uv run pytest tests/integration_test.py        # Full integration tests
-uv run pytest tests/performance_benchmark.py   # Performance benchmarks
-
-# Run hybrid search tests
-uv run pytest tests/test_hybrid_search.py
-uv run python run_hybrid_tests.py
-
-# Run linting
-uv run ruff check
-uv run ruff format
+# Specific test suites
+uv run pytest tests/test_mcp_basic.py          # MCP functionality
+uv run pytest tests/test_qdrant_wrapper.py     # Vector database
+uv run pytest tests/integration_test.py        # Full integration
+uv run pytest tests/performance_benchmark.py   # Performance tests
 ```
 
-## Utility Scripts
+## Maintenance Commands
 ```bash
-# Clean Qdrant database
+# Clean vector database
 uv run python scripts/clean_qdrant.py
 
-# Fix Qdrant dimensions for existing collections
+# Fix collection dimension issues
 uv run python scripts/fix_qdrant_dimensions.py
 
-# Analyze repository for hallucinations
-uv run python knowledge_graphs/ai_hallucination_detector.py script.py
-
-# Parse repository into Neo4j knowledge graph
+# Repository analysis for knowledge graph
 uv run python knowledge_graphs/parse_repo_into_neo4j.py <repo_url>
 
-# Validate installation
-uv run python validate-installation.py
+# AI code validation
+uv run python knowledge_graphs/ai_hallucination_detector.py script.py
 ```
 
 ## Docker Management
 ```bash
 # View service logs
-docker-compose logs qdrant
-docker-compose logs neo4j
-docker-compose logs redis
+docker-compose logs [qdrant|neo4j|redis]
 
-# Restart services
-docker-compose restart
+# Service status
+docker-compose ps
 
-# Stop all services
+# Clean restart (removes all data)
 docker-compose down --volumes
+docker-compose up -d
 
-# Check service status
-docker-compose ps
+# Health checks
+curl http://localhost:6333/health      # Qdrant
+curl http://localhost:7474             # Neo4j web interface
+redis-cli ping                         # Redis
 ```
 
-## Windows-Specific Commands
-```cmd
-REM Setup Docker services
-setup.bat
-
-REM Start MCP server
-start.bat
-
-REM Check Docker status
-docker --version
-docker-compose ps
-```
-
-## MCP Client Integration
+## Windows-Specific
 ```bash
-# Add to Claude Code CLI
-claude mcp add-json crawl4ai-rag '{"type":"http","url":"http://localhost:8051/sse"}' --scope user
-```
+# Check Python and uv versions
+python --version
+uv --version
 
-## Alternative Startup Methods
-```bash
-# Direct Python execution
-uv run python run_server.py
-
-# Module execution
-uv run -m src
-
-# Development with hot reload
-uv run python src/crawl4ai_mcp.py
+# Environment verification
+echo %CHAT_API_KEY%
+echo %EMBEDDINGS_API_KEY%
 ```

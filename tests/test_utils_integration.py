@@ -16,11 +16,11 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 from utils import (
-    get_supabase_client,
+    get_vector_db_client,
     search_documents,
     search_code_examples,
-    add_documents_to_supabase,
-    add_code_examples_to_supabase,
+    add_documents_to_vector_db,
+    add_code_examples_to_vector_db,
     create_embedding,
     create_embeddings_batch,
     extract_code_blocks,
@@ -34,15 +34,15 @@ class TestUtilsIntegration:
     """Test integration between utils and Qdrant wrapper."""
 
     @patch("utils.get_qdrant_client")
-    def test_get_supabase_client_returns_qdrant(self, mock_get_qdrant):
-        """Test that get_supabase_client returns Qdrant client (legacy compatibility)."""
+    def test_get_vector_db_client_returns_qdrant(self, mock_get_qdrant):
+        """Test that get_vector_db_client returns Qdrant client (legacy compatibility)."""
 
         # Setup
         mock_client = Mock(spec=QdrantClientWrapper)
         mock_get_qdrant.return_value = mock_client
 
         # Test
-        client = get_supabase_client()
+        client = get_vector_db_client()
 
         # Verify
         assert client == mock_client
@@ -127,7 +127,7 @@ class TestUtilsIntegration:
         url_to_full_document = {"https://example.com": "full document"}
 
         # Test
-        add_documents_to_supabase(
+        add_documents_to_vector_db(
             mock_client, urls, chunk_numbers, contents, metadatas, url_to_full_document
         )
 
@@ -167,7 +167,7 @@ class TestUtilsIntegration:
         metadatas = [{"language": "python"}]
 
         # Test
-        add_code_examples_to_supabase(
+        add_code_examples_to_vector_db(
             mock_client, urls, chunk_numbers, code_examples, summaries, metadatas
         )
 

@@ -32,7 +32,7 @@ os.environ.setdefault("QDRANT_PORT", "6333")
 class TestMCPBasicFunctionality:
     """Test basic MCP server functionality."""
 
-    @patch("crawl4ai_mcp.get_supabase_client")
+    @patch('crawl4ai_mcp.get_vector_db_client')
     def test_context_dataclass(self, mock_get_client):
         """Test that context dataclass uses Qdrant client."""
         mock_client = Mock()
@@ -78,25 +78,25 @@ class TestMCPBasicFunctionality:
         # Test importing main modules
         from crawl4ai_mcp import Crawl4AIContext
         from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
-        from utils import search_documents, get_supabase_client
+        from utils import search_documents, get_vector_db_client
 
         # Verify classes exist
         assert Crawl4AIContext is not None
         assert QdrantClientWrapper is not None
         assert callable(get_qdrant_client)
         assert callable(search_documents)
-        assert callable(get_supabase_client)
+        assert callable(get_vector_db_client)
 
     @patch("utils.get_qdrant_client")
-    def test_legacy_compatibility(self, mock_get_qdrant):
+    def test_vector_db_client_wrapper(self, mock_get_qdrant):
         """Test that legacy Supabase function names still work."""
         mock_client = Mock()
         mock_get_qdrant.return_value = mock_client
 
-        from utils import get_supabase_client
+        from utils import get_vector_db_client
 
         # Test legacy function returns Qdrant client
-        client = get_supabase_client()
+        client = get_vector_db_client()
         assert client == mock_client
 
     def test_qdrant_wrapper_interface(self):

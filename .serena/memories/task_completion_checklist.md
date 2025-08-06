@@ -1,59 +1,53 @@
 # Task Completion Checklist
 
-## Code Quality and Testing
-- [ ] **Run linting**: `uv run ruff check` and `uv run ruff format`
-- [ ] **Run tests**: `uv run pytest` for all test suites
-- [ ] **Test specific modules**: Run relevant test files for modified components
-- [ ] **Integration tests**: `uv run pytest tests/integration_test.py` for full system tests
-- [ ] **Performance validation**: `uv run pytest tests/performance_benchmark.py` if performance-related
+## Code Quality Validation
+- [ ] **Type Hints**: All new functions have complete type annotations
+- [ ] **Documentation**: All public APIs have descriptive docstrings
+- [ ] **Import Organization**: Follows specified hierarchy (stdlib → third-party → local)
+- [ ] **Naming Conventions**: snake_case variables/functions, PascalCase classes
 
-## Configuration and Environment
-- [ ] **Environment variables**: Verify `.env` configuration is correct
-- [ ] **Docker services**: Ensure Qdrant, Neo4j, Redis are running (`docker-compose ps`)
-- [ ] **API keys**: Validate API configuration and fallback settings
-- [ ] **Dependencies**: Run `uv sync` if new dependencies were added
+## Testing Requirements
+- [ ] **Unit Tests**: New functionality has corresponding test cases
+- [ ] **Async Tests**: All MCP tools tested in async contexts
+- [ ] **Integration Tests**: Docker-based testing where applicable
+- [ ] **Configuration Tests**: Multi-provider API configurations validated
 
-## Functionality Testing
-- [ ] **MCP server startup**: Test server starts without errors (`start.bat` or `uv run -m src`)
-- [ ] **MCP tools**: Verify all relevant MCP tools work correctly
-- [ ] **GPU acceleration**: Test GPU functionality if reranking/GPU features modified
-- [ ] **Windows compatibility**: Verify Windows-specific fixes work correctly
+## Performance Validation
+- [ ] **Memory Management**: GPU memory cleanup after operations
+- [ ] **Connection Handling**: Proper resource cleanup (Qdrant, Redis, Neo4j)
+- [ ] **Async Performance**: No blocking operations in async contexts
+- [ ] **Error Handling**: Tenacity retry policies applied correctly
 
-## Documentation and Communication
-- [ ] **Code comments**: Add/update inline documentation for complex logic
-- [ ] **Type hints**: Ensure all new functions have proper type annotations
-- [ ] **Error handling**: Implement graceful error handling with appropriate logging
-- [ ] **Changelog**: Document significant changes in commit messages
+## Configuration Validation
+- [ ] **Environment Variables**: All required env vars validated
+- [ ] **API Configuration**: Primary and fallback configurations tested
+- [ ] **Model Configurations**: Embedding dimensions auto-detected correctly
+- [ ] **Docker Services**: All required services (Qdrant, Neo4j) operational
 
-## Specific Component Checks
+## Security Checks
+- [ ] **Sensitive Data**: No credentials or keys committed
+- [ ] **Input Validation**: All external inputs properly validated
+- [ ] **File Paths**: Absolute paths used, no traversal vulnerabilities
+- [ ] **API Keys**: Environment-based configuration only
 
-### Vector Database Changes
-- [ ] **Qdrant collections**: Verify collection schemas are correct
-- [ ] **Embedding dimensions**: Check dimension consistency
-- [ ] **Hybrid search**: Test sparse/dense vector functionality if applicable
+## Validation Commands
+```bash
+# Run quality checks
+uv run ruff check --fix
 
-### API Client Changes  
-- [ ] **Fallback mechanisms**: Test primary and fallback API configurations
-- [ ] **Rate limiting**: Verify retry logic with tenacity
-- [ ] **Multi-provider**: Test different API providers if modified
+# Type checking (consider using mypy)
+uv run python -m py_compile src/*.py
 
-### Knowledge Graph Changes
-- [ ] **Neo4j connection**: Test connection and query functionality
-- [ ] **Repository parsing**: Verify GitHub repository processing
-- [ ] **Hallucination detection**: Test AI script validation if applicable
+# Comprehensive testing
+uv run pytest tests/ -v
 
-### Device Management Changes
-- [ ] **GPU detection**: Test automatic GPU/CPU fallback
-- [ ] **Memory cleanup**: Verify GPU memory is properly cleaned up
-- [ ] **Device configuration**: Test different GPU precision settings
+# Health check endpoints
+curl http://localhost:6333/health
+curl http://localhost:7474
+```
 
-## Pre-Commit Validation
-- [ ] **No syntax errors**: Python files parse correctly
-- [ ] **Import resolution**: All imports resolve correctly
-- [ ] **Environment compatibility**: Works with minimal .env configuration
-- [ ] **Docker compatibility**: Services start cleanly with docker-compose
-
-## Windows-Specific Validation
-- [ ] **Event loop fix**: Windows ConnectionResetError handling works
-- [ ] **Batch scripts**: setup.bat and start.bat execute successfully
-- [ ] **PyTorch CUDA**: GPU acceleration works on Windows if applicable
+## Deployment Checklist
+- [ ] **Environment**: .env file configured with production values
+- [ ] **Services**: All Docker services healthy
+- [ ] **Testing**: Comprehensive test suite passing
+- [ ] **Logs**: No critical errors in server logs

@@ -26,7 +26,7 @@ from urllib.parse import urlparse, urldefrag
 from xml.etree import ElementTree
 from dotenv import load_dotenv
 
-# Removed Supabase import - now using Qdrant client wrapper
+# Now using Qdrant client wrapper for vector database operations
 from pathlib import Path
 import requests
 import asyncio
@@ -98,12 +98,12 @@ from hallucination_reporter import HallucinationReporter
 
 try:
     from .utils import (
-        get_supabase_client,
-        add_documents_to_supabase,
+        get_vector_db_client,
+        add_documents_to_vector_db,
         search_documents,
         extract_code_blocks,
         generate_code_example_summary,
-        add_code_examples_to_supabase,
+        add_code_examples_to_vector_db,
         update_source_info,
         extract_source_summary,
     )
@@ -137,12 +137,12 @@ except ImportError:
     main_utils = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(main_utils)
 
-    get_supabase_client = main_utils.get_supabase_client
-    add_documents_to_supabase = main_utils.add_documents_to_supabase
+    get_vector_db_client = main_utils.get_vector_db_client
+    add_documents_to_vector_db = main_utils.add_documents_to_vector_db
     search_documents = main_utils.search_documents
     extract_code_blocks = main_utils.extract_code_blocks
     generate_code_example_summary = main_utils.generate_code_example_summary
-    add_code_examples_to_supabase = main_utils.add_code_examples_to_supabase
+    add_code_examples_to_vector_db = main_utils.add_code_examples_to_vector_db
     update_source_info = main_utils.update_source_info
     extract_source_summary = main_utils.extract_source_summary
 
@@ -444,7 +444,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
 
     # Initialize Qdrant client
     qdrant_client = (
-        get_supabase_client()
+        get_vector_db_client()
     )  # Legacy function name, returns QdrantClientWrapper
 
     # Validate embeddings configuration and dimensions
@@ -493,11 +493,11 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
 
 # Initialize FastMCP server
 mcp = FastMCP(
-    "mcp-crawl4ai-rag",
-    description="MCP server for RAG and web crawling with Crawl4AI",
-    lifespan=crawl4ai_lifespan,
+    name="mcp-crawl4ai-rag",
+    instructions="MCP server for RAG and web crawling with Crawl4AI",
     host=os.getenv("HOST", "0.0.0.0"),
-    port=os.getenv("PORT", "8051"),
+    port=int(os.getenv("PORT", "8051")),
+    lifespan=crawl4ai_lifespan
 )
 
 
@@ -694,17 +694,17 @@ def process_code_example(args):
 @mcp.tool()
 async def crawl_single_page(ctx: Context, url: str) -> str:
     """
-    Crawl a single web page and store its content in Supabase.
+    Crawl a single web page and store its content in the vector database.
 
     This tool is ideal for quickly retrieving content from a specific URL without following links.
-    The content is stored in Supabase for later retrieval and querying.
+    The content is stored in the vector database for later retrieval and querying.
 
     Args:
         ctx: The MCP server provided context
         url: URL of the web page to crawl
 
     Returns:
-        Summary of the crawling operation and storage in Supabase
+        Summary of the crawling operation and storage in the vector database
     """
     try:
         # Get the crawler from the context
@@ -725,7 +725,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
             # Chunk the content
             chunks = smart_chunk_markdown(result.markdown)
 
-            # Prepare data for Supabase
+            # Prepare data for vector database
             urls = []
             chunk_numbers = []
             contents = []
@@ -760,7 +760,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
             )
 
             # Add documentation chunks to Qdrant (AFTER source exists)
-            add_documents_to_supabase(
+            add_documents_to_vector_db(
                 qdrant_client,
                 urls,
                 chunk_numbers,
@@ -817,7 +817,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         code_metadatas.append(code_meta)
 
                     # Add code examples to Qdrant
-                    add_code_examples_to_supabase(
+                    add_code_examples_to_vector_db(
                         qdrant_client,
                         code_urls,
                         code_chunk_numbers,
@@ -859,14 +859,14 @@ async def smart_crawl_url(
     chunk_size: int = 5000,
 ) -> str:
     """
-    Intelligently crawl a URL based on its type and store content in Supabase.
+    Intelligently crawl a URL based on its type and store content in the vector database.
 
     This tool automatically detects the URL type and applies the appropriate crawling method:
     - For sitemaps: Extracts and crawls all URLs in parallel
     - For text files (llms.txt): Directly retrieves the content
     - For regular webpages: Recursively crawls internal links up to the specified depth
 
-    All crawled content is chunked and stored in Supabase for later retrieval and querying.
+    All crawled content is chunked and stored in the vector database for later retrieval and querying.
 
     Args:
         ctx: The MCP server provided context
@@ -915,7 +915,7 @@ async def smart_crawl_url(
                 {"success": False, "url": url, "error": "No content found"}, indent=2
             )
 
-        # Process results and store in Supabase
+        # Process results and store in vector database
         urls = []
         chunk_numbers = []
         contents = []
@@ -984,7 +984,7 @@ async def smart_crawl_url(
 
         # Add documentation chunks to Qdrant (AFTER sources exist)
         batch_size = 20
-        add_documents_to_supabase(
+        add_documents_to_vector_db(
             qdrant_client,
             urls,
             chunk_numbers,
@@ -1053,7 +1053,7 @@ async def smart_crawl_url(
 
             # Add all code examples to Qdrant
             if code_examples:
-                add_code_examples_to_supabase(
+                add_code_examples_to_vector_db(
                     qdrant_client,
                     code_urls,
                     code_chunk_numbers,
@@ -1273,7 +1273,7 @@ async def smart_crawl_github(
 
             # Add documents to Qdrant using existing function
             batch_size = 20
-            add_documents_to_supabase(
+            add_documents_to_vector_db(
                 qdrant_client,
                 urls,
                 chunk_numbers,
@@ -1360,7 +1360,7 @@ async def smart_crawl_github(
 
             # Add all code examples to Qdrant
             if code_examples:
-                add_code_examples_to_supabase(
+                add_code_examples_to_vector_db(
                     qdrant_client,
                     code_urls,
                     code_chunk_numbers,

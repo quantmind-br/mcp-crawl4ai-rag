@@ -183,12 +183,12 @@ class TestUtilsWithRealQdrant:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from utils import create_embedding, get_supabase_client
+        from utils import create_embedding, get_vector_db_client
         from qdrant_client.models import PointStruct
 
         try:
             # Get client
-            client = get_supabase_client()  # Returns Qdrant client
+            client = get_vector_db_client()  # Returns Qdrant client
 
             # Create test embedding (this will use real OpenAI API if key is available)
             test_text = "This is a test for integration testing"
@@ -289,14 +289,14 @@ class TestEndToEndWorkflow:
             pytest.skip("Qdrant not ready")
 
         from utils import (
-            get_supabase_client,
-            add_documents_to_supabase,
+    get_vector_db_client,
+            add_documents_to_vector_db,
             search_documents,
         )
 
         try:
             # Get client
-            client = get_supabase_client()
+            client = get_vector_db_client()
 
             # Test data
             test_urls = ["https://test-integration.com/page1"]
@@ -310,7 +310,7 @@ class TestEndToEndWorkflow:
             }
 
             # Store documents
-            add_documents_to_supabase(
+            add_documents_to_vector_db(
                 client=client,
                 urls=test_urls,
                 chunk_numbers=test_chunk_numbers,

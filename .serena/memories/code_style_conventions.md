@@ -1,44 +1,27 @@
-# Code Style and Conventions
+# Code Style & Conventions
 
-## Code Style
-- **Linter**: ruff >=0.12.7 for code quality and formatting
-- **Python Version**: 3.12+ with modern Python features
-- **Import Style**: Absolute imports with try/except for relative imports
-- **Docstrings**: Module-level docstrings with detailed descriptions
+## Language Standards
+- **Type Hints**: Required for all function parameters and return types
+- **Documentation**: Docstrings for all public functions and classes
+- **Naming**: snake_case for variables/functions, PascalCase for classes
+- **Error Handling**: tenacity for retries, explicit error propagation
 
-## Naming Conventions
-- **Classes**: PascalCase (e.g., `QdrantClientWrapper`, `GitHubRepoManager`)
-- **Functions**: snake_case (e.g., `get_optimal_device`, `create_embeddings_batch`)
-- **Variables**: snake_case (e.g., `embedding_dimensions`, `qdrant_client`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `TORCH_AVAILABLE`, `COLLECTIONS`)
-- **Private/Internal**: Leading underscore (e.g., `_qdrant_client_instance`, `_create_embeddings_api_call`)
+## Async/Concurrent Patterns
+- **Asynchronous First**: All MCP tools use `@mcp.tool()` decorator with async functions
+- **Connection Pooling**: Qdrant and Redis clients use connection pooling
+- **Resource Management**: Automatic cleanup for GPU memory after operations
 
-## Code Organization
-- **Imports**: External imports first, then try/except blocks for relative imports
-- **Error Handling**: Use tenacity for retrying operations, comprehensive exception handling
-- **Async Patterns**: All MCP tools are async with proper context management
-- **Type Hints**: Extensive use of typing with List, Dict, Any, Optional
+## Import Organization
+- **External**: Standard library → Third-party → Local imports
+- **Lazy Initialization**: Single instance patterns for heavy resources
+- **Singleton Patterns**: Reranking models, knowledge graphs, clients
 
-## File Structure Patterns
-- **Main Module**: `src/crawl4ai_mcp.py` - Primary MCP server with all tools
-- **Utilities**: `src/utils/` - Helper functions and client wrappers
-- **Configuration**: Environment-based with `.env` files and validation
-- **Tests**: Comprehensive test suite with mocking for external services
+## Configuration Management
+- **Modern API**: CHAT_MODEL/EMBEDDINGS_MODEL + API_KEY pattern
+- **Fallback**: Automatic fallback configuration validation
+- **Environment**: dotenv loading with comprehensive validation
 
-## Documentation Style
-- **Module Docstrings**: Detailed purpose and functionality descriptions
-- **Function Docstrings**: Parameters, return values, and usage examples
-- **Inline Comments**: Explanatory comments for complex logic
-- **README**: Comprehensive setup, configuration, and usage documentation
-
-## Error Handling Patterns
-- **Graceful Fallbacks**: GPU → CPU, primary API → fallback API
-- **Validation**: Input validation with clear error messages
-- **Logging**: Structured logging with appropriate levels
-- **Windows Compatibility**: Special handling for ConnectionResetError issues
-
-## Testing Conventions
-- **Test Organization**: Test files mirror source structure (`test_*.py`)
-- **Mocking**: Extensive use of unittest.mock for external dependencies
-- **Environment Setup**: conftest.py with automatic test environment configuration
-- **Coverage**: Multiple test categories (unit, integration, performance)
+## Error Handling
+- **Tenacity**: Retry policies for API calls and external services
+- **Graceful Degradation**: GPU → CPU fallback, temporary failures handling
+- **Logging**: Structured logging with appropriate levels (INFO, WARNING, ERROR)

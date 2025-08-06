@@ -95,7 +95,7 @@ class TestSmartCrawlGitHub:
     @patch("crawl4ai_mcp.smart_chunk_markdown")
     @patch("crawl4ai_mcp.extract_source_summary")
     @patch("crawl4ai_mcp.update_source_info")
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     async def test_successful_crawl(
         self,
         mock_add_docs,
@@ -192,10 +192,10 @@ class TestSmartCrawlGitHub:
     @patch("crawl4ai_mcp.smart_chunk_markdown")
     @patch("crawl4ai_mcp.extract_source_summary")
     @patch("crawl4ai_mcp.update_source_info")
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.extract_code_blocks")
     @patch("crawl4ai_mcp.generate_code_example_summary")
-    @patch("crawl4ai_mcp.add_code_examples_to_supabase")
+    @patch('crawl4ai_mcp.add_code_examples_to_vector_db')
     @patch("crawl4ai_mcp.os.getenv")
     async def test_with_code_examples_enabled(
         self,
@@ -336,7 +336,7 @@ class TestSmartCrawlGitHub:
             patch("crawl4ai_mcp.smart_chunk_markdown") as mock_chunk,
             patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
             patch("crawl4ai_mcp.update_source_info"),
-            patch("crawl4ai_mcp.add_documents_to_supabase"),
+            patch('crawl4ai_mcp.add_documents_to_vector_db'),
         ):
             # Setup mocks
             mock_manager = Mock()
@@ -398,7 +398,7 @@ class TestSmartCrawlGitHub:
     @patch("crawl4ai_mcp.smart_chunk_markdown")
     @patch("crawl4ai_mcp.extract_source_summary")
     @patch("crawl4ai_mcp.update_source_info")
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     async def test_many_files_truncation(
         self,
         mock_add_docs,
@@ -574,7 +574,7 @@ test_package.hello()
             patch("crawl4ai_mcp.smart_chunk_markdown") as mock_chunk,
             patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
             patch("crawl4ai_mcp.update_source_info") as mock_update_source,
-            patch("crawl4ai_mcp.add_documents_to_supabase") as mock_add_docs,
+            patch('crawl4ai_mcp.add_documents_to_vector_db') as mock_add_docs,
             patch("utils.github_processor.shutil.rmtree") as mock_rmtree,
         ):
             # Setup utility mocks

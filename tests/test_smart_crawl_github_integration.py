@@ -321,7 +321,7 @@ Create a new user.
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_multi_file_complete_workflow(
@@ -418,7 +418,7 @@ Create a new user.
         assert len(languages.intersection(expected_languages)) >= 4
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_backward_compatibility_markdown_only(
@@ -474,7 +474,7 @@ Create a new user.
             assert doc["metadata"]["language"] == "markdown"
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_single_file_type_processing(
@@ -561,7 +561,7 @@ Create a new user.
         assert result_data["total_chunks"] == 0
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_mixed_file_processing_with_errors(
@@ -639,7 +639,7 @@ def broken_function(
         assert len(all_content) < 1_500_000  # Large file not included
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_metadata_structure_validation(
@@ -730,7 +730,7 @@ def broken_function(
                 assert metadata["type"] == "configuration"
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.add_documents_to_supabase")
+    @patch('crawl4ai_mcp.add_documents_to_vector_db')
     @patch("crawl4ai_mcp.GitHubRepoManager")
     @patch("crawl4ai_mcp.GitHubMetadataExtractor")
     async def test_chunking_integration(

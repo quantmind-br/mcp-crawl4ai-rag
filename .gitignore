@@ -6,6 +6,9 @@
 # Python Standard Ignores
 # ==============================================================================
 
+#dev
+diffs.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -356,3 +359,6 @@ profiling/
 benchmark_results/
 performance_logs/
 nul
+# Cache files
+.serena/cache/
+**/__pycache__/

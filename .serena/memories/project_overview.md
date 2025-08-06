@@ -1,34 +1,18 @@
-# Project Overview
+# Crawl4AI RAG MCP Server - Project Overview
 
-## Purpose
-**Crawl4AI RAG MCP Server** is an advanced web crawling and RAG (Retrieval Augmented Generation) system that provides AI agents and coding assistants with intelligent capabilities through the Model Context Protocol (MCP).
+## Project Purpose
+Advanced web crawling and RAG capabilities for AI agents and coding assistants through Model Context Protocol (MCP). Integrates Crawl4AI for web scraping, Qdrant for vector storage, and Neo4j for knowledge graph-based AI hallucination detection.
 
-## Core Functionality
-- **Web Crawling**: Uses Crawl4AI for intelligent web scraping with automatic content extraction
-- **GitHub Integration**: Clone and index repositories with multi-file type support
-- **Vector Search**: Qdrant vector database for semantic search and document storage
-- **Knowledge Graph**: Optional Neo4j integration for AI hallucination detection
-- **RAG Strategies**: Multiple configurable strategies including hybrid search, reranking, and contextual embeddings
+## Core Architecture
+- **MCP Server**: FastMCP-based server providing 11+ async tools for crawling and RAG operations
+- **Vector Database**: Qdrant client with multi-collection support for documents and code
+- **Web Crawler**: Crawl4AI integration with sitemap detection and parallel processing
+- **Knowledge Graph**: Neo4j integration for codebase analysis and AI hallucination detection
+- **Device Management**: Automatic GPU detection, CUDA optimization with Windows compatibility
 
-## Key Features
-- **Smart URL Detection**: Automatically detects sitemaps, text files, or regular webpages
-- **Multi-Provider API Support**: OpenAI, DeepInfra, Azure OpenAI with fallback configurations
-- **GPU Acceleration**: Optional GPU support for reranking models
-- **Caching**: Redis-based embedding cache for performance
-- **Hybrid Search**: Combines semantic and keyword search using FastBM25
-- **AI Hallucination Detection**: Validates AI-generated code against knowledge graphs
-
-## Architecture
-- **MCP Server**: FastMCP-based async server with SSE/stdio transport
-- **Vector Database**: Qdrant for semantic search and storage
-- **Web Crawler**: Crawl4AI with smart URL detection and GitHub integration
-- **Knowledge Graph**: Neo4j for code structure analysis
-- **Device Manager**: Automatic GPU/CPU detection and fallback
-- **Event Loop Fix**: Windows compatibility layer for ConnectionResetError issues
-
-## Technology Stack
-- **Language**: Python 3.12+
-- **Framework**: FastMCP (Model Context Protocol)
-- **Databases**: Qdrant (vector), Neo4j (knowledge graph), Redis (cache)
-- **AI APIs**: OpenAI, DeepInfra, Azure OpenAI (multi-provider support)
-- **Dependencies**: crawl4ai, qdrant-client, fastembed, sentence-transformers, PyTorch
+## Key Capabilities
+- Web crawling with intelligent URL detection
+- Repository indexing and GitHub integration
+- Semantic search with vector+RAG capabilities
+- AI-generated code validation via knowledge graphs
+- Multi-provider API support with fallback configurations
