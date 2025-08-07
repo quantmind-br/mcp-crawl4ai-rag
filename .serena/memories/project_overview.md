@@ -1,18 +1,30 @@
-# Crawl4AI RAG MCP Server - Project Overview
+# Project Overview
 
 ## Project Purpose
-Advanced web crawling and RAG capabilities for AI agents and coding assistants through Model Context Protocol (MCP). Integrates Crawl4AI for web scraping, Qdrant for vector storage, and Neo4j for knowledge graph-based AI hallucination detection.
+This is a **Crawl4AI RAG MCP Server** that provides AI agents and coding assistants with advanced web crawling and RAG (Retrieval Augmented Generation) capabilities through the Model Context Protocol (MCP). The system integrates:
 
-## Core Architecture
-- **MCP Server**: FastMCP-based server providing 11+ async tools for crawling and RAG operations
-- **Vector Database**: Qdrant client with multi-collection support for documents and code
-- **Web Crawler**: Crawl4AI integration with sitemap detection and parallel processing
-- **Knowledge Graph**: Neo4j integration for codebase analysis and AI hallucination detection
-- **Device Management**: Automatic GPU detection, CUDA optimization with Windows compatibility
+- **Crawl4AI** for intelligent web scraping
+- **Qdrant** for vector storage and semantic search
+- **Neo4j** for knowledge graph-based AI hallucination detection (optional)
 
-## Key Capabilities
-- Web crawling with intelligent URL detection
-- Repository indexing and GitHub integration
-- Semantic search with vector+RAG capabilities
-- AI-generated code validation via knowledge graphs
-- Multi-provider API support with fallback configurations
+## Key Features
+- **Smart Web Crawling**: Auto-detects sitemaps, recursive crawling, GitHub repository indexing
+- **Vector Search**: Semantic search with source filtering and optional reranking
+- **Code Analysis**: Specialized code search and AI hallucination detection
+- **Multi-Provider API Support**: Flexible configuration for OpenAI, DeepInfra, Azure, etc.
+- **Advanced RAG Strategies**: Contextual embeddings, hybrid search, agentic RAG, reranking
+- **GPU Acceleration**: Optional GPU support for reranking models
+
+## Target Use Cases
+1. **Documentation RAG**: Index and search documentation websites
+2. **AI Coding Assistant**: Extract and search code examples with hallucination detection  
+3. **GitHub Repository Analysis**: Index repository structure for code validation
+4. **Multi-Source Knowledge Base**: Combine multiple documentation sources with filtering
+
+## Architecture Components
+- **MCP Server**: `src/crawl4ai_mcp.py` - Main FastMCP server with async tools
+- **Vector Database**: Qdrant client wrapper for document and code storage
+- **Web Crawler**: Crawl4AI integration with parallel processing
+- **Knowledge Graph**: Neo4j integration for code structure analysis
+- **Device Management**: GPU/CPU detection and fallback for reranking
+- **Embedding Services**: Multi-provider API support with fallback strategies

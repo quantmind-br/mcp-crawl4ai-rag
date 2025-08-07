@@ -99,7 +99,7 @@ tests/
 └── performance_benchmark.py # Timing and throughput tests
 
 scripts/
-├── fix_qdrant_dimensions.py # Collection recreation utility
+├── define_qdrant_dimensions.py # Collection recreation utility
 └── clean_qdrant.py         # Database cleanup utility
 ```
 
@@ -119,7 +119,7 @@ tests/test_qdrant_wrapper.py # Hybrid search and sparse vector tests
 tests/test_hybrid_search.py  # Integration tests for hybrid functionality
 
 # MODIFY scripts
-scripts/fix_qdrant_dimensions.py # Handle named vector migration
+scripts/define_qdrant_dimensions.py # Handle named vector migration
 ```
 
 ### Known Gotchas & Library Quirks
@@ -238,7 +238,7 @@ Task 5 - Collection Migration Strategy:
 MODIFY src/qdrant_wrapper.py:
   - UPDATE _ensure_collections_exist() to detect schema changes
   - ADD hybrid_schema_migration() method for safe collection recreation
-  - IMPLEMENT backup/restore pattern from scripts/fix_qdrant_dimensions.py
+  - IMPLEMENT backup/restore pattern from scripts/define_qdrant_dimensions.py
   - ADD user confirmation for data loss operations
 
 Task 6 - Native Hybrid Search Implementation:
@@ -365,7 +365,7 @@ CONFIGURATION:
 COLLECTIONS:
   - migration: Automatic recreation when schema mismatch detected
   - warning: "Collection recreation will delete all existing data"
-  - script: scripts/fix_qdrant_dimensions.py handles safe migration
+  - script: scripts/define_qdrant_dimensions.py handles safe migration
 
 API_COMPATIBILITY:
   - preserve: All existing MCP tool interfaces unchanged
@@ -478,7 +478,7 @@ uv run pytest tests/performance_benchmark.py::test_hybrid_search_performance -v
 # - Memory usage stable with sparse vectors
 
 # Collection migration test
-uv run python scripts/fix_qdrant_dimensions.py --dry-run
+uv run python scripts/define_qdrant_dimensions.py --dry-run
 
 # Manual validation queries
 curl -X POST http://localhost:8000/mcp/tools/perform_rag_query \

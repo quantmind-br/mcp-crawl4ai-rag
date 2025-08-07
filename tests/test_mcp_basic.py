@@ -8,6 +8,7 @@ Simple tests to validate core MCP tool functionality after Qdrant migration.
 import pytest
 import os
 import sys
+from src.embedding_config import get_embedding_dimensions
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -32,24 +33,29 @@ os.environ.setdefault("QDRANT_PORT", "6333")
 class TestMCPBasicFunctionality:
     """Test basic MCP server functionality."""
 
-    @patch('crawl4ai_mcp.get_vector_db_client')
+    @patch('src.clients.qdrant_client.get_qdrant_client')
     def test_context_dataclass(self, mock_get_client):
         """Test that context dataclass uses Qdrant client."""
         mock_client = Mock()
         mock_get_client.return_value = mock_client
 
         # Import after mocking
-        from crawl4ai_mcp import Crawl4AIContext
+        from src.core.context import Crawl4AIContext
 
         # Test
-        context = Crawl4AIContext(crawler=Mock(), qdrant_client=mock_client)
+        context = Crawl4AIContext(
+            crawler=Mock(), 
+            qdrant_client=mock_client, 
+            embedding_cache=Mock()
+        )
 
         # Verify
         assert context.qdrant_client == mock_client
         assert hasattr(context, "qdrant_client")
         assert hasattr(context, "crawler")
+        assert hasattr(context, "embedding_cache")
 
-    @patch("crawl4ai_mcp.search_documents")
+    @patch("src.services.rag_service.search_documents")
     def test_perform_rag_query_basic(self, mock_search):
         """Test basic RAG query functionality."""
         # Setup mock
@@ -62,12 +68,13 @@ class TestMCPBasicFunctionality:
             }
         ]
 
-        from crawl4ai_mcp import perform_rag_query
+        from src.tools.rag_tools import perform_rag_query
 
         # Create mock context
         mock_ctx = Mock()
-        mock_ctx.deps = Mock()
-        mock_ctx.deps.qdrant_client = Mock()
+        mock_ctx.request_context = Mock()
+        mock_ctx.request_context.lifespan_context = Mock()
+        mock_ctx.request_context.lifespan_context.qdrant_client = Mock()
 
         # Test (this is an async function)
         # Note: Testing the basic call structure, actual async execution would need more setup
@@ -76,9 +83,10 @@ class TestMCPBasicFunctionality:
     def test_import_structure(self):
         """Test that all required imports work after migration."""
         # Test importing main modules
-        from crawl4ai_mcp import Crawl4AIContext
-        from qdrant_wrapper import QdrantClientWrapper, get_qdrant_client
-        from utils import search_documents, get_vector_db_client
+        from src.core.context import Crawl4AIContext
+        from src.clients.qdrant_client import QdrantClientWrapper, get_qdrant_client
+        from src.services.rag_service import search_documents
+        from src.clients.qdrant_client import get_qdrant_client as get_vector_db_client
 
         # Verify classes exist
         assert Crawl4AIContext is not None
@@ -87,21 +95,31 @@ class TestMCPBasicFunctionality:
         assert callable(search_documents)
         assert callable(get_vector_db_client)
 
-    @patch("utils.get_qdrant_client")
-    def test_vector_db_client_wrapper(self, mock_get_qdrant):
-        """Test that legacy Supabase function names still work."""
-        mock_client = Mock()
-        mock_get_qdrant.return_value = mock_client
+    @patch("src.clients.qdrant_client.QdrantClient")
+    def test_vector_db_client_wrapper(self, mock_qdrant_client):
+        """Test that the vector DB client helper function works."""
+        # Setup mock client
+        mock_client_instance = Mock()
+        
+        # Mock collections to return empty list (no existing collections)
+        mock_collections = Mock()
+        mock_collections.collections = []
+        mock_client_instance.get_collections.return_value = mock_collections
+        
+        # Mock get_collection to raise exception (collection doesn't exist)
+        mock_client_instance.get_collection.side_effect = Exception("Collection not found")
+        
+        mock_qdrant_client.return_value = mock_client_instance
 
-        from utils import get_vector_db_client
+        from src.clients.qdrant_client import get_qdrant_client as get_vector_db_client
 
-        # Test legacy function returns Qdrant client
         client = get_vector_db_client()
-        assert client == mock_client
+        assert client is not None
+        assert hasattr(client, 'client')
 
     def test_qdrant_wrapper_interface(self):
         """Test that Qdrant wrapper has expected interface."""
-        from qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         # Check that class has expected methods (without calling them)
         expected_methods = [
@@ -120,10 +138,10 @@ class TestMCPBasicFunctionality:
             assert hasattr(QdrantClientWrapper, method_name)
             assert callable(getattr(QdrantClientWrapper, method_name))
 
-    @patch("qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_collections_configuration(self, mock_qdrant_client):
         """Test that collections are properly configured."""
-        from qdrant_wrapper import COLLECTIONS
+        from src.clients.qdrant_client import COLLECTIONS
 
         # Verify collection configurations exist
         assert "crawled_pages" in COLLECTIONS
@@ -138,7 +156,7 @@ class TestMCPBasicFunctionality:
             vector_config = config["vectors_config"]
             assert hasattr(vector_config, "size")
             assert hasattr(vector_config, "distance")
-            assert config["vectors_config"].size == 1536  # OpenAI embedding size
+            assert config["vectors_config"].size == get_embedding_dimensions()  # OpenAI embedding size
 
     def test_environment_configuration(self):
         """Test that environment variables are properly configured."""
@@ -161,48 +179,42 @@ class TestMCPBasicFunctionality:
 class TestSearchFunctionality:
     """Test search functionality with mocked Qdrant."""
 
-    @patch("utils.create_embedding")
-    @patch("utils.QdrantClientWrapper")
-    def test_document_search_workflow(self, mock_wrapper_class, mock_create_embedding):
+    @patch("src.clients.qdrant_client.get_qdrant_client")
+    def test_document_search_workflow(self, mock_get_client):
         """Test complete document search workflow."""
         # Setup mocks
         mock_client = Mock()
         mock_client.search_documents.return_value = [
             {"id": "doc1", "similarity": 0.9, "content": "test content"}
         ]
-        mock_wrapper_class.return_value = mock_client
-        mock_create_embedding.return_value = [0.1] * 1536
+        mock_get_client.return_value = mock_client
 
-        from utils import search_documents
+        from src.services.rag_service import search_documents
 
         # Test
-        results = search_documents(mock_client, "test query")
+        results = search_documents("test query")
 
         # Verify workflow
-        mock_create_embedding.assert_called_once_with("test query")
         mock_client.search_documents.assert_called_once()
         assert len(results) == 1
         assert results[0]["id"] == "doc1"
 
-    @patch("utils.create_embedding")
-    @patch("utils.QdrantClientWrapper")
-    def test_code_search_workflow(self, mock_wrapper_class, mock_create_embedding):
+    @patch("src.clients.qdrant_client.get_qdrant_client")
+    def test_code_search_workflow(self, mock_get_client):
         """Test complete code search workflow."""
         # Setup mocks
         mock_client = Mock()
         mock_client.search_code_examples.return_value = [
             {"id": "code1", "similarity": 0.85, "content": "def test(): pass"}
         ]
-        mock_wrapper_class.return_value = mock_client
-        mock_create_embedding.return_value = [0.1] * 1536
+        mock_get_client.return_value = mock_client
 
-        from utils import search_code_examples
+        from src.services.rag_service import search_code_examples
 
         # Test
-        results = search_code_examples(mock_client, "test function")
+        results = search_code_examples("test function")
 
         # Verify workflow
-        mock_create_embedding.assert_called_once()
         mock_client.search_code_examples.assert_called_once()
         assert len(results) == 1
         assert results[0]["id"] == "code1"

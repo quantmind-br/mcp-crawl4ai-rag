@@ -6,7 +6,7 @@ Build/lint/test
 - Docker: docker build -t mcp/crawl4ai-rag --build-arg PORT=8051 .; docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag; compose: docker-compose up -d
 - Tests: uv run pytest -q; single file: uv run pytest tests/test_qdrant_wrapper.py -q; single test: uv run pytest tests/test_qdrant_wrapper.py::TestQdrantClientWrapper::test_init_default_config -q
 - Lint/format/typecheck: uv run ruff check .; uv run ruff format .; uv run mypy .
-- Utilities: uv run python scripts/clean_qdrant.py; uv run python scripts/fix_qdrant_dimensions.py; KG tools: uv run python knowledge_graphs/ai_hallucination_detector.py <script.py>
+- Utilities: uv run python scripts/clean_qdrant.py; uv run python scripts/define_qdrant_dimensions.py; KG tools: uv run python knowledge_graphs/ai_hallucination_detector.py <script.py>
 
 Code style
 - Imports: group stdlib/third-party/local; one per line; avoid deep relatives; minimal __all__; keep MCP tool imports local to tools

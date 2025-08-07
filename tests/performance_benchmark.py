@@ -151,7 +151,7 @@ def benchmark_memory_usage():
     print(f"{'=' * 50}")
 
     try:
-        from utils import monitor_gpu_memory, cleanup_compute_memory
+        from src.services.embedding_service import monitor_gpu_memory, cleanup_compute_memory
 
         # Monitor memory before
         print("Memory status before operations:")

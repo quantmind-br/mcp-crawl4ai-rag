@@ -6,14 +6,9 @@ These tests validate the complete hybrid search workflow end-to-end.
 
 import os
 import pytest
-import asyncio
-import json
-from typing import Dict, Any
-import tempfile
-import shutil
 
 try:
-    from src.qdrant_wrapper import QdrantClientWrapper
+    from src.clients.qdrant_client import QdrantClientWrapper
     from src.crawl4ai_mcp import perform_hybrid_search
     from qdrant_client import QdrantClient
     INTEGRATION_TESTS = True
@@ -130,7 +125,7 @@ class TestHybridSearchIntegration:
         
         # This should not raise "Not existing vector name error"
         try:
-            from src.qdrant_wrapper import qdrant_client
+            from src.clients.qdrant_client import qdrant_client
             qdrant_client.update_source_info(
                 source_info["source_id"],
                 source_info["summary"],
@@ -167,7 +162,7 @@ class TestHybridSearchIntegration:
         except:
             pass
     
-    @patch('src.qdrant_wrapper.get_embedding_dimensions')
+    @patch('src.embedding_config.get_embedding_dimensions')
     def test_hybrid_collection_properties(self, mock_get_dims, qdrant_wrapper):
         """Test properties of hybrid collections."""
         mock_get_dims.return_value = 1024

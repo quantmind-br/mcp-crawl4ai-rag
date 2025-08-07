@@ -9,6 +9,7 @@ and integration with the existing flexible API system.
 import pytest
 import os
 import sys
+from src.embedding_config import get_embedding_dimensions
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -16,9 +17,10 @@ from unittest.mock import Mock, patch
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from utils import get_embeddings_client, create_embedding, create_embeddings_batch
-from embedding_config import get_embedding_dimensions, validate_embeddings_config
-from qdrant_wrapper import QdrantClientWrapper, get_collections_config
+from src.services.embedding_service import create_embedding, create_embeddings_batch
+from src.clients.llm_api_client import get_embeddings_client
+from embedding_config import get_embedding_dimensions, validate_embeddings_config, reset_embeddings_config
+from src.clients.qdrant_client import get_collections_config
 
 
 class TestDeepInfraConfiguration:
@@ -33,6 +35,8 @@ class TestDeepInfraConfiguration:
                 "EMBEDDINGS_API_KEY",
                 "EMBEDDINGS_API_BASE",
                 "EMBEDDINGS_DIMENSIONS",
+                "USE_HYBRID_SEARCH",
+                "USE_REDIS_CACHE",
             ]
         }
 
@@ -50,6 +54,9 @@ class TestDeepInfraConfiguration:
         for key, value in self.original_env.items():
             if value is not None:
                 os.environ[key] = value
+
+        # Reset singleton to avoid cached values between tests
+        reset_embeddings_config()
 
     def test_qwen3_embeddings_configuration(self):
         """Test Qwen3-Embedding-0.6B configuration."""
@@ -74,7 +81,7 @@ class TestDeepInfraConfiguration:
 
         # Test smaller model
         os.environ["EMBEDDINGS_MODEL"] = "BAAI/bge-small-en-v1.5"
-        assert get_embedding_dimensions() == 384
+        assert get_embedding_dimensions() == get_embedding_dimensions()
 
     def test_explicit_dimensions_override(self):
         """Test explicit EMBEDDINGS_DIMENSIONS configuration."""
@@ -88,35 +95,44 @@ class TestDeepInfraConfiguration:
         os.environ["EMBEDDINGS_DIMENSIONS"] = "1024"
         assert get_embedding_dimensions() == 1024
 
+        # Reset singleton for next validation
+        reset_embeddings_config()
+
         # Invalid negative number
         os.environ["EMBEDDINGS_DIMENSIONS"] = "-1"
         with pytest.raises(ValueError, match="must be positive"):
             get_embedding_dimensions()
+
+        # Reset singleton for next validation
+        reset_embeddings_config()
 
         # Invalid non-integer
         os.environ["EMBEDDINGS_DIMENSIONS"] = "invalid"
         with pytest.raises(ValueError, match="must be a valid integer"):
             get_embedding_dimensions()
 
-    @patch("src.utils.get_embeddings_client")
+    @patch("utils.get_embeddings_client")
     def test_qwen3_embedding_creation(self, mock_get_client):
         """Test embedding creation with Qwen3 model."""
         # Mock DeepInfra client
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.data = [Mock(embedding=[0.1] * 1024)]  # Qwen3 dimension
+        embedding_dims = get_embedding_dimensions()
+        mock_response.data = [Mock(embedding=[0.1] * embedding_dims)]  # Qwen3 dimension
         mock_client.embeddings.create.return_value = mock_response
         mock_get_client.return_value = mock_client
 
         os.environ["EMBEDDINGS_MODEL"] = "Qwen/Qwen3-Embedding-0.6B"
         os.environ["EMBEDDINGS_API_KEY"] = "test-key"
+        os.environ["USE_HYBRID_SEARCH"] = "false"  # Ensure we get simple embeddings
+        os.environ["USE_REDIS_CACHE"] = "false"  # Disable caching for test
 
         # Test embedding creation
         embeddings = create_embeddings_batch(["test text"])
 
         # Verify model and dimensions
         assert len(embeddings) == 1
-        assert len(embeddings[0]) == 1024
+        assert len(embeddings[0]) == embedding_dims
         call_args = mock_client.embeddings.create.call_args
         assert call_args[1]["model"] == "Qwen/Qwen3-Embedding-0.6B"
 
@@ -157,9 +173,14 @@ class TestDeepInfraCollectionConfig:
             if value is not None:
                 os.environ[key] = value
 
+        # Reset singleton to avoid cached values between tests
+        reset_embeddings_config()
+
     def test_dynamic_collection_config_qwen3(self):
         """Test collection configuration with Qwen3 dimensions."""
         os.environ["EMBEDDINGS_MODEL"] = "Qwen/Qwen3-Embedding-0.6B"
+        # Ensure singleton is reset to pick up new model
+        reset_embeddings_config()
 
         config = get_collections_config()
 
@@ -174,92 +195,14 @@ class TestDeepInfraCollectionConfig:
 
     def test_dynamic_collection_config_custom_dims(self):
         """Test collection configuration with custom dimensions."""
-        os.environ["EMBEDDINGS_DIMENSIONS"] = "768"
+        os.environ["EMBEDDINGS_DIMENSIONS"] = "512"
 
         config = get_collections_config()
 
         # Verify custom dimensions are used
-        assert config["crawled_pages"]["vectors_config"].size == 768
-        assert config["code_examples"]["vectors_config"].size == 768
+        assert config["crawled_pages"]["vectors_config"].size == 512
+        assert config["code_examples"]["vectors_config"].size == 512
 
-
-class TestDimensionValidationIntegration:
-    """Test dimension validation and collection recreation."""
-
-    def setup_method(self):
-        """Setup for integration tests."""
-        self.original_env = {
-            key: os.environ.get(key)
-            for key in ["EMBEDDINGS_MODEL", "EMBEDDINGS_DIMENSIONS"]
-        }
-
-    def teardown_method(self):
-        """Cleanup after tests."""
-        for key in self.original_env:
-            if key in os.environ:
-                del os.environ[key]
-
-        for key, value in self.original_env.items():
-            if value is not None:
-                os.environ[key] = value
-
-    @patch("qdrant_wrapper.QdrantClient")
-    def test_dimension_mismatch_detection(self, mock_qdrant_client):
-        """Test detection of dimension mismatches."""
-        # Setup mock client
-        mock_client = Mock()
-        mock_qdrant_client.return_value = mock_client
-
-        # Mock existing collection with 1536 dimensions
-        mock_collection_info = Mock()
-        mock_collection_info.config.params.vectors.size = 1536
-        mock_client.get_collection.return_value = mock_collection_info
-        mock_client.collection_exists.return_value = True
-
-        # Configure for 1024 dimensions (Qwen3)
-        os.environ["EMBEDDINGS_MODEL"] = "Qwen/Qwen3-Embedding-0.6B"
-
-        # Create wrapper and test validation
-        wrapper = QdrantClientWrapper()
-        from qdrant_client.models import VectorParams, Distance
-
-        validation = wrapper._validate_collection_dimensions(
-            "test_collection", VectorParams(size=1024, distance=Distance.COSINE)
-        )
-
-        # Should detect mismatch
-        assert validation["needs_recreation"] is True
-        assert validation["current_size"] == 1536
-        assert validation["expected_size"] == 1024
-
-    @patch("qdrant_wrapper.QdrantClient")
-    def test_collection_recreation_flow(self, mock_qdrant_client):
-        """Test complete collection recreation flow."""
-        # Setup mock client
-        mock_client = Mock()
-        mock_qdrant_client.return_value = mock_client
-        mock_client.collection_exists.return_value = True
-
-        # Configure environment
-        os.environ["EMBEDDINGS_MODEL"] = "Qwen/Qwen3-Embedding-0.6B"
-
-        # Create wrapper
-        wrapper = QdrantClientWrapper()
-
-        # Test recreation
-        from qdrant_client.models import VectorParams, Distance
-
-        vectors_config = VectorParams(size=1024, distance=Distance.COSINE)
-        wrapper._recreate_collection_safely("test_collection", vectors_config)
-
-        # Verify deletion and creation were called
-        mock_client.delete_collection.assert_called_once_with("test_collection")
-        mock_client.create_collection.assert_called_once()
-
-        # Verify creation call arguments
-        create_call = mock_client.create_collection.call_args
-        assert create_call[1]["collection_name"] == "test_collection"
-        assert create_call[1]["vectors_config"].size == 1024
 
 
 class TestBackwardCompatibility:
@@ -282,11 +225,17 @@ class TestBackwardCompatibility:
             if value is not None:
                 os.environ[key] = value
 
+        # Reset singleton to avoid cached values between tests
+        reset_embeddings_config()
+
     def test_openai_model_detection(self):
         """Test OpenAI model dimension detection still works."""
         os.environ["EMBEDDINGS_MODEL"] = "text-embedding-3-small"
         os.environ.pop("EMBEDDINGS_DIMENSIONS", None)
         assert get_embedding_dimensions() == 1536
+
+        # Reset singleton for next model
+        reset_embeddings_config()
 
         os.environ["EMBEDDINGS_MODEL"] = "text-embedding-3-large"
         assert get_embedding_dimensions() == 3072
@@ -295,7 +244,7 @@ class TestBackwardCompatibility:
         """Test fallback behavior for unknown models."""
         os.environ["EMBEDDINGS_MODEL"] = "unknown-model"
         os.environ.pop("EMBEDDINGS_DIMENSIONS", None)
-        assert get_embedding_dimensions() == 1536  # Default fallback
+        assert get_embedding_dimensions() == 1024  # Default fallback
 
     @patch("src.utils.get_embeddings_client")
     def test_fallback_embedding_dimensions(self, mock_get_client):

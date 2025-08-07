@@ -14,7 +14,10 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from dotenv import load_dotenv
-from embedding_cache import EmbeddingCache
+from embedding_cache import (
+    get_embedding_dimensions,
+    EmbeddingCache,
+)
 import redis
 
 load_dotenv()
@@ -66,7 +69,8 @@ def test_redis_cache():
 
     # 4. Simular criação de embedding e cache
     print("4. TESTE CACHE SET:")
-    fake_embedding = [0.1, 0.2, 0.3, 0.4, 0.5] * 200  # 1000 dimensions
+    embedding_dims = get_embedding_dimensions()
+    fake_embedding = [0.1] * embedding_dims
 
     start_time = time.time()
     cache.set(test_key, fake_embedding, ttl=300)  # 5 minutos
@@ -98,7 +102,8 @@ def test_redis_cache():
     embeddings_test = {}
     for i in range(10):
         key = f"perf_test_{i}"
-        embedding = [i * 0.1] * 1024  # 1024 dims
+        embedding_dims = get_embedding_dimensions()
+        embedding = [i * 0.1] * embedding_dims
         embeddings_test[key] = embedding
 
     # Teste SET em lote

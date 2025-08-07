@@ -17,17 +17,8 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from embedding_cache import EmbeddingCache, get_embedding_cache, validate_redis_config
-
-# Import create_embeddings_batch from utils.py directly
-import importlib.util
-
-utils_spec = importlib.util.spec_from_file_location(
-    "utils_module", src_path / "utils.py"
-)
-utils_module = importlib.util.module_from_spec(utils_spec)
-utils_spec.loader.exec_module(utils_module)
-create_embeddings_batch = utils_module.create_embeddings_batch
+from src.services.embedding_service import EmbeddingCache, get_embedding_cache, validate_redis_config
+from src.services.embedding_service import create_embeddings_batch
 
 
 # Check if Redis is available

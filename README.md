@@ -322,7 +322,7 @@ uv run pytest tests/integration_test.py        # Full integration
 uv run python scripts/clean_qdrant.py
 
 # Fix dimension mismatches
-uv run python scripts/fix_qdrant_dimensions.py
+uv run python scripts/define_qdrant_dimensions.py
 
 # Analyze repository for hallucinations
 uv run python knowledge_graphs/ai_hallucination_detector.py script.py

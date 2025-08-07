@@ -17,6 +17,8 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
+from src.embedding_config import get_embedding_dimensions
+
 
 def is_docker_service_ready(url: str, max_retries: int = 10) -> bool:
     """Check if a Docker service is ready by polling its endpoint."""
@@ -72,7 +74,7 @@ class TestQdrantIntegration:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         # Test connection
         try:
@@ -92,7 +94,7 @@ class TestQdrantIntegration:
                     collection_info = collections[collection_name]
                     assert "status" in collection_info
                     assert "config" in collection_info
-                    assert collection_info["config"]["size"] == 1536
+                    assert collection_info["config"]["size"] == get_embedding_dimensions()
 
         except Exception as e:
             pytest.fail(f"QdrantClientWrapper connection failed: {e}")
@@ -102,17 +104,18 @@ class TestQdrantIntegration:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
         from qdrant_client.models import PointStruct
 
         try:
             client = QdrantClientWrapper(host="localhost", port=6333)
 
             # Test adding a test point with UUID
+            embedding_dims = get_embedding_dimensions()
             test_id = str(uuid.uuid4())
             test_point = PointStruct(
                 id=test_id,
-                vector=[0.1] * 1536,  # Mock embedding
+                vector=[0.1] * embedding_dims,  # Mock embedding
                 payload={
                     "url": "https://test.com",
                     "content": "Test content for integration",
@@ -129,7 +132,7 @@ class TestQdrantIntegration:
 
             # Test search
             results = client.search_documents(
-                query_embedding=[0.1] * 1536, match_count=1
+                query_embedding=[0.1] * embedding_dims, match_count=1
             )
 
             # Verify we can search (even if no exact matches)
@@ -162,7 +165,7 @@ class TestUtilsWithRealQdrant:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         try:
             client = get_qdrant_client()
@@ -183,7 +186,8 @@ class TestUtilsWithRealQdrant:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from utils import create_embedding, get_vector_db_client
+        from src.services.embedding_service import create_embedding
+        from src.clients.qdrant_client import get_qdrant_client as get_vector_db_client
         from qdrant_client.models import PointStruct
 
         try:
@@ -196,7 +200,7 @@ class TestUtilsWithRealQdrant:
 
             # Verify embedding structure
             assert isinstance(embedding, list)
-            assert len(embedding) == 1536
+            assert len(embedding) == get_embedding_dimensions()
 
             # Test storing embedding
             test_point = PointStruct(
@@ -288,11 +292,11 @@ class TestEndToEndWorkflow:
         if not docker_services["qdrant_ready"]:
             pytest.skip("Qdrant not ready")
 
-        from utils import (
-    get_vector_db_client,
+        from src.services.rag_service import (
             add_documents_to_vector_db,
             search_documents,
         )
+        from src.clients.qdrant_client import get_qdrant_client as get_vector_db_client
 
         try:
             # Get client

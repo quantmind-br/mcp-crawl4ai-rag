@@ -10,7 +10,7 @@ import logging
 import os
 import warnings
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 try:
     import torch
@@ -39,12 +39,14 @@ class DeviceInfo:
     """Information about detected device capabilities."""
 
     device: str  # PyTorch device string
+    device_type: str  # Device type for compatibility
     name: str  # Human-readable device name
     memory_total: Optional[float]  # Total memory in GB
     is_available: bool  # Whether device is truly available
+    model_kwargs: Dict[str, Any]  # Model kwargs for CrossEncoder
 
 
-def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> torch.device:
+def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> DeviceInfo:
     """
     Get optimal device for CrossEncoder model with robust detection.
 
@@ -56,25 +58,35 @@ def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> torch.de
         gpu_index: GPU index for multi-GPU systems (default: 0)
 
     Returns:
-        torch.device: Optimal device for model initialization
+        DeviceInfo: Optimal device info for model initialization
 
     Raises:
         None - Always returns valid device with fallback to CPU
     """
+    precision = os.getenv("GPU_PRECISION", "float32")
+    
     if not TORCH_AVAILABLE:
         logging.warning("PyTorch not available. Using CPU.")
-
-        # Return a mock device object that represents CPU when PyTorch unavailable
-        class MockDevice:
-            def __str__(self):
-                return "cpu"
-
-        return MockDevice()
+        return DeviceInfo(
+            device="cpu",
+            device_type="cpu",
+            name="CPU (PyTorch unavailable)",
+            memory_total=None,
+            is_available=True,
+            model_kwargs={}
+        )
 
     # Force CPU if requested
     if preference == "cpu":
         logging.info("CPU device forced by preference")
-        return torch.device("cpu")
+        return DeviceInfo(
+            device="cpu",
+            device_type="cpu", 
+            name="CPU",
+            memory_total=None,
+            is_available=True,
+            model_kwargs={}
+        )
 
     # Try GPU (CUDA or MPS) if requested or auto
     if preference in ["auto", "cuda"] and torch.cuda.is_available():
@@ -89,7 +101,18 @@ def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> torch.de
             logging.info(
                 f"GPU device verified: {device} ({torch.cuda.get_device_name(device)})"
             )
-            return device
+            
+            # Get model kwargs for GPU device
+            model_kwargs = get_model_kwargs_for_device(device, precision)
+            
+            return DeviceInfo(
+                device=str(device),
+                device_type="cuda",
+                name=torch.cuda.get_device_name(device),
+                memory_total=torch.cuda.get_device_properties(device).total_memory / (1024**3),
+                is_available=True,
+                model_kwargs=model_kwargs
+            )
 
         except Exception as e:
             logging.warning(f"GPU test failed: {e}. Falling back to CPU.")
@@ -109,19 +132,37 @@ def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> torch.de
             _ = test_tensor.sum()
 
             logging.info(f"MPS device verified: {device}")
-            return device
+            
+            # Get model kwargs for MPS device  
+            model_kwargs = get_model_kwargs_for_device(device, precision)
+            
+            return DeviceInfo(
+                device=str(device),
+                device_type="mps",
+                name="Apple Silicon GPU (MPS)",
+                memory_total=None,
+                is_available=True,
+                model_kwargs=model_kwargs
+            )
 
         except Exception as e:
             logging.warning(f"MPS test failed: {e}. Falling back to CPU.")
 
     # FALLBACK: Always return CPU as last resort
     logging.info("Using CPU device (fallback)")
-    return torch.device("cpu")
+    return DeviceInfo(
+        device="cpu",
+        device_type="cpu",
+        name="CPU",
+        memory_total=None,
+        is_available=True,
+        model_kwargs={}
+    )
 
 
 def device_detection_with_fallback(
     config: Optional[DeviceConfig] = None,
-) -> Tuple[torch.device, DeviceInfo]:
+) -> DeviceInfo:
     """
     Comprehensive device detection with fallback strategy.
 
@@ -129,15 +170,8 @@ def device_detection_with_fallback(
         config: Device configuration preferences
 
     Returns:
-        Tuple of (torch.device, DeviceInfo) with detected device and metadata
+        DeviceInfo with detected device and metadata
     """
-    if not TORCH_AVAILABLE:
-        cpu_device = torch.device("cpu")
-        cpu_info = DeviceInfo(
-            device="cpu", name="CPU", memory_total=None, is_available=True
-        )
-        return cpu_device, cpu_info
-
     if config is None:
         # Default configuration from environment variables
         config = DeviceConfig(
@@ -147,31 +181,8 @@ def device_detection_with_fallback(
             memory_fraction=float(os.getenv("GPU_MEMORY_FRACTION", "0.8")),
         )
 
-    # Get optimal device
-    device = get_optimal_device(config.device_type, config.device_index)
-
-    # Gather device info
-    if device.type == "cuda":
-        device_info = DeviceInfo(
-            device=str(device),
-            name=torch.cuda.get_device_name(device),
-            memory_total=torch.cuda.get_device_properties(device).total_memory
-            / (1024**3),  # GB
-            is_available=True,
-        )
-    elif device.type == "mps":
-        device_info = DeviceInfo(
-            device=str(device),
-            name="Apple Silicon GPU (MPS)",
-            memory_total=None,  # MPS doesn't expose memory info
-            is_available=True,
-        )
-    else:
-        device_info = DeviceInfo(
-            device=str(device), name="CPU", memory_total=None, is_available=True
-        )
-
-    return device, device_info
+    # Get optimal device info
+    return get_optimal_device(config.device_type, config.device_index)
 
 
 def cleanup_gpu_memory() -> None:

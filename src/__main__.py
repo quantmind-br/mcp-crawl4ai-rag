@@ -4,11 +4,14 @@ This allows us to use relative imports properly.
 """
 
 import asyncio
-from .crawl4ai_mcp import main
 
 if __name__ == "__main__":
-    # Apply Windows ConnectionResetError fix before starting event loop
+    # Import the new core application runner first
+    from .core.app import run_server
+    
+    # Apply Windows ConnectionResetError fix after imports (so Playwright is detected)
     from .event_loop_fix import setup_event_loop
-
     setup_event_loop()
-    asyncio.run(main())
+
+    # Run the server
+    asyncio.run(run_server())

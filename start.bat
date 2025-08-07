@@ -77,8 +77,8 @@ if %errorlevel% neq 0 (
 echo OK Dependencias instaladas
 
 echo [5/6] Verificando arquivos do servidor...
-if not exist "src\crawl4ai_mcp.py" (
-    echo ERRO: src\crawl4ai_mcp.py nao encontrado.
+if not exist "src\__main__.py" (
+    echo ERRO: src\__main__.py nao encontrado.
     pause
     exit /b 1
 )

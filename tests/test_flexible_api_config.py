@@ -60,7 +60,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "test-chat-key"
         os.environ["CHAT_API_BASE"] = "https://api.openai.com/v1"
 
-        from src.utils import get_chat_client
+        from src.clients.llm_api_client import get_chat_client
 
         client = get_chat_client()
         assert client.api_key == "test-chat-key"
@@ -73,7 +73,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "test-embeddings-key"
         os.environ["EMBEDDINGS_API_BASE"] = "https://api.openai.com/v1"
 
-        from src.utils import get_embeddings_client
+        from src.clients.llm_api_client import get_embeddings_client
 
         client = get_embeddings_client()
         assert client.api_key == "test-embeddings-key"
@@ -86,7 +86,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "azure-embeddings-key"
         os.environ["EMBEDDINGS_API_BASE"] = "https://my-resource.openai.azure.com/"
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         chat_client = get_chat_client()
         embeddings_client = get_embeddings_client()
@@ -109,7 +109,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "not-needed"
         os.environ["EMBEDDINGS_API_BASE"] = "http://localhost:8080/v1"
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         chat_client = get_chat_client()
         embeddings_client = get_embeddings_client()
@@ -121,7 +121,7 @@ class TestFlexibleAPIConfiguration:
         """Test error handling when no API key is configured."""
         # Don't set any API keys
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         with pytest.raises(ValueError, match="No API key configured for chat model"):
             get_chat_client()
@@ -131,7 +131,8 @@ class TestFlexibleAPIConfiguration:
 
     def test_validation_functions(self):
         """Test configuration validation functions."""
-        from src.utils import validate_chat_config, validate_embeddings_config
+        from src.clients.llm_api_client import validate_chat_config
+        from src.embedding_config import validate_embeddings_config
 
         # Test with missing configuration
         with pytest.raises(ValueError, match="No API key configured"):
@@ -152,7 +153,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_MODEL"] = "text-embedding-3-large"
         os.environ["EMBEDDINGS_API_KEY"] = "test-key"
 
-        from src.utils import create_embeddings_batch
+        from src.services.embedding_service import create_embeddings_batch
 
         # Mock the embeddings client
         with patch("src.utils.get_embeddings_client") as mock_get_client:
@@ -183,7 +184,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_MODEL"] = "text-embedding-3-small"
         os.environ["EMBEDDINGS_API_KEY"] = "test-key"
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         # Measure client creation time
         start_time = time.time()
@@ -206,7 +207,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "openai-embeddings-key"
         # No EMBEDDINGS_API_BASE, should use default OpenAI
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         chat_client = get_chat_client()
         embeddings_client = get_embeddings_client()
@@ -230,7 +231,7 @@ class TestFlexibleAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "embeddings-provider-key"
         os.environ["EMBEDDINGS_API_BASE"] = "https://embeddings-provider.com/v1"
 
-        from src.utils import get_chat_client, get_embeddings_client
+        from src.clients.llm_api_client import get_chat_client, get_embeddings_client
 
         chat_client = get_chat_client()
         embeddings_client = get_embeddings_client()

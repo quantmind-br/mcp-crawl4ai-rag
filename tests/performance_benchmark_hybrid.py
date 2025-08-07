@@ -9,12 +9,10 @@ import os
 import time
 import json
 import statistics
-import tempfile
-from typing import Dict, List, Any, Tuple
-import contextlib
+from typing import Dict, List, Any
 
 try:
-    from src.qdrant_wrapper import QdrantClientWrapper
+    from src.clients.qdrant_client import QdrantClientWrapper
     from memory_profiler import memory_usage
     PERF_TESTS = True
 except ImportError:
@@ -143,7 +141,7 @@ class HybridSearchBenchmark:
                 "success": result.operation_id is not None
             }
             
-        except Exception as e:
+        except Exception:
             return {"insertion_time": -1, "total_time": -1, "docs_per_second": -1, "success": False}
     
     def benchmark_search_performance(self, collection_name: str, query_vector: List[float], test_types: List[str]) -> Dict[str, Dict[str, float]]:
@@ -291,7 +289,7 @@ class HybridSearchBenchmark:
                 ])
                 
                 # Legacy search comparison
-                if not legacy_col in ["benchmark_1000_legacy"]:  # Limit to smaller sets
+                if legacy_col not in ["benchmark_1000_legacy"]:  # Limit to smaller sets
                     legacy_search = self.benchmark_search_performance(legacy_col, query_vector, ["semantic_only"])
                     search_results.update(legacy_search)
                 

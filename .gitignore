@@ -6,7 +6,10 @@
 # Python Standard Ignores
 # ==============================================================================
 
-#dev
+# Serena
+.serena/cache"
+
+# dev
 diffs.md
 
 # Byte-compiled / optimized / DLL files
@@ -362,3 +365,4 @@ nul
 # Cache files
 .serena/cache/
 **/__pycache__/
+.aider*

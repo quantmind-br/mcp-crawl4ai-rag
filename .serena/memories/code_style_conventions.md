@@ -1,27 +1,79 @@
-# Code Style & Conventions
+# Code Style and Conventions
 
-## Language Standards
-- **Type Hints**: Required for all function parameters and return types
-- **Documentation**: Docstrings for all public functions and classes
-- **Naming**: snake_case for variables/functions, PascalCase for classes
-- **Error Handling**: tenacity for retries, explicit error propagation
+## General Python Conventions
+- **Python 3.12+** syntax and features
+- **Type hints** for all function parameters and return values
+- **Async/await** patterns for I/O operations
+- **Docstrings** using Google/NumPy style with Args/Returns sections
+- **Error handling** with try/except blocks and context logging
 
-## Async/Concurrent Patterns
-- **Asynchronous First**: All MCP tools use `@mcp.tool()` decorator with async functions
-- **Connection Pooling**: Qdrant and Redis clients use connection pooling
-- **Resource Management**: Automatic cleanup for GPU memory after operations
+## Code Organization Patterns
+```python
+# Import order: standard library, third-party, local imports
+import os
+import json
+from typing import Dict, List, Optional
 
-## Import Organization
-- **External**: Standard library → Third-party → Local imports
-- **Lazy Initialization**: Single instance patterns for heavy resources
-- **Singleton Patterns**: Reranking models, knowledge graphs, clients
+from crawl4ai import AsyncWebCrawler
+from qdrant_client import QdrantClient
 
-## Configuration Management
-- **Modern API**: CHAT_MODEL/EMBEDDINGS_MODEL + API_KEY pattern
-- **Fallback**: Automatic fallback configuration validation
-- **Environment**: dotenv loading with comprehensive validation
+from .clients.qdrant_client import QdrantClientWrapper
+```
 
-## Error Handling
-- **Tenacity**: Retry policies for API calls and external services
-- **Graceful Degradation**: GPU → CPU fallback, temporary failures handling
-- **Logging**: Structured logging with appropriate levels (INFO, WARNING, ERROR)
+## Async Function Patterns
+```python
+@mcp.tool()
+async def function_name(ctx: Context, param: str) -> str:
+    """
+    Brief description of the function.
+
+    Args:
+        ctx: The MCP server provided context
+        param: Description of parameter
+
+    Returns:
+        Description of return value
+    """
+    try:
+        # Implementation
+        result = await some_async_operation()
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+```
+
+## Error Handling Conventions
+- Use **tenacity** for retrying failed operations (especially API calls)
+- Implement **graceful fallbacks** (GPU → CPU, contextual → basic embeddings)
+- **Log errors** with context using the configured logger
+- Return **JSON responses** from MCP tools with success/error structure
+
+## File and Directory Structure
+- `src/` - Main source code
+  - `clients/` - API and database client wrappers
+  - `services/` - Business logic services
+  - `features/` - Feature-specific implementations
+  - `utils/` - Utility functions and helpers
+- `tests/` - Test files with `test_` prefix
+- `knowledge_graphs/` - Neo4j integration scripts
+- `scripts/` - Utility scripts for database management
+
+## Variable Naming
+- **snake_case** for variables, functions, and modules
+- **PascalCase** for classes
+- **UPPER_CASE** for constants
+- **Descriptive names** preferred over abbreviations
+- **Context-specific prefixes**: `mock_` for test mocks, `temp_` for temporary variables
+
+## Configuration Patterns
+- **Environment variables** for configuration with `.env` support
+- **Flexible API configuration** supporting multiple providers
+- **Graceful defaults** with fallback options
+- **Validation functions** for configuration correctness
+
+## Testing Conventions
+- **Class-based tests** using `TestClassName` pattern
+- **Descriptive test names** explaining what is being tested
+- **Mocking external services** (APIs, databases) in unit tests
+- **Integration tests** requiring actual Docker services
+- **Async test support** where needed

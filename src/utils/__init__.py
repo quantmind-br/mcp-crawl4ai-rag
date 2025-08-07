@@ -2,107 +2,121 @@
 Utility modules for the Crawl4AI MCP server.
 """
 
-from .github_processor import (
+from src.features.github_processor import (
     GitHubRepoManager,
     MarkdownDiscovery,
     GitHubMetadataExtractor,
 )
 from .validation import validate_github_url
 
-# Import functions from the main utils.py for backward compatibility
-import sys
-from pathlib import Path
-
-# Import directly from utils.py file to avoid circular imports
-utils_file = Path(__file__).parent.parent / "utils.py"
-
-# Load utils.py module directly
-import importlib.util
-spec = importlib.util.spec_from_file_location("utils_module", utils_file)
-utils_module = importlib.util.module_from_spec(spec)
-
+# Import functions from new modular structure for backward compatibility
 try:
-    spec.loader.exec_module(utils_module)
-    # Extract the functions we need
-    get_embeddings_client = getattr(utils_module, 'get_embeddings_client', None)
-    get_vector_db_client = getattr(utils_module, 'get_vector_db_client', None)
-    get_qdrant_client = getattr(utils_module, 'get_qdrant_client', None)
-    QdrantClientWrapper = getattr(utils_module, 'QdrantClientWrapper', None)
-    health_check_gpu_acceleration = getattr(utils_module, 'health_check_gpu_acceleration', None)
-    health_check_reranking_model = getattr(utils_module, 'health_check_reranking_model', None)
-    cleanup_gpu_memory = getattr(utils_module, 'cleanup_gpu_memory', None)
-    get_chat_client = getattr(utils_module, 'get_chat_client', None)
-    get_chat_fallback_client = getattr(utils_module, 'get_chat_fallback_client', None)
-    get_embeddings_fallback_client = getattr(utils_module, 'get_embeddings_fallback_client', None)
-    get_adaptive_chat_client = getattr(utils_module, 'get_adaptive_chat_client', None)
-    validate_chat_fallback_config = getattr(utils_module, 'validate_chat_fallback_config', None)
-    validate_embeddings_fallback_config = getattr(utils_module, 'validate_embeddings_fallback_config', None)
-    get_effective_fallback_config = getattr(utils_module, 'get_effective_fallback_config', None)
-    create_embeddings_batch = getattr(utils_module, 'create_embeddings_batch', None)
-    create_embedding = getattr(utils_module, 'create_embedding', None)
-    add_documents_to_vector_db = getattr(utils_module, 'add_documents_to_vector_db', None)
-    search_documents = getattr(utils_module, 'search_documents', None)
-    extract_code_blocks = getattr(utils_module, 'extract_code_blocks', None)
-    add_code_examples_to_vector_db = getattr(utils_module, 'add_code_examples_to_vector_db', None)
-    search_code_examples = getattr(utils_module, 'search_code_examples', None)
-    update_source_info = getattr(utils_module, 'update_source_info', None)
-    extract_source_summary = getattr(utils_module, 'extract_source_summary', None)
-    generate_contextual_embedding = getattr(utils_module, 'generate_contextual_embedding', None)
-    get_device_info = getattr(utils_module, 'get_device_info', None)
-    log_device_status = getattr(utils_module, 'log_device_status', None)
-    cleanup_compute_memory = getattr(utils_module, 'cleanup_compute_memory', None)
-    get_optimal_compute_device = getattr(utils_module, 'get_optimal_compute_device', None)
-    # Sparse vector functions
-    create_sparse_embedding = getattr(utils_module, 'create_sparse_embedding', None)
-    create_sparse_embeddings_batch = getattr(utils_module, 'create_sparse_embeddings_batch', None)
-    SparseVectorEncoder = getattr(utils_module, 'SparseVectorEncoder', None)
+    from ..clients.qdrant_client import get_qdrant_client, QdrantClientWrapper
+    from ..clients.llm_api_client import (
+        get_embeddings_client,
+        get_chat_client,
+        get_chat_fallback_client,
+        get_embeddings_fallback_client,
+        get_adaptive_chat_client,
+        validate_chat_config,
+        validate_chat_fallback_config,
+        validate_embeddings_fallback_config,
+        get_effective_fallback_config,
+    )
+    from ..services.embedding_service import (
+        create_embeddings_batch,
+        create_embedding,
+        create_sparse_embedding,
+        create_sparse_embeddings_batch,
+        generate_contextual_embedding,
+        process_chunk_with_context,
+        health_check_gpu_acceleration,
+    )
+    from ..services.rag_service import (
+        add_documents_to_vector_db,
+        search_documents,
+        search_code_examples,
+        update_source_info,
+        add_code_examples_to_vector_db,
+    )
+    from ..device_manager import (
+        get_device_info,
+        cleanup_gpu_memory,
+        get_optimal_device,
+    )
+    from ..sparse_vector_types import SparseVectorConfig
+except ImportError:
+    from clients.qdrant_client import get_qdrant_client, QdrantClientWrapper
+    from clients.llm_api_client import (
+        get_embeddings_client,
+        get_chat_client,
+        get_chat_fallback_client,
+        get_embeddings_fallback_client,
+        get_adaptive_chat_client,
+        validate_chat_config,
+        validate_chat_fallback_config,
+        validate_embeddings_fallback_config,
+        get_effective_fallback_config,
+    )
+    from services.embedding_service import (
+        create_embeddings_batch,
+        create_embedding,
+        create_sparse_embedding,
+        create_sparse_embeddings_batch,
+        generate_contextual_embedding,
+        process_chunk_with_context,
+        health_check_gpu_acceleration,
+    )
+    from services.rag_service import (
+        add_documents_to_vector_db,
+        search_documents,
+        search_code_examples,
+        update_source_info,
+        add_code_examples_to_vector_db,
+    )
+    from device_manager import (
+        get_device_info,
+        cleanup_gpu_memory,
+        get_optimal_device,
+    )
+    from sparse_vector_types import SparseVectorConfig
+
+# Additional utility functions
+try:
+    from ..utils import extract_code_blocks, generate_code_example_summary, extract_source_summary
+except ImportError:
+    # These functions were moved to features or services, provide fallback
+    def extract_code_blocks(*args, **kwargs):
+        raise NotImplementedError("extract_code_blocks moved to features/github_processor")
     
-    # Import SparseVectorConfig from separate module to avoid circular imports
-    try:
-        from ..sparse_vector_types import SparseVectorConfig
-    except ImportError:
-        SparseVectorConfig = None
+    def generate_code_example_summary(*args, **kwargs):
+        raise NotImplementedError("generate_code_example_summary moved to services")
     
-    
-except Exception as e:
-    logging.debug(f"Error loading utils.py module: {e}")
-    import traceback
-    traceback.print_exc()
-    # If we can't load from utils.py, define minimal stubs
-    def get_embeddings_client():
-        raise NotImplementedError("get_embeddings_client not available")
+    def extract_source_summary(*args, **kwargs):
+        raise NotImplementedError("extract_source_summary moved to services")
 
-    def get_vector_db_client():
-        raise NotImplementedError("get_vector_db_client not available")
-
-    def health_check_gpu_acceleration():
-        raise NotImplementedError("health_check_gpu_acceleration not available")
-
-    def health_check_reranking_model():
-        raise NotImplementedError("health_check_reranking_model not available")
-
-    def cleanup_gpu_memory():
-        raise NotImplementedError("cleanup_gpu_memory not available")
-
+# Create SparseVectorEncoder reference for backward compatibility
+try:
+    from ..services.embedding_service import SparseVectorEncoder
+except ImportError:
+    from services.embedding_service import SparseVectorEncoder
 
 __all__ = [
     "GitHubRepoManager",
-    "MarkdownDiscovery",
+    "MarkdownDiscovery", 
     "GitHubMetadataExtractor",
     "validate_github_url",
     # Backward compatibility exports
     "get_embeddings_client",
-    "get_vector_db_client",
     "get_qdrant_client", 
     "QdrantClientWrapper",
     "health_check_gpu_acceleration",
-    "health_check_reranking_model",
-    "cleanup_gpu_memory",
     "get_chat_client",
     "get_chat_fallback_client",
     "get_embeddings_fallback_client",
     "get_adaptive_chat_client",
-    "validate_chat_fallback_config",
+    "validate_chat_config",
+    "validate_chat_fallback_config", 
     "validate_embeddings_fallback_config",
     "get_effective_fallback_config",
     "create_embeddings_batch",
@@ -111,17 +125,19 @@ __all__ = [
     "search_documents",
     "extract_code_blocks",
     "add_code_examples_to_vector_db",
-    "search_code_examples",
+    "search_code_examples", 
     "update_source_info",
     "extract_source_summary",
     "generate_contextual_embedding",
     "get_device_info",
-    "log_device_status",
-    "cleanup_compute_memory",
-    "get_optimal_compute_device",
+    "cleanup_gpu_memory",
+    "get_optimal_device",
     # Sparse vector functions
     "create_sparse_embedding",
-    "create_sparse_embeddings_batch",
+    "create_sparse_embeddings_batch", 
     "SparseVectorConfig",
     "SparseVectorEncoder",
+    # Code example functions
+    "generate_code_example_summary",
+    "process_chunk_with_context",
 ]

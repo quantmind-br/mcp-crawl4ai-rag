@@ -95,7 +95,7 @@ def test_memory_cleanup():
 
     try:
         from device_manager import cleanup_gpu_memory
-        from utils import cleanup_compute_memory, health_check_gpu_acceleration
+        from src.services.embedding_service import cleanup_compute_memory, health_check_gpu_acceleration
 
         # Test memory cleanup functions
         cleanup_gpu_memory()
@@ -125,7 +125,6 @@ def test_rerank_integration():
     print("\n=== Testing Reranking Integration ===")
 
     try:
-        from crawl4ai_mcp import rerank_results
         from unittest.mock import Mock
 
         # Create mock model

@@ -61,7 +61,7 @@ uv run pytest tests/integration_test.py
 uv run python scripts/clean_qdrant.py
 
 # Fix Qdrant dimensions for existing collections
-uv run python scripts/fix_qdrant_dimensions.py
+uv run python scripts/define_qdrant_dimensions.py
 
 # Knowledge graph tools
 uv run python knowledge_graphs/parse_repo_into_neo4j.py <repo_url>

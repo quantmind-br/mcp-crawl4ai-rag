@@ -1,53 +1,61 @@
 # Task Completion Checklist
 
-## Code Quality Validation
-- [ ] **Type Hints**: All new functions have complete type annotations
-- [ ] **Documentation**: All public APIs have descriptive docstrings
-- [ ] **Import Organization**: Follows specified hierarchy (stdlib → third-party → local)
-- [ ] **Naming Conventions**: snake_case variables/functions, PascalCase classes
+## Before Making Changes
+- [ ] Read relevant existing code to understand patterns and conventions
+- [ ] Check if similar functionality already exists to avoid duplication
+- [ ] Understand the MCP tool structure and async patterns used
+- [ ] Verify environment configuration requirements
+
+## During Development
+- [ ] Follow existing code style and naming conventions
+- [ ] Use type hints for all function parameters and return types
+- [ ] Implement proper error handling with try/except blocks
+- [ ] Add comprehensive docstrings using Google/NumPy style
+- [ ] Use async/await patterns for I/O operations
+- [ ] Return JSON responses from MCP tools with consistent structure
+- [ ] Test with different API providers if applicable
+- [ ] Consider GPU/CPU fallback scenarios where relevant
+
+## Code Quality Checks
+- [ ] **No linting specified** - Follow existing code patterns for consistency
+- [ ] **No formatting tool specified** - Maintain existing indentation and style
+- [ ] **No type checking tool specified** - Use type hints but manual verification
+- [ ] Ensure proper import organization (standard, third-party, local)
+- [ ] Check for proper exception handling and logging
 
 ## Testing Requirements
-- [ ] **Unit Tests**: New functionality has corresponding test cases
-- [ ] **Async Tests**: All MCP tools tested in async contexts
-- [ ] **Integration Tests**: Docker-based testing where applicable
-- [ ] **Configuration Tests**: Multi-provider API configurations validated
+- [ ] Run all existing tests: `uv run pytest`
+- [ ] Run specific relevant tests for the area you modified
+- [ ] Test with Docker services running: `uv run pytest tests/integration_test.py`
+- [ ] If modifying MCP tools, test: `uv run pytest tests/test_mcp_basic.py`
+- [ ] If modifying Qdrant integration, test: `uv run pytest tests/test_qdrant_wrapper.py`
+- [ ] Run performance benchmarks if performance-critical changes: `uv run pytest tests/performance_benchmark.py`
+- [ ] Test with both SSE and stdio transports if modifying MCP server
 
-## Performance Validation
-- [ ] **Memory Management**: GPU memory cleanup after operations
-- [ ] **Connection Handling**: Proper resource cleanup (Qdrant, Redis, Neo4j)
-- [ ] **Async Performance**: No blocking operations in async contexts
-- [ ] **Error Handling**: Tenacity retry policies applied correctly
+## Environment Testing
+- [ ] Test with different API providers (OpenAI, DeepInfra, etc.)
+- [ ] Test with various RAG strategy flag combinations
+- [ ] Test with and without Docker services running
+- [ ] Test GPU acceleration if modifying reranking features
+- [ ] Verify Windows batch script compatibility if applicable
 
-## Configuration Validation
-- [ ] **Environment Variables**: All required env vars validated
-- [ ] **API Configuration**: Primary and fallback configurations tested
-- [ ] **Model Configurations**: Embedding dimensions auto-detected correctly
-- [ ] **Docker Services**: All required services (Qdrant, Neo4j) operational
+## Documentation Updates
+- [ ] Update relevant docstrings and inline comments
+- [ ] Update CLAUDE.md if architecture or commands change
+- [ ] Update README.md if user-facing features change
+- [ ] Update .env.example if new environment variables are added
 
-## Security Checks
-- [ ] **Sensitive Data**: No credentials or keys committed
-- [ ] **Input Validation**: All external inputs properly validated
-- [ ] **File Paths**: Absolute paths used, no traversal vulnerabilities
-- [ ] **API Keys**: Environment-based configuration only
+## Final Verification
+- [ ] Ensure the MCP server starts correctly: `start.bat` or `uv run -m src`
+- [ ] Test basic MCP functionality through a client
+- [ ] Verify Docker services are properly utilized
+- [ ] Check that no secrets or API keys are hardcoded
+- [ ] Confirm backward compatibility with existing configurations
+- [ ] Test error scenarios and ensure graceful error handling
 
-## Validation Commands
-```bash
-# Run quality checks
-uv run ruff check --fix
-
-# Type checking (consider using mypy)
-uv run python -m py_compile src/*.py
-
-# Comprehensive testing
-uv run pytest tests/ -v
-
-# Health check endpoints
-curl http://localhost:6333/health
-curl http://localhost:7474
-```
-
-## Deployment Checklist
-- [ ] **Environment**: .env file configured with production values
-- [ ] **Services**: All Docker services healthy
-- [ ] **Testing**: Comprehensive test suite passing
-- [ ] **Logs**: No critical errors in server logs
+## Deployment Considerations
+- [ ] Verify Windows compatibility if using batch scripts
+- [ ] Test both development and production-like environments
+- [ ] Ensure proper resource cleanup (GPU memory, database connections)
+- [ ] Test with resource constraints (limited memory, CPU)
+- [ ] Verify proper logging and monitoring capabilities

@@ -24,10 +24,10 @@ class TestQdrantOptimization:
     def setup_method(self):
         """Reset singleton state before each test."""
         # Import and reset singleton state
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         # Reset global state
-        import src.qdrant_wrapper as qw
+        import src.clients.qdrant_client as qw
 
         qw._qdrant_client_instance = None
         QdrantClientWrapper._collections_verified = False
@@ -35,14 +35,14 @@ class TestQdrantOptimization:
     def teardown_method(self):
         """Clean up after each test."""
         # Reset global state
-        import src.qdrant_wrapper as qw
+        import src.clients.qdrant_client as qw
 
         qw._qdrant_client_instance = None
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         QdrantClientWrapper._collections_verified = False
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_singleton_pattern_reuse(self, mock_qdrant_client):
         """Test that the singleton pattern reuses existing client instances."""
         # Mock successful Qdrant client
@@ -50,7 +50,7 @@ class TestQdrantOptimization:
         mock_client_instance.get_collections.return_value = Mock()
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         # First call should create new instance
         client1 = get_qdrant_client()
@@ -61,7 +61,7 @@ class TestQdrantOptimization:
         assert mock_qdrant_client.call_count == 1  # No additional calls
         assert client1 is client2  # Same instance
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_collection_verification_caching(self, mock_qdrant_client):
         """Test that collection verification is cached across instances."""
         # Mock successful Qdrant client
@@ -72,32 +72,32 @@ class TestQdrantOptimization:
         )
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         # First instance should verify collections
         QdrantClientWrapper()
         assert QdrantClientWrapper._collections_verified is True
 
         # Reset singleton to force new instance creation
-        import src.qdrant_wrapper as qw
+        import src.clients.qdrant_client as qw
 
         qw._qdrant_client_instance = None
 
         # Second instance should skip verification
         with patch(
-            "src.qdrant_wrapper.QdrantClientWrapper._ensure_collections_exist"
+            "src.clients.qdrant_client.QdrantClientWrapper._ensure_collections_exist"
         ) as mock_ensure:
             QdrantClientWrapper()
             mock_ensure.assert_not_called()  # Should not be called due to caching
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_unhealthy_client_recreation(self, mock_qdrant_client):
         """Test that unhealthy clients are recreated."""
         # Mock client that becomes unhealthy
         mock_client_instance = Mock()
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         # First call creates healthy client
         mock_client_instance.get_collections.return_value = Mock()
@@ -116,7 +116,7 @@ class TestQdrantOptimization:
 
     def test_reset_verification_cache(self):
         """Test that verification cache can be reset."""
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         # Set verification flag
         QdrantClientWrapper._collections_verified = True
@@ -127,7 +127,7 @@ class TestQdrantOptimization:
         # Should be reset
         assert QdrantClientWrapper._collections_verified is False
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_health_check_includes_cache_status(self, mock_qdrant_client):
         """Test that health check includes verification cache status."""
         # Mock successful Qdrant client
@@ -137,7 +137,7 @@ class TestQdrantOptimization:
         mock_client_instance.get_collections.return_value = mock_collections
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         client = QdrantClientWrapper()
         health = client.health_check()
@@ -145,7 +145,7 @@ class TestQdrantOptimization:
         assert "collections_verified" in health
         assert health["collections_verified"] is True
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_performance_optimization(self, mock_qdrant_client):
         """Test that optimizations improve performance."""
         # Mock Qdrant client
@@ -153,7 +153,7 @@ class TestQdrantOptimization:
         mock_client_instance.get_collections.return_value = Mock()
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         # Measure time for multiple client retrievals
         start_time = time.time()
@@ -175,7 +175,7 @@ class TestQdrantOptimization:
         # Should only create one Qdrant client instance
         assert mock_qdrant_client.call_count == 1
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_concurrent_access_safety(self, mock_qdrant_client):
         """Test that singleton pattern is safe for concurrent access."""
         import concurrent.futures
@@ -185,7 +185,7 @@ class TestQdrantOptimization:
         mock_client_instance.get_collections.return_value = Mock()
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         clients = []
 
@@ -212,37 +212,37 @@ class TestQdrantConnectionManagement:
 
     def setup_method(self):
         """Reset state before each test."""
-        import src.qdrant_wrapper as qw
+        import src.clients.qdrant_client as qw
 
         qw._qdrant_client_instance = None
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         QdrantClientWrapper._collections_verified = False
 
     def teardown_method(self):
         """Clean up after each test."""
-        import src.qdrant_wrapper as qw
+        import src.clients.qdrant_client as qw
 
         qw._qdrant_client_instance = None
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         QdrantClientWrapper._collections_verified = False
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_connection_error_handling(self, mock_qdrant_client):
         """Test proper handling of connection errors."""
         # Mock connection failure
         mock_qdrant_client.side_effect = ConnectionError("Cannot connect to Qdrant")
 
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         with pytest.raises(ConnectionError):
             get_qdrant_client()
 
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_connection_recovery(self, mock_qdrant_client):
         """Test that connections can be recovered after failures."""
-        from src.qdrant_wrapper import get_qdrant_client
+        from src.clients.qdrant_client import get_qdrant_client
 
         # First call fails
         mock_qdrant_client.side_effect = ConnectionError("Connection failed")
@@ -261,7 +261,7 @@ class TestQdrantConnectionManagement:
         assert client is not None
 
     @patch.dict(os.environ, {"QDRANT_HOST": "test-host", "QDRANT_PORT": "9999"})
-    @patch("src.qdrant_wrapper.QdrantClient")
+    @patch("src.clients.qdrant_client.QdrantClient")
     def test_environment_configuration(self, mock_qdrant_client):
         """Test that environment variables are properly used."""
         # Mock successful client
@@ -269,7 +269,7 @@ class TestQdrantConnectionManagement:
         mock_client_instance.get_collections.return_value = Mock()
         mock_qdrant_client.return_value = mock_client_instance
 
-        from src.qdrant_wrapper import QdrantClientWrapper
+        from src.clients.qdrant_client import QdrantClientWrapper
 
         client = QdrantClientWrapper()
 

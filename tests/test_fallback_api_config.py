@@ -65,7 +65,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "primary-chat-key"
         os.environ["CHAT_API_BASE"] = "https://primary.api.com/v1"
 
-        from src.utils import get_chat_fallback_client
+        from src.clients.llm_api_client import get_chat_fallback_client
 
         client = get_chat_fallback_client()
         assert client.api_key == "primary-chat-key"
@@ -79,7 +79,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_FALLBACK_API_KEY"] = "fallback-chat-key"
         os.environ["CHAT_FALLBACK_API_BASE"] = "https://fallback.api.com/v1"
 
-        from src.utils import get_chat_fallback_client
+        from src.clients.llm_api_client import get_chat_fallback_client
 
         client = get_chat_fallback_client()
         assert client.api_key == "fallback-chat-key"
@@ -91,7 +91,7 @@ class TestFallbackAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "primary-embeddings-key"
         os.environ["EMBEDDINGS_API_BASE"] = "https://primary.api.com/v1"
 
-        from src.utils import get_embeddings_fallback_client
+        from src.clients.llm_api_client import get_embeddings_fallback_client
 
         client = get_embeddings_fallback_client()
         assert client.api_key == "primary-embeddings-key"
@@ -105,7 +105,7 @@ class TestFallbackAPIConfiguration:
         os.environ["EMBEDDINGS_FALLBACK_API_KEY"] = "fallback-embeddings-key"
         os.environ["EMBEDDINGS_FALLBACK_API_BASE"] = "https://fallback.api.com/v1"
 
-        from src.utils import get_embeddings_fallback_client
+        from src.clients.llm_api_client import get_embeddings_fallback_client
 
         client = get_embeddings_fallback_client()
         assert client.api_key == "fallback-embeddings-key"
@@ -121,7 +121,7 @@ class TestFallbackAPIConfiguration:
             "https://api.openai.com/v1"  # Explicitly set for different provider
         )
 
-        from src.utils import get_chat_client, get_chat_fallback_client
+        from src.clients.llm_api_client import get_chat_client, get_chat_fallback_client
 
         primary_client = get_chat_client()
         fallback_client = get_chat_fallback_client()
@@ -143,7 +143,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "primary-key"
         os.environ["CHAT_API_BASE"] = "https://primary.api.com/v1"
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         client, model_used, is_fallback = get_adaptive_chat_client()
 
@@ -159,7 +159,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_FALLBACK_API_KEY"] = "fallback-key"
         os.environ["CHAT_FALLBACK_API_BASE"] = "https://fallback.api.com/v1"
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         client, model_used, is_fallback = get_adaptive_chat_client()
 
@@ -176,7 +176,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_FALLBACK_MODEL"] = "gpt-3.5-turbo"
         # No primary model set, so should use fallback
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         client, model_used, is_fallback = get_adaptive_chat_client()
 
@@ -190,7 +190,7 @@ class TestFallbackAPIConfiguration:
         # Set fallback configuration
         os.environ["CHAT_FALLBACK_API_KEY"] = "fallback-key"
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         client, model_used, is_fallback = get_adaptive_chat_client(
             model_preference="custom-model"
@@ -206,7 +206,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "valid-key"
         os.environ["CHAT_API_BASE"] = "https://valid.api.com/v1"
 
-        from src.utils import validate_chat_fallback_config
+        from src.clients.llm_api_client import validate_chat_fallback_config
 
         result = validate_chat_fallback_config()
         assert result is True
@@ -215,7 +215,7 @@ class TestFallbackAPIConfiguration:
         """Test validation fails when no API key is available."""
         # No API keys set
 
-        from src.utils import validate_chat_fallback_config
+        from src.clients.llm_api_client import validate_chat_fallback_config
 
         with pytest.raises(ValueError, match="No API key configured for chat fallback"):
             validate_chat_fallback_config()
@@ -226,7 +226,7 @@ class TestFallbackAPIConfiguration:
         os.environ["EMBEDDINGS_API_KEY"] = "valid-key"
         os.environ["EMBEDDINGS_API_BASE"] = "https://valid.api.com/v1"
 
-        from src.utils import validate_embeddings_fallback_config
+        from src.clients.llm_api_client import validate_embeddings_fallback_config
 
         result = validate_embeddings_fallback_config()
         assert result is True
@@ -235,7 +235,7 @@ class TestFallbackAPIConfiguration:
         """Test validation fails when no API key is available."""
         # No API keys set
 
-        from src.utils import validate_embeddings_fallback_config
+        from src.clients.llm_api_client import validate_embeddings_fallback_config
 
         with pytest.raises(
             ValueError, match="No API key configured for embeddings fallback"
@@ -250,7 +250,7 @@ class TestFallbackAPIConfiguration:
         os.environ["EMBEDDINGS_FALLBACK_API_KEY"] = "explicit-embeddings-key"
         os.environ["EMBEDDINGS_FALLBACK_API_BASE"] = "https://explicit.api.com/v1"
 
-        from src.utils import get_effective_fallback_config
+        from src.clients.llm_api_client import get_effective_fallback_config
 
         config = get_effective_fallback_config()
 
@@ -271,7 +271,7 @@ class TestFallbackAPIConfiguration:
         """Test error handling when no configuration is available."""
         # No environment variables set
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         with pytest.raises(ValueError, match="No valid API configuration available"):
             get_adaptive_chat_client()
@@ -292,7 +292,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "primary-key"  # This will fail
         os.environ["CHAT_MODEL"] = "gpt-4"
 
-        from src.utils import get_adaptive_chat_client
+        from src.clients.llm_api_client import get_adaptive_chat_client
 
         # Measure fallback switching time
         start_time = time.time()
@@ -311,7 +311,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "valid-key"
         os.environ["CHAT_FALLBACK_API_BASE"] = "not-a-valid-url"
 
-        from src.utils import validate_chat_fallback_config
+        from src.clients.llm_api_client import validate_chat_fallback_config
 
         with pytest.raises(ValueError, match="Invalid"):
             validate_chat_fallback_config()
@@ -322,7 +322,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_API_KEY"] = "inherited-key"
         os.environ["CHAT_FALLBACK_API_BASE"] = "https://fallback.api.com/v1"
 
-        from src.utils import get_chat_fallback_client
+        from src.clients.llm_api_client import get_chat_fallback_client
 
         client = get_chat_fallback_client()
         assert client.api_key == "inherited-key"
@@ -339,7 +339,7 @@ class TestFallbackAPIConfiguration:
         os.environ["CHAT_FALLBACK_API_KEY"] = "openrouter-key"
         os.environ["CHAT_FALLBACK_API_BASE"] = "https://openrouter.ai/api/v1"
 
-        from src.utils import get_chat_client, get_chat_fallback_client
+        from src.clients.llm_api_client import get_chat_client, get_chat_fallback_client
 
         primary_client = get_chat_client()
         fallback_client = get_chat_fallback_client()

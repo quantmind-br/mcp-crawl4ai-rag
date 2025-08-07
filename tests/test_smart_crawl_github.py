@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from crawl4ai_mcp import smart_crawl_github
+from src.tools.github_tools import smart_crawl_github
 
 
 class TestSmartCrawlGitHub:
@@ -497,11 +497,11 @@ class TestSmartCrawlGitHubIntegration:
         self.mock_qdrant_client.upsert_points.return_value = None
 
     @pytest.mark.asyncio
-    @patch("utils.github_processor.tempfile.mkdtemp")
-    @patch("utils.github_processor.subprocess.run")
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.path.getsize")
-    @patch("utils.github_processor.os.path.exists")
+    @patch("features.github_processor.tempfile.mkdtemp")
+    @patch("features.github_processor.subprocess.run")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.path.getsize")
+    @patch("features.github_processor.os.path.exists")
     @patch("builtins.open")
     async def test_end_to_end_workflow(
         self,
@@ -575,7 +575,7 @@ test_package.hello()
             patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
             patch("crawl4ai_mcp.update_source_info") as mock_update_source,
             patch('crawl4ai_mcp.add_documents_to_vector_db') as mock_add_docs,
-            patch("utils.github_processor.shutil.rmtree") as mock_rmtree,
+            patch("features.github_processor.shutil.rmtree") as mock_rmtree,
         ):
             # Setup utility mocks
             mock_chunk.side_effect = (

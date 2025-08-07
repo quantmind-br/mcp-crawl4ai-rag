@@ -19,18 +19,18 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 # Import the functions we're testing
-from crawl4ai_mcp import rerank_results
-from device_manager import get_optimal_device
-from utils import health_check_gpu_acceleration
+from src.services.rag_service import rerank_results
+from src.device_manager import get_optimal_device
+from src.services.embedding_service import health_check_gpu_acceleration
 
 
 class TestCrossEncoderGPUInitialization:
     """Test CrossEncoder initialization with GPU acceleration."""
 
-    @patch("crawl4ai_mcp.CrossEncoder")
-    @patch("crawl4ai_mcp.get_optimal_device")
-    @patch("crawl4ai_mcp.get_model_kwargs_for_device")
-    @patch("crawl4ai_mcp.get_gpu_preference")
+    @patch("src.services.rag_service.CrossEncoder")
+    @patch("src.device_manager.get_optimal_device")
+    @patch("src.device_manager.get_model_kwargs_for_device")
+    @patch("src.device_manager.get_gpu_preference")
     @patch.dict(os.environ, {"USE_RERANKING": "true", "USE_GPU_ACCELERATION": "auto"})
     def test_crossencoder_gpu_initialization_success(
         self, mock_get_gpu_pref, mock_get_kwargs, mock_get_device, mock_crossencoder
@@ -57,9 +57,9 @@ class TestCrossEncoderGPUInitialization:
             model_kwargs={"torch_dtype": "float16"},
         )
 
-    @patch("crawl4ai_mcp.CrossEncoder")
-    @patch("crawl4ai_mcp.get_optimal_device")
-    @patch("crawl4ai_mcp.get_gpu_preference")
+    @patch("src.services.rag_service.CrossEncoder")
+    @patch("src.device_manager.get_optimal_device")
+    @patch("src.device_manager.get_gpu_preference")
     @patch.dict(os.environ, {"USE_RERANKING": "true", "USE_GPU_ACCELERATION": "cpu"})
     def test_crossencoder_cpu_forced_initialization(
         self, mock_get_gpu_pref, mock_get_device, mock_crossencoder
@@ -79,9 +79,9 @@ class TestCrossEncoderGPUInitialization:
         # Verify device selection was called with CPU preference
         mock_get_device.assert_called_with(preference="cpu", gpu_index=0)
 
-    @patch("crawl4ai_mcp.CrossEncoder")
-    @patch("crawl4ai_mcp.get_optimal_device")
-    @patch("crawl4ai_mcp.print")  # Mock print statements
+    @patch("src.services.rag_service.CrossEncoder")
+    @patch("src.device_manager.get_optimal_device")
+    @patch("src.services.rag_service.print")  # Mock print statements
     @patch.dict(os.environ, {"USE_RERANKING": "true"})
     def test_crossencoder_initialization_failure_fallback(
         self, mock_print, mock_get_device, mock_crossencoder
@@ -128,7 +128,7 @@ class TestRerankingWithGPU:
 
         query = "test query"
 
-        with patch("crawl4ai_mcp.cleanup_gpu_memory") as mock_cleanup:
+        with patch("src.device_manager.cleanup_gpu_memory") as mock_cleanup:
             reranked = rerank_results(mock_model, query, results)
 
             # Verify reranking worked
@@ -175,7 +175,7 @@ class TestRerankingWithGPU:
 
         results = [{"content": "Document 1", "id": "doc1"}]
 
-        with patch("crawl4ai_mcp.print") as mock_print:
+        with patch("src.services.rag_service.print") as mock_print:
             result = rerank_results(mock_model, "query", results)
 
             assert result == results  # Should return original results on error
@@ -185,7 +185,7 @@ class TestRerankingWithGPU:
 class TestMemoryManagement:
     """Test GPU memory management in reranking operations."""
 
-    @patch("crawl4ai_mcp.cleanup_gpu_memory")
+    @patch("src.device_manager.cleanup_gpu_memory")
     def test_memory_cleanup_called_after_reranking(self, mock_cleanup):
         """Test that GPU memory cleanup is called after reranking."""
 
@@ -198,7 +198,7 @@ class TestMemoryManagement:
 
         mock_cleanup.assert_called_once()
 
-    @patch("crawl4ai_mcp.cleanup_gpu_memory")
+    @patch("src.device_manager.cleanup_gpu_memory")
     def test_memory_cleanup_called_even_on_error(self, mock_cleanup):
         """Test that memory cleanup is attempted even when reranking fails."""
 
@@ -207,7 +207,7 @@ class TestMemoryManagement:
 
         results = [{"content": "Test document", "id": "doc1"}]
 
-        with patch("crawl4ai_mcp.print"):
+        with patch("src.services.rag_service.print"):
             rerank_results(mock_model, "test query", results)
 
         # Memory cleanup should not be called in error path since it returns early
@@ -218,7 +218,7 @@ class TestMemoryManagement:
 class TestDeviceHealthCheck:
     """Test GPU acceleration health check functionality."""
 
-    @patch("utils.torch")
+    @patch("src.services.embedding_service.torch")
     def test_health_check_gpu_available_and_working(self, mock_torch):
         """Test health check when GPU is available and working."""
 
@@ -244,7 +244,7 @@ class TestDeviceHealthCheck:
         assert health_status["test_passed"] is True
         assert health_status["error_message"] is None
 
-    @patch("utils.torch")
+    @patch("src.services.embedding_service.torch")
     def test_health_check_mps_available_and_working(self, mock_torch):
         """Test health check when MPS (Apple Silicon) is available."""
 
@@ -266,7 +266,7 @@ class TestDeviceHealthCheck:
         assert health_status["test_passed"] is True
         assert health_status["error_message"] is None
 
-    @patch("utils.torch")
+    @patch("src.services.embedding_service.torch")
     def test_health_check_gpu_operations_fail(self, mock_torch):
         """Test health check when GPU is detected but operations fail."""
 
@@ -280,7 +280,7 @@ class TestDeviceHealthCheck:
         assert health_status["test_passed"] is False
         assert health_status["error_message"] == "CUDA out of memory"
 
-    @patch("utils.torch")
+    @patch("src.services.embedding_service.torch")
     def test_health_check_no_gpu_available(self, mock_torch):
         """Test health check when no GPU is available."""
 
@@ -379,7 +379,7 @@ class TestRerankingIntegration:
             },
         ]
 
-        with patch("crawl4ai_mcp.cleanup_gpu_memory"):
+        with patch("src.device_manager.cleanup_gpu_memory"):
             reranked = rerank_results(mock_model, "query", results)
 
             # Check that all original fields are preserved
@@ -398,7 +398,7 @@ class TestRerankingIntegration:
 
         results = [{"text": "Custom content field", "id": "doc1"}]
 
-        with patch("crawl4ai_mcp.cleanup_gpu_memory"):
+        with patch("src.device_manager.cleanup_gpu_memory"):
             rerank_results(mock_model, "query", results, content_key="text")
 
             # Verify correct content was used for reranking

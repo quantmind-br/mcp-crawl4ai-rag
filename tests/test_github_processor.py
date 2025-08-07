@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch, mock_open
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from utils.github_processor import (
+from features.github_processor import (
     GitHubRepoManager,
     MarkdownDiscovery,
     GitHubMetadataExtractor,
@@ -74,10 +74,10 @@ class TestGitHubRepoManager:
             == "https://github.com/user/repo.git"
         )
 
-    @patch("utils.github_processor.tempfile.mkdtemp")
-    @patch("utils.github_processor.subprocess.run")
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.path.getsize")
+    @patch("features.github_processor.tempfile.mkdtemp")
+    @patch("features.github_processor.subprocess.run")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.path.getsize")
     def test_clone_repository_success(
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
@@ -111,8 +111,8 @@ class TestGitHubRepoManager:
             timeout=300,
         )
 
-    @patch("utils.github_processor.tempfile.mkdtemp")
-    @patch("utils.github_processor.subprocess.run")
+    @patch("features.github_processor.tempfile.mkdtemp")
+    @patch("features.github_processor.subprocess.run")
     def test_clone_repository_invalid_url(self, mock_subprocess, mock_mkdtemp):
         """Test cloning with invalid URL."""
 
@@ -123,8 +123,8 @@ class TestGitHubRepoManager:
         with pytest.raises(ValueError, match="Invalid GitHub repository URL"):
             manager.clone_repository("https://gitlab.com/user/repo")
 
-    @patch("utils.github_processor.tempfile.mkdtemp")
-    @patch("utils.github_processor.subprocess.run")
+    @patch("features.github_processor.tempfile.mkdtemp")
+    @patch("features.github_processor.subprocess.run")
     def test_clone_repository_git_failure(self, mock_subprocess, mock_mkdtemp):
         """Test cloning when git command fails."""
 
@@ -136,10 +136,10 @@ class TestGitHubRepoManager:
         with pytest.raises(RuntimeError, match="Git clone failed"):
             manager.clone_repository("https://github.com/user/nonexistent")
 
-    @patch("utils.github_processor.tempfile.mkdtemp")
-    @patch("utils.github_processor.subprocess.run")
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.path.getsize")
+    @patch("features.github_processor.tempfile.mkdtemp")
+    @patch("features.github_processor.subprocess.run")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.path.getsize")
     def test_clone_repository_too_large(
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
@@ -255,8 +255,8 @@ class TestMarkdownDiscovery:
         # README files should have higher priority
         assert readme_priority[0] > regular_priority[0]
 
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.stat")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.stat")
     @patch("builtins.open", new_callable=mock_open)
     def test_discover_markdown_files(self, mock_file, mock_stat, mock_walk):
         """Test markdown file discovery."""
@@ -312,7 +312,7 @@ class TestGitHubMetadataExtractor:
             extractor._parse_repo_info("https://github.com/user")
 
     @patch("builtins.open", new_callable=mock_open)
-    @patch("utils.github_processor.os.path.exists")
+    @patch("features.github_processor.os.path.exists")
     def test_extract_package_info_nodejs(self, mock_exists, mock_file):
         """Test package.json extraction."""
 
@@ -338,7 +338,7 @@ class TestGitHubMetadataExtractor:
         assert result["license"] == "MIT"
 
     @patch("builtins.open", new_callable=mock_open)
-    @patch("utils.github_processor.os.path.exists")
+    @patch("features.github_processor.os.path.exists")
     def test_extract_package_info_python(self, mock_exists, mock_file):
         """Test pyproject.toml extraction."""
 
@@ -361,7 +361,7 @@ class TestGitHubMetadataExtractor:
         assert result["description"] == "A Python test package"
 
     @patch("builtins.open", new_callable=mock_open)
-    @patch("utils.github_processor.os.path.exists")
+    @patch("features.github_processor.os.path.exists")
     def test_extract_readme_info(self, mock_exists, mock_file):
         """Test README extraction."""
 
@@ -384,7 +384,7 @@ class TestGitHubMetadataExtractor:
 
         assert result["readme_title"] == "Test Project"
 
-    @patch("utils.github_processor.subprocess.run")
+    @patch("features.github_processor.subprocess.run")
     def test_extract_git_info(self, mock_subprocess):
         """Test Git information extraction."""
 
@@ -1022,8 +1022,8 @@ class TestMultiFileDiscovery:
         assert discovery._is_supported_file("image.png", [".png"]) is False
         assert discovery._is_supported_file("data.csv", [".csv"]) is False
 
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.stat")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.stat")
     @patch("builtins.open", new_callable=mock_open)
     def test_discover_files_multi_type(self, mock_file, mock_stat, mock_walk):
         """Test discovering multiple file types."""
@@ -1059,7 +1059,7 @@ class TestMultiFileDiscovery:
             assert "file_type" in file_info
             assert "is_readme" in file_info
 
-    @patch("utils.github_processor.os.walk")
+    @patch("features.github_processor.os.walk")
     def test_discover_files_empty_result(self, mock_walk):
         """Test discovering files with no matches."""
 
@@ -1070,8 +1070,8 @@ class TestMultiFileDiscovery:
 
         assert result == []
 
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.stat")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.stat")
     @patch("builtins.open")
     def test_discover_files_binary_filtering(self, mock_file, mock_stat, mock_walk):
         """Test filtering out binary files."""
@@ -1090,8 +1090,8 @@ class TestMultiFileDiscovery:
         # Should filter out binary files
         assert result == []
 
-    @patch("utils.github_processor.os.walk")
-    @patch("utils.github_processor.os.stat")
+    @patch("features.github_processor.os.walk")
+    @patch("features.github_processor.os.stat")
     def test_discover_files_size_limits(self, mock_stat, mock_walk):
         """Test file size limits by type."""
 

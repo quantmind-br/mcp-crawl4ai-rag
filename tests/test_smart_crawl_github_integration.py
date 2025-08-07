@@ -20,7 +20,8 @@ from unittest.mock import Mock, patch
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from crawl4ai_mcp import smart_crawl_github, Context
+from src.tools.github_tools import smart_crawl_github
+from mcp.server.fastmcp import Context
 
 
 class TestSmartCrawlGitHubIntegration:

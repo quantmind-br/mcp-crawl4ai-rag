@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to path
+# Add src to path for imports
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
@@ -25,6 +25,9 @@ def test_deepinfra_config():
         # 1. Teste de detecção de dimensões
         print("\n1. Testando detecção de dimensões...")
         from embedding_config import get_embedding_dimensions
+        from embedding_config import reset_embeddings_config
+
+        reset_embeddings_config()
 
         # Simular configuração DeepInfra
         os.environ["EMBEDDINGS_MODEL"] = "Qwen/Qwen3-Embedding-0.6B"
@@ -35,8 +38,11 @@ def test_deepinfra_config():
         assert dims == 1024, f"Esperado 1024, obtido {dims}"
 
         # 2. Teste de configuração de collections
-        print("\n2. Testando configuração de collections...")
-        from qdrant_wrapper import get_collections_config
+        print("
+2. Testando configuração de collections...")
+        # We need to reset because get_embedding_dimensions caches the result
+        reset_embeddings_config()
+        from src.clients.qdrant_client import get_collections_config
 
         config = get_collections_config()
         crawled_dims = config["crawled_pages"]["vectors_config"].size
@@ -51,7 +57,9 @@ def test_deepinfra_config():
         assert code_dims == 1024, f"code_examples: esperado 1024, obtido {code_dims}"
 
         # 3. Teste de override manual
-        print("\n3. Testando override manual de dimensões...")
+        print("
+3. Testando override manual de dimensões...")
+        reset_embeddings_config()
         os.environ["EMBEDDINGS_DIMENSIONS"] = "512"
 
         dims_override = get_embedding_dimensions()
@@ -61,7 +69,9 @@ def test_deepinfra_config():
         )
 
         # 4. Teste de validação
-        print("\n4. Testando validação de configuração...")
+        print("
+4. Testando validação de configuração...")
+        reset_embeddings_config()
         from embedding_config import validate_embeddings_config
 
         # Simular API key
@@ -77,7 +87,9 @@ def test_deepinfra_config():
                 raise
 
         # 5. Teste de modelos OpenAI (backward compatibility)
-        print("\n5. Testando compatibilidade com modelos OpenAI...")
+        print("
+5. Testando compatibilidade com modelos OpenAI...")
+        reset_embeddings_config()
         os.environ["EMBEDDINGS_MODEL"] = "text-embedding-3-small"
         os.environ.pop("EMBEDDINGS_DIMENSIONS", None)
 
@@ -85,13 +97,16 @@ def test_deepinfra_config():
         print(f"   ✓ OpenAI text-embedding-3-small: {openai_dims} dimensões")
         assert openai_dims == 1536, f"OpenAI: esperado 1536, obtido {openai_dims}"
 
-        # 6. Teste de modelo desconhecido
-        print("\n6. Testando fallback para modelo desconhecido...")
+        # 6. Teste de modelo desconhecido (deve falhar)
+        print("
+6. Testando erro para modelo desconhecido...")
+        reset_embeddings_config()
         os.environ["EMBEDDINGS_MODEL"] = "modelo-inexistente"
+        os.environ.pop("EMBEDDINGS_DIMENSIONS", None)
 
-        fallback_dims = get_embedding_dimensions()
-        print(f"   ✓ Fallback para modelo desconhecido: {fallback_dims} dimensões")
-        assert fallback_dims == 1536, f"Fallback: esperado 1536, obtido {fallback_dims}"
+        with pytest.raises(ValueError, match="Unknown embeddings model"):
+            get_embedding_dimensions()
+        print("   ✓ Erro esperado para modelo desconhecido, OK")
 
         print("\n" + "=" * 60)
         print("🎉 TODOS OS TESTES PASSARAM!")

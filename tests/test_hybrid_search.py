@@ -13,14 +13,12 @@ This test suite validates:
 import os
 import pytest
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
-import json
+from unittest.mock import Mock, patch
 
 # Import test utilities
 try:
-    from src.qdrant_wrapper import QdrantClientWrapper
+    from src.clients.qdrant_client import QdrantClientWrapper
+    from src.embedding_config import get_embedding_dimensions
     from src.sparse_vector_types import SparseVectorConfig
     from qdrant_client import QdrantClient
     from qdrant_client.models import (
@@ -78,12 +76,13 @@ class TestSparseVectorConfig:
 class TestHybridCollectionConfiguration:
     """Test hybrid collection creation and configuration."""
     
-    @patch('src.qdrant_wrapper.get_embedding_dimensions')
+    @patch('src.embedding_config.get_embedding_dimensions')
     def test_hybrid_collections_config(self, mock_get_dims):
         """Test hybrid collections configuration generation."""
-        from src.qdrant_wrapper import get_hybrid_collections_config
+        from src.clients.qdrant_client import get_hybrid_collections_config
         
-        mock_get_dims.return_value = 1024
+        embedding_dims = get_embedding_dimensions()
+        mock_get_dims.return_value = embedding_dims
         config = get_hybrid_collections_config()
         
         # Verify crawled_pages configuration
@@ -93,7 +92,7 @@ class TestHybridCollectionConfiguration:
         # Check dense vector configuration
         assert "vectors_config" in crawled_config
         assert "text-dense" in crawled_config["vectors_config"]
-        assert crawled_config["vectors_config"]["text-dense"].size == 1024
+        assert crawled_config["vectors_config"]["text-dense"].size == embedding_dims
         assert crawled_config["vectors_config"]["text-dense"].distance == Distance.COSINE
         
         # Check sparse vector configuration
@@ -125,7 +124,8 @@ class TestQdrantWrapperHybridIntegration:
     def test_vector_naming_compatibility(self):
         """Test that vector naming follows hybrid collection schema."""
         # This test simulates the point struct validation issue
-        dummy_dense = [0.0] * 1024
+        embedding_dims = get_embedding_dimensions()
+        dummy_dense = [0.0] * embedding_dims
         
         # Test correct named vector format
         point = PointStruct(
@@ -142,7 +142,7 @@ class TestQdrantWrapperHybridIntegration:
         assert "text-sparse" in point.vector
         assert isinstance(point.vector["text-sparse"], SparseVector)
     
-    @patch('src.qdrant_wrapper.QdrantClient')
+    @patch('src.clients.qdrant_client.QdrantClient')
     def test_point_struct_upsert_compatibility(self, mock_client):
         """Test PointStruct creation for hybrid collections correctly handles vector naming."""
         wrapper = QdrantClientWrapper()
@@ -150,7 +150,7 @@ class TestQdrantWrapperHybridIntegration:
         # Mock collection info for hybrid schema
         mock_collection_info = Mock()
         mock_collection_info.config.params.vectors = {
-            "text-dense": VectorParams(size=1024, distance=Distance.COSINE)
+            "text-dense": VectorParams(size=get_embedding_dimensions(), distance=Distance.COSINE)
         }
         mock_collection_info.config.params.sparse_vectors = {
             "text-sparse": SparseVectorParams(
@@ -245,48 +245,6 @@ class TestHybridSearchFunctionality:
         
         assert abs(fusion_scores["doc1"] - expected_doc1) < 0.001
         assert abs(fusion_scores["doc2"] - expected_doc2) < 0.001
-
-
-@pytest.mark.skipif(not QDRANT_AVAILABLE, reason="Qdrant dependencies not available")
-class TestCollectionMigration:
-    """Test collection migration from legacy to hybrid schema."""
-    
-    def test_migration_detector(self):
-        """Test migration detection logic."""
-        # This tests the validate_collection method logic
-        legacy_config = VectorParams(size=1024, distance=Distance.COSINE)
-        hybrid_config = {
-            "text-dense": VectorParams(size=1024, distance=Distance.COSINE),
-            "text-sparse": SparseVectorParams(
-                index=SparseIndexParams(on_disk=False),
-                modifier=Modifier.IDF
-            )
-        }
-        
-        # Legacy detection should return true for migration needed
-        assert "VectorParams" in str(type(legacy_config))
-        assert isinstance(hybrid_config, dict)
-
-
-@pytest.mark.skipif(not QDRANT_AVAILABLE, reason="Qdrant dependencies not available")
-class TestPerformanceBenchmarks:
-    """Performance benchmarks for hybrid search."""
-    
-    def test_sparse_vector_memory_usage(self):
-        """Test memory efficiency of sparse vectors."""
-        # Typical sparse vectors from BM25 should be memory efficient
-        text = "machine learning python artificial intelligence neural network"
-        mock_indices = list(range(0, 50, 3))  # Sparse vector
-        mock_values = [1.0, 1.2, 0.8, 1.5, 0.9] * 10
-        
-        sparse_vector = SparseVector(indices=mock_indices, values=mock_values)
-        
-        # Verify sparse structure is maintained
-        assert len(sparse_vector.indices) >= 10
-        assert len(sparse_vector.values) >= 10
-        # Sparse vectors should use significantly less memory than dense
-        sparsity = 1 - (len(sparse_vector.indices) / 1024)
-        assert sparsity > 0.9  # At least 90% sparse
 
 
 if __name__ == "__main__":

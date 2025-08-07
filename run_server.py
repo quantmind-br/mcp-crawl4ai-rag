@@ -13,7 +13,12 @@ src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
 # Import after path setup - this is intentional for standalone scripts
-from crawl4ai_mcp import main  # noqa: E402
+from event_loop_fix import setup_event_loop  # noqa: E402
+from core.app import run_server  # noqa: E402
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Apply Windows ConnectionResetError fix before starting event loop
+    setup_event_loop()
+    
+    # Run the server with the new core structure
+    asyncio.run(run_server())

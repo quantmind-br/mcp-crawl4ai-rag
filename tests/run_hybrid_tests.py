@@ -9,8 +9,6 @@ and provides a comprehensive report of the implementation quality.
 import os
 import sys
 import subprocess
-import time
-import json
 from pathlib import Path
 
 
@@ -39,9 +37,9 @@ def test_imports():
         project_root = Path(__file__).parent.parent
         sys.path.insert(0, str(project_root / "src"))
         
-        import qdrant_wrapper
+        import clients.qdrant_client
         import sparse_vector_types
-        from qdrant_wrapper import QdrantClientWrapper
+        from clients.qdrant_client import QdrantClientWrapper
         
         # Test wrapper initialization
         wrapper = QdrantClientWrapper(device="cpu")
@@ -62,7 +60,7 @@ def test_configuration():
         project_root = Path(__file__).parent.parent
         sys.path.insert(0, str(project_root / "src"))
         
-        from qdrant_wrapper import get_hybrid_collections_config
+        from clients.qdrant_client import get_hybrid_collections_config
         config = get_hybrid_collections_config()
         
         assert "crawled_pages" in config
@@ -119,7 +117,7 @@ def run_performance_benchmarks():
         sys.path.insert(0, str(project_root / "src"))
         
         # Test with minimal setup
-        from qdrant_wrapper import get_collections_config, get_hybrid_collections_config
+        from clients.qdrant_client import get_collections_config, get_hybrid_collections_config
         
         legacy_config = get_collections_config()
         hybrid_config = get_hybrid_collections_config()
@@ -231,7 +229,7 @@ def generate_test_report(results):
         project_root = Path(__file__).parent.parent
         sys.path.insert(0, str(project_root / "src"))
         
-        from qdrant_wrapper import get_hybrid_collections_config
+        from clients.qdrant_client import get_hybrid_collections_config
         config = get_hybrid_collections_config()
         
         for collection_name, cfg in config.items():

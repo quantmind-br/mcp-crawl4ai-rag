@@ -15,7 +15,7 @@ import sys
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from utils.github_processor import MultiFileDiscovery, MarkdownDiscovery
+from features.github_processor import MultiFileDiscovery, MarkdownDiscovery
 
 
 class TestBackwardCompatibility:
