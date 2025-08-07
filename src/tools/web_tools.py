@@ -80,59 +80,108 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
 
 def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[Dict[str, Any]]:
     """
-    Extract code blocks from markdown content.
+    Extract code blocks from markdown content with context.
     
     Args:
         markdown_content: The markdown content to extract code blocks from
         min_length: Minimum length of code blocks to extract
         
     Returns:
-        List of dictionaries containing code blocks
+        List of dictionaries containing code blocks with context
     """
     import re
     code_blocks = []
     
-    # Simple regex to find code blocks
+    # Pattern to find code blocks with context
     pattern = r'```(\w*)\n(.*?)\n```'
-    matches = re.findall(pattern, markdown_content, re.DOTALL)
     
-    for i, (language, code) in enumerate(matches):
+    # Split content into lines for context extraction
+    lines = markdown_content.split('\n')
+    
+    # Find all matches with their positions
+    for match in re.finditer(pattern, markdown_content, re.DOTALL):
+        language, code = match.groups()
+        
         if len(code) >= min_length:
+            # Find the line numbers for context
+            start_pos = match.start()
+            end_pos = match.end()
+            
+            # Count lines before the match
+            lines_before_start = markdown_content[:start_pos].count('\n')
+            lines_after_end = markdown_content[:end_pos].count('\n')
+            
+            # Extract context (3 lines before and after)
+            context_before_lines = max(0, lines_before_start - 3)
+            context_after_lines = min(len(lines), lines_after_end + 3)
+            
+            context_before = '\n'.join(lines[context_before_lines:lines_before_start])
+            context_after = '\n'.join(lines[lines_after_end:context_after_lines])
+            
             code_blocks.append({
                 'code': code.strip(),
                 'language': language or 'text',
-                'index': i,
+                'context_before': context_before.strip(),
+                'context_after': context_after.strip(),
+                'index': len(code_blocks),
                 'length': len(code)
             })
     
     return code_blocks
 
 
-def generate_code_example_summary(code: str, language: str = "") -> str:
+def generate_code_example_summary(code: str, context_before: str = "", context_after: str = "") -> str:
     """
-    Generate a summary for a code example.
+    Generate a summary for a code example with context.
     
     Args:
         code: The code to summarize
-        language: Programming language
+        context_before: Context before the code block
+        context_after: Context after the code block
         
     Returns:
         A summary string
     """
     lines = code.strip().split('\n')
     
+    # Try to extract language from context or code patterns
+    language = ""
+    
+    # Check for language indicators in context
+    context = (context_before + " " + context_after).lower()
+    if "python" in context or code.strip().startswith(("def ", "class ", "import ", "from ")):
+        language = "Python"
+    elif "javascript" in context or "js" in context or code.strip().startswith(("function", "const ", "let ", "var ")):
+        language = "JavaScript"
+    elif "bash" in context or "shell" in context or code.strip().startswith(("#!/bin/bash", "$", "sudo")):
+        language = "Bash"
+    elif "yaml" in context or code.strip().startswith(("-", "---")):
+        language = "YAML"
+    elif "json" in context or (code.strip().startswith("{") and code.strip().endswith("}")):
+        language = "JSON"
+    
     # Try to find function/class definitions
     for line in lines:
         line = line.strip()
-        if line.startswith(('def ', 'class ', 'function ', 'const ', 'let ', 'var ')):
-            return f"{language} code example: {line}"
+        if line.startswith(('def ', 'class ')):
+            return f"{language} code: {line}"
+        elif line.startswith(('function ', 'const ', 'let ', 'var ')):
+            return f"{language} code: {line}"
+        elif line.startswith('#!/'):
+            return f"{language} script: {line}"
+    
+    # Use context to provide better summary
+    if context_before:
+        context_summary = context_before.strip().split('\n')[-1][:50]
+        if context_summary:
+            return f"{language} code example: {context_summary}..."
     
     # Fallback to first non-empty line
     for line in lines:
         line = line.strip()
         if line and not line.startswith('#') and not line.startswith('//'):
             truncated = line[:100] + "..." if len(line) > 100 else line
-            return f"{language} code example: {truncated}"
+            return f"{language} code: {truncated}"
     
     return f"{language} code example ({len(lines)} lines)"
 

@@ -26,21 +26,16 @@ from ..features.github_processor import (
 from ..utils.validation import validate_github_url
 
 # Import utility functions from refactored modules
-try:
-    from ..services.rag_service import (
-        add_documents_to_vector_db,
-        add_code_examples_to_vector_db,
-        update_source_info,
-    )
-    from ..clients.qdrant_client import get_qdrant_client
-    from .web_tools import extract_source_summary
-except ImportError:
-    from services.rag_service import (
-        add_documents_to_vector_db,
-        add_code_examples_to_vector_db,
-        update_source_info,
-    )
-    from web_tools import extract_source_summary
+from ..services.rag_service import (
+    add_documents_to_vector_db,
+    add_code_examples_to_vector_db,
+    update_source_info,
+)
+from .web_tools import (
+    extract_code_blocks,
+    extract_source_summary,
+    generate_code_example_summary,
+)
 
 
 def smart_chunk_markdown(text: str, chunk_size: int = 5000) -> List[str]:

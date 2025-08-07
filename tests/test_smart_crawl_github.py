@@ -55,9 +55,9 @@ class TestSmartCrawlGitHub:
         assert "Invalid GitHub repository URL" in response["error"]
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
-    @patch("crawl4ai_mcp.MarkdownDiscovery")
-    @patch("crawl4ai_mcp.GitHubMetadataExtractor")
+    @patch("src.tools.github_tools.GitHubRepoManager")
+    @patch("src.tools.github_tools.MultiFileDiscovery")
+    @patch("src.tools.github_tools.GitHubMetadataExtractor")
     async def test_no_markdown_files_found(
         self, mock_extractor_cls, mock_discovery_cls, mock_manager_cls
     ):
@@ -77,7 +77,7 @@ class TestSmartCrawlGitHub:
             "owner": "user",
             "repo_name": "repo",
         }
-        mock_discovery.discover_markdown_files.return_value = []
+        mock_discovery.discover_files.return_value = []
 
         result = await smart_crawl_github(
             ctx=self.mock_context, repo_url="https://github.com/user/repo"
@@ -89,13 +89,13 @@ class TestSmartCrawlGitHub:
         mock_manager.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
-    @patch("crawl4ai_mcp.MarkdownDiscovery")
-    @patch("crawl4ai_mcp.GitHubMetadataExtractor")
-    @patch("crawl4ai_mcp.smart_chunk_markdown")
-    @patch("crawl4ai_mcp.extract_source_summary")
-    @patch("crawl4ai_mcp.update_source_info")
-    @patch('crawl4ai_mcp.add_documents_to_vector_db')
+    @patch("src.tools.github_tools.GitHubRepoManager")
+    @patch("src.tools.github_tools.MultiFileDiscovery")
+    @patch("src.tools.github_tools.GitHubMetadataExtractor")
+    @patch("src.tools.github_tools.smart_chunk_markdown")
+    @patch("src.tools.github_tools.extract_source_summary")
+    @patch("src.tools.github_tools.update_source_info")
+    @patch('src.tools.github_tools.add_documents_to_vector_db')
     async def test_successful_crawl(
         self,
         mock_add_docs,
@@ -149,7 +149,7 @@ class TestSmartCrawlGitHub:
                 "is_readme": False,
             },
         ]
-        mock_discovery.discover_markdown_files.return_value = mock_markdown_files
+        mock_discovery.discover_files.return_value = mock_markdown_files
 
         # Mock chunking
         mock_chunk.side_effect = lambda content, chunk_size: [content[:chunk_size]]
@@ -180,23 +180,23 @@ class TestSmartCrawlGitHub:
             "https://github.com/user/test-repo", 500
         )
         mock_extractor.extract_repo_metadata.assert_called_once()
-        mock_discovery.discover_markdown_files.assert_called_once()
+        mock_discovery.discover_files.assert_called_once()
         mock_update_source.assert_called_once()
         mock_add_docs.assert_called_once()
         mock_manager.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
-    @patch("crawl4ai_mcp.MarkdownDiscovery")
-    @patch("crawl4ai_mcp.GitHubMetadataExtractor")
-    @patch("crawl4ai_mcp.smart_chunk_markdown")
-    @patch("crawl4ai_mcp.extract_source_summary")
-    @patch("crawl4ai_mcp.update_source_info")
-    @patch('crawl4ai_mcp.add_documents_to_vector_db')
-    @patch("crawl4ai_mcp.extract_code_blocks")
-    @patch("crawl4ai_mcp.generate_code_example_summary")
-    @patch('crawl4ai_mcp.add_code_examples_to_vector_db')
-    @patch("crawl4ai_mcp.os.getenv")
+    @patch("src.tools.github_tools.GitHubRepoManager")
+    @patch("src.tools.github_tools.MultiFileDiscovery")
+    @patch("src.tools.github_tools.GitHubMetadataExtractor")
+    @patch("src.tools.github_tools.smart_chunk_markdown")
+    @patch("src.tools.github_tools.extract_source_summary")
+    @patch("src.tools.github_tools.update_source_info")
+    @patch('src.tools.github_tools.add_documents_to_vector_db')
+    @patch("src.tools.github_tools.extract_code_blocks")
+    @patch("src.tools.github_tools.generate_code_example_summary")
+    @patch('src.tools.github_tools.add_code_examples_to_vector_db')
+    @patch("src.tools.github_tools.os.getenv")
     async def test_with_code_examples_enabled(
         self,
         mock_getenv,
@@ -244,7 +244,7 @@ class TestSmartCrawlGitHub:
                 "is_readme": True,
             }
         ]
-        mock_discovery.discover_markdown_files.return_value = mock_markdown_files
+        mock_discovery.discover_files.return_value = mock_markdown_files
 
         # Mock code extraction
         mock_code_blocks = [
@@ -277,7 +277,7 @@ class TestSmartCrawlGitHub:
         mock_add_code.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
+    @patch("src.tools.github_tools.GitHubRepoManager")
     async def test_clone_failure(self, mock_manager_cls):
         """Test when repository cloning fails."""
 
@@ -295,9 +295,9 @@ class TestSmartCrawlGitHub:
         mock_manager.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
-    @patch("crawl4ai_mcp.MarkdownDiscovery")
-    @patch("crawl4ai_mcp.GitHubMetadataExtractor")
+    @patch("src.tools.github_tools.GitHubRepoManager")
+    @patch("src.tools.github_tools.MultiFileDiscovery")
+    @patch("src.tools.github_tools.GitHubMetadataExtractor")
     async def test_metadata_extraction_failure(
         self, mock_extractor_cls, mock_discovery_cls, mock_manager_cls
     ):
@@ -330,13 +330,13 @@ class TestSmartCrawlGitHub:
         """Test with custom parameters."""
 
         with (
-            patch("crawl4ai_mcp.GitHubRepoManager") as mock_manager_cls,
-            patch("crawl4ai_mcp.MarkdownDiscovery") as mock_discovery_cls,
-            patch("crawl4ai_mcp.GitHubMetadataExtractor") as mock_extractor_cls,
-            patch("crawl4ai_mcp.smart_chunk_markdown") as mock_chunk,
-            patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
-            patch("crawl4ai_mcp.update_source_info"),
-            patch('crawl4ai_mcp.add_documents_to_vector_db'),
+            patch("src.tools.github_tools.GitHubRepoManager") as mock_manager_cls,
+            patch("src.tools.github_tools.MultiFileDiscovery") as mock_discovery_cls,
+            patch("src.tools.github_tools.GitHubMetadataExtractor") as mock_extractor_cls,
+            patch("src.tools.github_tools.smart_chunk_markdown") as mock_chunk,
+            patch("src.tools.github_tools.extract_source_summary") as mock_extract_summary,
+            patch("src.tools.github_tools.update_source_info"),
+            patch('src.tools.github_tools.add_documents_to_vector_db'),
         ):
             # Setup mocks
             mock_manager = Mock()
@@ -365,7 +365,7 @@ class TestSmartCrawlGitHub:
                     "is_readme": True,
                 }
             ]
-            mock_discovery.discover_markdown_files.return_value = mock_markdown_files
+            mock_discovery.discover_files.return_value = mock_markdown_files
             mock_chunk.return_value = ["Test content"]
             mock_extract_summary.return_value = "Test"
 
@@ -385,20 +385,20 @@ class TestSmartCrawlGitHub:
             mock_manager.clone_repository.assert_called_once_with(
                 "https://github.com/user/repo", 200
             )
-            mock_discovery.discover_markdown_files.assert_called_once()
+            mock_discovery.discover_files.assert_called_once()
 
             # Check that max_files parameter was passed
-            call_args = mock_discovery.discover_markdown_files.call_args
+            call_args = mock_discovery.discover_files.call_args
             assert call_args[1]["max_files"] == 25
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
-    @patch("crawl4ai_mcp.MarkdownDiscovery")
-    @patch("crawl4ai_mcp.GitHubMetadataExtractor")
-    @patch("crawl4ai_mcp.smart_chunk_markdown")
-    @patch("crawl4ai_mcp.extract_source_summary")
-    @patch("crawl4ai_mcp.update_source_info")
-    @patch('crawl4ai_mcp.add_documents_to_vector_db')
+    @patch("src.tools.github_tools.GitHubRepoManager")
+    @patch("src.tools.github_tools.MultiFileDiscovery")
+    @patch("src.tools.github_tools.GitHubMetadataExtractor")
+    @patch("src.tools.github_tools.smart_chunk_markdown")
+    @patch("src.tools.github_tools.extract_source_summary")
+    @patch("src.tools.github_tools.update_source_info")
+    @patch('src.tools.github_tools.add_documents_to_vector_db')
     async def test_many_files_truncation(
         self,
         mock_add_docs,
@@ -442,7 +442,7 @@ class TestSmartCrawlGitHub:
                 }
             )
 
-        mock_discovery.discover_markdown_files.return_value = mock_markdown_files
+        mock_discovery.discover_files.return_value = mock_markdown_files
         mock_chunk.side_effect = lambda content, chunk_size: [content]
         mock_extract_summary.return_value = "Test repository"
 
@@ -459,7 +459,7 @@ class TestSmartCrawlGitHub:
         assert response["files_processed"][-1] == "..."
 
     @pytest.mark.asyncio
-    @patch("crawl4ai_mcp.GitHubRepoManager")
+    @patch("src.tools.github_tools.GitHubRepoManager")
     async def test_cleanup_on_exception(self, mock_manager_cls):
         """Test that cleanup is called even when an exception occurs."""
 
@@ -571,10 +571,10 @@ test_package.hello()
 
         # Mock additional utilities
         with (
-            patch("crawl4ai_mcp.smart_chunk_markdown") as mock_chunk,
-            patch("crawl4ai_mcp.extract_source_summary") as mock_extract_summary,
-            patch("crawl4ai_mcp.update_source_info") as mock_update_source,
-            patch('crawl4ai_mcp.add_documents_to_vector_db') as mock_add_docs,
+            patch("src.tools.github_tools.smart_chunk_markdown") as mock_chunk,
+            patch("src.tools.github_tools.extract_source_summary") as mock_extract_summary,
+            patch("src.tools.github_tools.update_source_info") as mock_update_source,
+            patch('src.tools.github_tools.add_documents_to_vector_db') as mock_add_docs,
             patch("features.github_processor.shutil.rmtree") as mock_rmtree,
         ):
             # Setup utility mocks

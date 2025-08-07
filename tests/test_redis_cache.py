@@ -14,8 +14,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from dotenv import load_dotenv
+from embedding_config import get_embedding_dimensions
 from embedding_cache import (
-    get_embedding_dimensions,
     EmbeddingCache,
 )
 import redis
@@ -45,8 +45,8 @@ def test_redis_cache():
         # Health check
         health = cache.health_check()
         print(f"   Status: {health['status']}")
-        print(f"   Conexao: {health['connection_test']}")
-        print(f"   Memoria: {health['memory_usage']}")
+        print(f"   Conexao: {health.get('connection_test') or health.get('ping')}")
+        print(f"   Memoria: {health.get('memory_usage') or health.get('connection_info')}")
         print()
 
     except Exception as e:
@@ -59,11 +59,11 @@ def test_redis_cache():
     test_key = f"test_embedding_{hash(test_text)}"
 
     start_time = time.time()
-    result_miss = cache.get(test_key)
+    result_miss = cache.get_batch([test_text], os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"))
     miss_time = time.time() - start_time
 
     print(f"   Texto: '{test_text[:50]}...'")
-    print(f"   Resultado (deve ser None): {result_miss}")
+    print(f"   Resultado (deve ser None): {result_miss.get(test_text) if isinstance(result_miss, dict) else None}")
     print(f"   Tempo: {miss_time * 1000:.2f}ms")
     print()
 
@@ -73,10 +73,10 @@ def test_redis_cache():
     fake_embedding = [0.1] * embedding_dims
 
     start_time = time.time()
-    cache.set(test_key, fake_embedding, ttl=300)  # 5 minutos
+    cache.set_batch({test_text: fake_embedding}, os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"), ttl=300)
     set_time = time.time() - start_time
 
-    print(f"   Embedding simulado (1000 dims): {fake_embedding[:5]}...")
+    print(f"   Embedding simulado ({embedding_dims} dims): {fake_embedding[:5]}...")
     print("   Cache SET completado")
     print(f"   Tempo: {set_time * 1000:.2f}ms")
     print()
@@ -85,44 +85,38 @@ def test_redis_cache():
     print("5. TESTE CACHE HIT:")
 
     start_time = time.time()
-    result_hit = cache.get(test_key)
+    result_hit = cache.get_batch([test_text], os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"))
     hit_time = time.time() - start_time
 
-    print(f"   Resultado encontrado: {result_hit is not None}")
-    print(f"   Dimensoes: {len(result_hit) if result_hit else 0}")
-    print(f"   Primeiros valores: {result_hit[:5] if result_hit else None}")
+    found = isinstance(result_hit, dict) and test_text in result_hit
+    print(f"   Resultado encontrado: {found}")
+    print(f"   Dimensoes: {len(result_hit[test_text]) if found else 0}")
+    print(f"   Primeiros valores: {result_hit[test_text][:5] if found else None}")
     print(f"   Tempo: {hit_time * 1000:.2f}ms")
-    print(f"   Speedup: {miss_time / hit_time:.1f}x mais rapido")
+    if hit_time > 0:
+        print(f"   Speedup: {miss_time / hit_time:.1f}x mais rapido")
     print()
 
     # 6. Teste de Performance (múltiplas operações)
     print("6. TESTE DE PERFORMANCE:")
 
-    # Cache múltiplos embeddings
     embeddings_test = {}
     for i in range(10):
-        key = f"perf_test_{i}"
+        key_text = f"perf_text_{i}"
         embedding_dims = get_embedding_dimensions()
         embedding = [i * 0.1] * embedding_dims
-        embeddings_test[key] = embedding
+        embeddings_test[key_text] = embedding
 
-    # Teste SET em lote
     start_time = time.time()
-    for key, embedding in embeddings_test.items():
-        cache.set(key, embedding, ttl=300)
+    cache.set_batch(embeddings_test, os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"), ttl=300)
     batch_set_time = time.time() - start_time
-
     print(f"   SET 10 embeddings: {batch_set_time * 1000:.2f}ms")
 
-    # Teste GET em lote
     start_time = time.time()
-    hits = 0
-    for key in embeddings_test.keys():
-        result = cache.get(key)
-        if result is not None:
-            hits += 1
+    result_batch = cache.get_batch(list(embeddings_test.keys()), os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"))
     batch_get_time = time.time() - start_time
 
+    hits = sum(1 for k in embeddings_test.keys() if isinstance(result_batch, dict) and k in result_batch)
     print(f"   GET 10 embeddings: {batch_get_time * 1000:.2f}ms")
     print(f"   Cache hits: {hits}/10")
     print(f"   Avg GET time: {batch_get_time / 10 * 1000:.2f}ms per embedding")
@@ -131,19 +125,17 @@ def test_redis_cache():
     # 7. Teste de TTL (Time To Live)
     print("7. TESTE TTL (Time To Live):")
 
-    ttl_key = "ttl_test"
-    cache.set(ttl_key, [1, 2, 3], ttl=2)  # 2 segundos apenas
+    ttl_text = "ttl_text"
+    cache.set_batch({ttl_text: [1.0, 2.0, 3.0]}, os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"), ttl=2)
 
-    # Verificar imediatamente
-    immediate_result = cache.get(ttl_key)
-    print(f"   Imediatamente: {immediate_result is not None}")
+    immediate_result = cache.get_batch([ttl_text], os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"))
+    print(f"   Imediatamente: {isinstance(immediate_result, dict) and ttl_text in immediate_result}")
 
-    # Aguardar expiração
     print("   Aguardando expiracao (3s)...")
     time.sleep(3)
 
-    expired_result = cache.get(ttl_key)
-    print(f"   Apos expiracao: {expired_result is not None}")
+    expired_result = cache.get_batch([ttl_text], os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small"))
+    print(f"   Apos expiracao: {isinstance(expired_result, dict) and ttl_text in expired_result}")
     print()
 
     # 8. Estatísticas do Redis
@@ -154,30 +146,18 @@ def test_redis_cache():
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
         )
-
         info = r.info()
         stats = r.info("stats")
-
-        print(
-            f"   Total commands processed: {stats.get('total_commands_processed', 'N/A')}"
-        )
+        print(f"   Total commands processed: {stats.get('total_commands_processed', 'N/A')}")
         print(f"   Cache hits: {stats.get('keyspace_hits', 0)}")
         print(f"   Cache misses: {stats.get('keyspace_misses', 0)}")
-
         hit_ratio = 0
-        if stats.get("keyspace_hits", 0) + stats.get("keyspace_misses", 0) > 0:
-            hit_ratio = (
-                stats["keyspace_hits"]
-                / (stats["keyspace_hits"] + stats["keyspace_misses"])
-                * 100
-            )
-
+        denom = stats.get("keyspace_hits", 0) + stats.get("keyspace_misses", 0)
+        if denom > 0:
+            hit_ratio = stats["keyspace_hits"] / denom * 100
         print(f"   Hit ratio: {hit_ratio:.1f}%")
-        print(f"   Memory used: {info['used_memory_human']}")
-        print(
-            f"   Keys in DB: {info.get('db0', {}).get('keys', 0) if 'db0' in info else 0}"
-        )
-
+        print(f"   Memory used: {info.get('used_memory_human')}")
+        print(f"   Keys in DB: {info.get('db0', {}).get('keys', 0) if 'db0' in info else 0}")
     except Exception as e:
         print(f"   [ERROR] Falha ao obter estatisticas: {e}")
 
@@ -185,10 +165,13 @@ def test_redis_cache():
 
     # 9. Limpeza
     print("9. LIMPEZA:")
-    cleanup_keys = [test_key, ttl_key] + list(embeddings_test.keys())
-    for key in cleanup_keys:
-        cache.delete(key)
-    print(f"   {len(cleanup_keys)} chaves de teste removidas")
+    cleanup_texts = [test_text, ttl_text] + list(embeddings_test.keys())
+    for text in cleanup_texts:
+        try:
+            cache.redis.delete(cache._generate_cache_key(text, os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")))
+        except Exception:
+            pass
+    print(f"   {len(cleanup_texts)} chaves de teste removidas")
     print()
 
     print("=== TESTE CONCLUIDO ===")
