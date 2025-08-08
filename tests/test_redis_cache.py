@@ -13,12 +13,12 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from dotenv import load_dotenv
-from embedding_config import get_embedding_dimensions
-from embedding_cache import (
+from dotenv import load_dotenv  # noqa: E402
+from embedding_config import get_embedding_dimensions  # noqa: E402
+from embedding_cache import (  # noqa: E402
     EmbeddingCache,
 )
-import redis
+import redis  # noqa: E402
 
 load_dotenv()
 

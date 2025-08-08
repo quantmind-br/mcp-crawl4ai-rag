@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 # Add src to path
-src_path = Path(__file__).parent / "src"
+project_root = Path(__file__).parent.parent
+src_path = project_root / "src"
 sys.path.insert(0, str(src_path))
 
 
@@ -129,6 +130,7 @@ def test_rerank_integration():
 
     try:
         from unittest.mock import Mock
+        from services.rag_service import rerank_results  # noqa: E402
 
         # Create mock model
         mock_model = Mock()

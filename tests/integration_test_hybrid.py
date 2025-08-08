@@ -6,11 +6,12 @@ These tests validate the complete hybrid search workflow end-to-end.
 
 import os
 import pytest
+from unittest.mock import patch
 
 try:
     from src.clients.qdrant_client import QdrantClientWrapper
-    from src.crawl4ai_mcp import perform_hybrid_search
-    from qdrant_client import QdrantClient
+    from qdrant_client.models import VectorParams, Distance, SparseVector, PointStruct, Modifier
+    import time as import_time
 
     INTEGRATION_TESTS = True
 except ImportError as e:
@@ -41,7 +42,7 @@ class TestHybridSearchIntegration:
         # Cleanup
         try:
             wrapper.client.delete_collection("test_hybrid_collection")
-        except:
+        except Exception:
             pass
 
     @pytest.mark.asyncio
@@ -171,7 +172,7 @@ class TestHybridSearchIntegration:
         # Cleanup
         try:
             qdrant_wrapper.client.delete_collection(legacy_collection)
-        except:
+        except Exception:
             pass
 
     @patch("src.embedding_config.get_embedding_dimensions")
@@ -202,7 +203,7 @@ class TestHybridSearchIntegration:
         # Cleanup
         try:
             qdrant_wrapper.client.delete_collection(collection_name)
-        except:
+        except Exception:
             pass
 
 
@@ -270,7 +271,7 @@ def test_performance_benchmark_comparison():
     finally:
         try:
             wrapper.client.delete_collection(collection_name)
-        except:
+        except Exception:
             pass
 
 

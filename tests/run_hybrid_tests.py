@@ -37,8 +37,6 @@ def test_imports():
         project_root = Path(__file__).parent.parent
         sys.path.insert(0, str(project_root / "src"))
 
-        import clients.qdrant_client
-        import sparse_vector_types
         from clients.qdrant_client import QdrantClientWrapper
 
         # Test wrapper initialization
@@ -179,7 +177,6 @@ def test_fastembed_compatibility():
     print("📦 Testing FastBM25 compatibility...")
 
     try:
-        import fastembed as fe
 
         # Test basic BM25 model loading
         from fastembed import SparseTextEmbedding

@@ -25,13 +25,8 @@ from crawl4ai import (
 from mcp.server.fastmcp import Context
 
 # Import MCP decorator - will be applied when tools are registered
-try:
-    from ..core.app import create_app
-
-    # Will get actual mcp instance from parent module
-    mcp = None
-except ImportError:
-    mcp = None
+# Will get actual mcp instance from parent module
+mcp = None
 
 # Import utilities from the services layer
 try:
@@ -40,8 +35,6 @@ try:
         add_code_examples_to_vector_db,
         update_source_info,
     )
-    from ..clients.qdrant_client import get_qdrant_client
-    from ..services.embedding_service import create_embedding
 except ImportError:
     from services.rag_service import (
         add_documents_to_vector_db,

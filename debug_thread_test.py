@@ -13,8 +13,8 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from src.services.unified_indexing_service import UnifiedIndexingService
-from src.models.unified_indexing_models import UnifiedIndexingRequest, IndexingDestination
+from src.services.unified_indexing_service import UnifiedIndexingService  # noqa: E402
+from src.models.unified_indexing_models import UnifiedIndexingRequest, IndexingDestination  # noqa: E402
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -21,7 +21,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -30,8 +30,6 @@ sys.path.insert(0, str(project_root))
 try:
     from src.clients.qdrant_client import get_qdrant_client
     from knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
-    from qdrant_client.http import models
-    from neo4j import GraphDatabase
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you're running from the project root and dependencies are installed")

@@ -380,11 +380,8 @@ def add_documents_to_vector_db(
     try:
         from ..services.embedding_service import (
             create_embeddings_batch,
-            create_embedding,
-            create_sparse_embedding,
             process_chunk_with_context,
         )
-        from ..sparse_vector_types import SparseVectorConfig
     except ImportError:
         from services.embedding_service import (
             create_embeddings_batch,
@@ -706,10 +703,6 @@ def search_documents(
     Returns:
         List of matching documents
     """
-    try:
-        from ..clients.qdrant_client import QdrantClientWrapper
-    except ImportError:
-        pass
 
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client, reranking_model=reranker)
@@ -744,10 +737,6 @@ def search_code_examples(
     Returns:
         List of matching code examples
     """
-    try:
-        from ..clients.qdrant_client import QdrantClientWrapper
-    except ImportError:
-        pass
 
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client, reranking_model=reranker)
@@ -770,10 +759,6 @@ def update_source_info(qdrant_client, source_id: str, summary: str, word_count: 
         summary: Summary of the source
         word_count: Total word count for the source
     """
-    try:
-        from ..clients.qdrant_client import QdrantClientWrapper
-    except ImportError:
-        pass
 
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client)

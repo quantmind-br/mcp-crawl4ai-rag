@@ -19,10 +19,10 @@ knowledge_graphs_path = project_root / "knowledge_graphs"
 if str(knowledge_graphs_path) not in sys.path:
     sys.path.append(str(knowledge_graphs_path))
 
-from ai_script_analyzer import AIScriptAnalyzer
-from hallucination_reporter import HallucinationReporter
+from ai_script_analyzer import AIScriptAnalyzer  # noqa: E402
+from hallucination_reporter import HallucinationReporter  # noqa: E402
 
-import logging
+import logging  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

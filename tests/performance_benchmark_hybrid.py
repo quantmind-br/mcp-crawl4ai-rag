@@ -13,8 +13,7 @@ from typing import Dict, List, Any
 
 try:
     from src.clients.qdrant_client import QdrantClientWrapper
-    from memory_profiler import memory_usage
-
+    
     PERF_TESTS = True
 except ImportError:
     print("Memory profiler not available, using simple timing")
@@ -285,7 +284,7 @@ class HybridSearchBenchmark:
                 # Clean previous collection
                 try:
                     self.wrapper.client.delete_collection(collection_name)
-                except:
+                except Exception:
                     pass
 
                 # Set up test environment
@@ -339,7 +338,7 @@ class HybridSearchBenchmark:
                 try:
                     self.wrapper.client.delete_collection(hybrid_col)
                     self.wrapper.client.delete_collection(legacy_col)
-                except:
+                except Exception:
                     pass
 
                 print(f"✅ Completed {count:,} documents test")
