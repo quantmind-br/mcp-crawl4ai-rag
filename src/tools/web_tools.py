@@ -569,10 +569,14 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                     code_summaries = []
                     code_metadatas = []
 
+                    # Get context executor if available, fallback to local executor
+                    cpu_executor = getattr(
+                        ctx.request_context.lifespan_context, "cpu_executor", None
+                    )
+
                     # Process code examples in parallel
-                    with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=10
-                    ) as executor:
+                    if cpu_executor:
+                        # Use context executor
                         # Prepare arguments for parallel processing
                         summary_args = [
                             (
@@ -583,10 +587,29 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                             for block in code_blocks
                         ]
 
-                        # Generate summaries in parallel
+                        # Generate summaries in parallel using context executor
                         summaries = list(
-                            executor.map(process_code_example, summary_args)
+                            cpu_executor.map(process_code_example, summary_args)
                         )
+                    else:
+                        # Fallback to local ThreadPoolExecutor
+                        with concurrent.futures.ThreadPoolExecutor(
+                            max_workers=10
+                        ) as executor:
+                            # Prepare arguments for parallel processing
+                            summary_args = [
+                                (
+                                    block["code"],
+                                    block["context_before"],
+                                    block["context_after"],
+                                )
+                                for block in code_blocks
+                            ]
+
+                            # Generate summaries in parallel
+                            summaries = list(
+                                executor.map(process_code_example, summary_args)
+                            )
 
                     # Prepare code example data
                     for i, (block, summary) in enumerate(zip(code_blocks, summaries)):
@@ -807,18 +830,33 @@ async def smart_crawl_url(
         for doc in crawl_results:
             url_to_full_document[doc["url"]] = doc["markdown"]
 
+        # Get context executor if available, fallback to local executor
+        cpu_executor = getattr(
+            ctx.request_context.lifespan_context, "cpu_executor", None
+        )
+
         # Update source information for each unique source FIRST (before inserting documents)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            source_summary_args = [
-                (source_id, content)
-                for source_id, content in source_content_map.items()
-            ]
+        source_summary_args = [
+            (source_id, content) for source_id, content in source_content_map.items()
+        ]
+
+        if cpu_executor:
+            # Use context executor
             source_summaries = list(
-                executor.map(
+                cpu_executor.map(
                     lambda args: extract_source_summary(args[0], args[1]),
                     source_summary_args,
                 )
             )
+        else:
+            # Fallback to local ThreadPoolExecutor
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                source_summaries = list(
+                    executor.map(
+                        lambda args: extract_source_summary(args[0], args[1]),
+                        source_summary_args,
+                    )
+                )
 
         for (source_id, _), summary in zip(source_summary_args, source_summaries):
             word_count = source_word_counts.get(source_id, 0)
@@ -845,17 +883,23 @@ async def smart_crawl_url(
             code_summaries = []
             code_metadatas = []
 
-            # Extract code blocks from all documents
-            for doc in crawl_results:
-                source_url = doc["url"]
-                md = doc["markdown"]
-                code_blocks = extract_code_blocks(md)
+            # Get context executor if available (outside the loop for efficiency)
+            cpu_executor = getattr(
+                ctx.request_context.lifespan_context, "cpu_executor", None
+            )
+            local_executor = None
+            if not cpu_executor:
+                # Create local executor if context executor not available
+                local_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
-                if code_blocks:
-                    # Process code examples in parallel
-                    with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=10
-                    ) as executor:
+            try:
+                # Extract code blocks from all documents
+                for doc in crawl_results:
+                    source_url = doc["url"]
+                    md = doc["markdown"]
+                    code_blocks = extract_code_blocks(md)
+
+                    if code_blocks:
                         # Prepare arguments for parallel processing
                         summary_args = [
                             (
@@ -866,9 +910,12 @@ async def smart_crawl_url(
                             for block in code_blocks
                         ]
 
-                        # Generate summaries in parallel
+                        # Generate summaries in parallel using available executor
+                        executor_to_use = (
+                            cpu_executor if cpu_executor else local_executor
+                        )
                         summaries = list(
-                            executor.map(process_code_example, summary_args)
+                            executor_to_use.map(process_code_example, summary_args)
                         )
 
                     # Prepare code example data
@@ -893,17 +940,21 @@ async def smart_crawl_url(
                         }
                         code_metadatas.append(code_meta)
 
-            # Add all code examples to Qdrant
-            if code_examples:
-                add_code_examples_to_vector_db(
-                    qdrant_client,
-                    code_urls,
-                    code_chunk_numbers,
-                    code_examples,
-                    code_summaries,
-                    code_metadatas,
-                    batch_size=batch_size,
-                )
+                # Add all code examples to Qdrant
+                if code_examples:
+                    add_code_examples_to_vector_db(
+                        qdrant_client,
+                        code_urls,
+                        code_chunk_numbers,
+                        code_examples,
+                        code_summaries,
+                        code_metadatas,
+                        batch_size=batch_size,
+                    )
+            finally:
+                # Cleanup local executor if it was created
+                if local_executor:
+                    local_executor.shutdown(wait=True)
 
         return json.dumps(
             {

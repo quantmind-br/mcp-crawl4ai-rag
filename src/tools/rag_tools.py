@@ -50,11 +50,11 @@ async def get_available_sources(ctx: Context) -> str:
 
 
 async def perform_rag_query(
-    ctx: Context, 
-    query: str, 
-    source: Optional[str] = None, 
+    ctx: Context,
+    query: str,
+    source: Optional[str] = None,
     match_count: int = 5,
-    file_id: Optional[str] = None
+    file_id: Optional[str] = None,
 ) -> str:
     """
     Perform a RAG (Retrieval Augmented Generation) query on the stored content.
@@ -81,6 +81,9 @@ async def perform_rag_query(
         # Get clients from context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         reranker = getattr(ctx.request_context.lifespan_context, "reranker", None)
+        cpu_executor = getattr(
+            ctx.request_context.lifespan_context, "cpu_executor", None
+        )
 
         # Build filter metadata with support for both source and file_id filtering
         filter_metadata = {}
@@ -88,41 +91,49 @@ async def perform_rag_query(
             filter_metadata["source"] = source
         if file_id:
             filter_metadata["file_id"] = file_id
-        
+
         # Use updated search function that accepts filter_metadata
         from ..services.rag_service import RagService
+
         rag_service = RagService(qdrant_client, reranking_model=reranker)
-        
-        results = rag_service.search_with_reranking(
-            query=query,
-            match_count=match_count,
-            filter_metadata=filter_metadata if filter_metadata else None,
-            search_type="documents"
-        )
+
+        # Use async methods when executor available, fallback to sync
+        if cpu_executor and reranker:
+            results = await rag_service.search_with_reranking_async(
+                query=query,
+                executor=cpu_executor,
+                match_count=match_count,
+                filter_metadata=filter_metadata if filter_metadata else None,
+                search_type="documents",
+            )
+        else:
+            results = rag_service.search_with_reranking(
+                query=query,
+                match_count=match_count,
+                filter_metadata=filter_metadata if filter_metadata else None,
+                search_type="documents",
+            )
 
         # Format response with filtering information
         response = {
             "success": True,
             "query": query,
             "match_count": len(results),
-            "filters_applied": {
-                "source": source,
-                "file_id": file_id
-            },
-            "results": results
+            "filters_applied": {"source": source, "file_id": file_id},
+            "results": results,
         }
-        
+
         return json.dumps(response, indent=2)
     except Exception as e:
         return json.dumps({"success": False, "query": query, "error": str(e)}, indent=2)
 
 
 async def search_code_examples(
-    ctx: Context, 
-    query: str, 
-    source_id: Optional[str] = None, 
+    ctx: Context,
+    query: str,
+    source_id: Optional[str] = None,
     match_count: int = 5,
-    file_id: Optional[str] = None
+    file_id: Optional[str] = None,
 ) -> str:
     """
     Search for code examples relevant to the query.
@@ -151,6 +162,9 @@ async def search_code_examples(
         # Get clients from context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
         reranker = getattr(ctx.request_context.lifespan_context, "reranker", None)
+        cpu_executor = getattr(
+            ctx.request_context.lifespan_context, "cpu_executor", None
+        )
 
         # Build filter metadata with support for both source_id and file_id filtering
         filter_metadata = {}
@@ -158,30 +172,38 @@ async def search_code_examples(
             filter_metadata["source"] = source_id
         if file_id:
             filter_metadata["file_id"] = file_id
-        
+
         # Use updated search function that accepts filter_metadata
         from ..services.rag_service import RagService
+
         rag_service = RagService(qdrant_client, reranking_model=reranker)
-        
-        results = rag_service.search_with_reranking(
-            query=query,
-            match_count=match_count,
-            filter_metadata=filter_metadata if filter_metadata else None,
-            search_type="code_examples"
-        )
+
+        # Use async methods when executor available, fallback to sync
+        if cpu_executor and reranker:
+            results = await rag_service.search_with_reranking_async(
+                query=query,
+                executor=cpu_executor,
+                match_count=match_count,
+                filter_metadata=filter_metadata if filter_metadata else None,
+                search_type="code_examples",
+            )
+        else:
+            results = rag_service.search_with_reranking(
+                query=query,
+                match_count=match_count,
+                filter_metadata=filter_metadata if filter_metadata else None,
+                search_type="code_examples",
+            )
 
         # Format response with filtering information
         response = {
             "success": True,
             "query": query,
             "match_count": len(results),
-            "filters_applied": {
-                "source_id": source_id,
-                "file_id": file_id
-            },
-            "results": results
+            "filters_applied": {"source_id": source_id, "file_id": file_id},
+            "results": results,
         }
-        
+
         return json.dumps(response, indent=2)
     except Exception as e:
         return json.dumps({"success": False, "query": query, "error": str(e)}, indent=2)

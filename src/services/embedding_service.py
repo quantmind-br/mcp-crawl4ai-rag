@@ -10,7 +10,9 @@ the application layer.
 import os
 import time
 import logging
+import asyncio
 from typing import List, Dict, Any, Tuple, Union
+from concurrent.futures import ThreadPoolExecutor
 
 import openai
 
@@ -343,6 +345,63 @@ class EmbeddingService:
         if use_hybrid_search:
             return (final_embeddings, final_sparse_vectors)
         return final_embeddings
+
+    async def create_embeddings_batch_async(
+        self, texts: List[str], executor: ThreadPoolExecutor
+    ) -> Union[List[List[float]], Tuple[List[List[float]], List[SparseVectorConfig]]]:
+        """
+        Async create embeddings for multiple texts with ThreadPoolExecutor for CPU-bound operations.
+
+        This is the async version of create_embeddings_batch that moves CPU-bound operations
+        (API calls and sparse vector generation) to a thread pool to prevent blocking
+        the event loop.
+
+        Args:
+            texts: List of texts to create embeddings for
+            executor: ThreadPoolExecutor for CPU-bound operations
+
+        Returns:
+            When USE_HYBRID_SEARCH=false: List of embeddings (each embedding is a list of floats)
+            When USE_HYBRID_SEARCH=true: Tuple of (dense_vectors, sparse_vectors)
+        """
+        if not texts:
+            # Return appropriate empty structure based on hybrid search mode
+            use_hybrid_search = (
+                os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+            )
+            if use_hybrid_search:
+                return ([], [])  # (dense_vectors, sparse_vectors)
+            return []
+
+        try:
+            # Move the entire batch processing to the thread pool
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                executor, self._thread_safe_create_embeddings_batch, texts
+            )
+            return result
+
+        except Exception as e:
+            logging.warning(
+                f"Async embedding creation failed: {e}, falling back to sync"
+            )
+            # Graceful fallback to synchronous operation
+            return self.create_embeddings_batch(texts)
+
+    def _thread_safe_create_embeddings_batch(
+        self, texts: List[str]
+    ) -> Union[List[List[float]], Tuple[List[List[float]], List[SparseVectorConfig]]]:
+        """
+        Thread-safe wrapper for batch embedding creation.
+
+        Args:
+            texts: List of texts to create embeddings for
+
+        Returns:
+            Same format as create_embeddings_batch
+        """
+        # Call the existing synchronous method in the thread pool
+        return self.create_embeddings_batch(texts)
 
     def _create_embeddings_api_call(self, texts: List[str]) -> List[List[float]]:
         """

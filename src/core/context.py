@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from crawl4ai import AsyncWebCrawler
 from sentence_transformers import CrossEncoder
@@ -35,6 +36,9 @@ class Crawl4AIContext:
     reranker: Optional[CrossEncoder] = None
     knowledge_validator: Optional[Any] = None  # KnowledgeGraphValidator when available
     repo_extractor: Optional[Any] = None  # DirectNeo4jExtractor when available
+
+    # ThreadPool executor for CPU-bound operations
+    cpu_executor: Optional[ThreadPoolExecutor] = None
 
     # Application services (to be added in future phases)
     embedding_service: Optional[Any] = None  # EmbeddingService instance

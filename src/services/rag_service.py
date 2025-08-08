@@ -7,7 +7,9 @@ hybrid search functionality, result fusion, and CrossEncoder-based re-ranking.
 
 import os
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
 from sentence_transformers import CrossEncoder
 
 # Import clients and services
@@ -243,6 +245,93 @@ class RagService:
             logger.error(f"Error during reranking: {e}")
             return results
 
+    async def rerank_results_async(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+        executor: ThreadPoolExecutor,
+        content_key: str = "content",
+    ) -> List[Dict[str, Any]]:
+        """
+        Async rerank search results using a cross-encoder model with ThreadPoolExecutor.
+
+        Args:
+            query: The search query
+            results: List of search results
+            executor: ThreadPoolExecutor for CPU-bound operations
+            content_key: The key in each result dict that contains the text content
+
+        Returns:
+            Reranked list of results
+        """
+        if not self.reranking_model or not results or not self.use_reranking:
+            return results
+
+        try:
+            logger.debug(
+                f"Starting async reranking with {len(results)} results for query: '{query[:50]}...'"
+            )
+
+            # Extract content and create pairs (same as sync version)
+            texts = [result.get(content_key, "") for result in results]
+            pairs = [[query, text] for text in texts]
+            logger.debug(
+                f"Created {len(pairs)} query-document pairs for async reranking"
+            )
+
+            # Move CPU-bound operation to thread pool
+            loop = asyncio.get_running_loop()
+            scores = await loop.run_in_executor(
+                executor, self._thread_safe_predict, pairs
+            )
+
+            logger.debug(
+                f"Generated async rerank scores: {[f'{s:.4f}' for s in scores[:5]]}"
+            )
+
+            # Apply scores and sort (same as sync version)
+            for i, result in enumerate(results):
+                result["rerank_score"] = float(scores[i])
+
+            reranked = sorted(
+                results, key=lambda x: x.get("rerank_score", 0), reverse=True
+            )
+            logger.debug(
+                f"Async reranked results - top score: {reranked[0].get('rerank_score', 0):.4f}"
+            )
+
+            # Clean up GPU memory
+            cleanup_gpu_memory()
+
+            return reranked
+
+        except Exception as e:
+            logger.warning(f"Async reranking failed: {e}, falling back to sync")
+            # Graceful fallback to synchronous operation
+            return self.rerank_results(query, results, content_key)
+
+    def _thread_safe_predict(self, pairs: List[List[str]]) -> List[float]:
+        """
+        Thread-safe wrapper for model prediction.
+
+        Args:
+            pairs: List of [query, document] pairs
+
+        Returns:
+            List of relevance scores
+        """
+        # Import torch inside the method for thread safety
+        try:
+            import torch
+
+            with torch.no_grad():  # Critical for memory efficiency
+                scores = self.reranking_model.predict(pairs)
+                return scores.tolist() if hasattr(scores, "tolist") else scores
+        except ImportError:
+            # Fallback if torch not available
+            scores = self.reranking_model.predict(pairs)
+            return scores.tolist() if hasattr(scores, "tolist") else scores
+
     def search_with_reranking(
         self,
         query: str,
@@ -286,6 +375,64 @@ class RagService:
             results = self.rerank_results(query, results)
 
         return results
+
+    async def search_with_reranking_async(
+        self,
+        query: str,
+        executor: ThreadPoolExecutor,
+        match_count: int = 10,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+        search_type: str = "documents",
+        use_hybrid: bool = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Async perform search with optional hybrid search and re-ranking using ThreadPoolExecutor.
+
+        Args:
+            query: Query text
+            executor: ThreadPoolExecutor for CPU-bound operations
+            match_count: Maximum number of results to return
+            filter_metadata: Optional metadata filter
+            search_type: Type of search - "documents" or "code_examples"
+            use_hybrid: Override hybrid search setting (None uses environment setting)
+
+        Returns:
+            List of search results, optionally re-ranked
+        """
+        try:
+            # Determine if we should use hybrid search
+            should_use_hybrid = (
+                use_hybrid if use_hybrid is not None else self.use_hybrid_search
+            )
+
+            # Perform the search (I/O bound operations, can stay synchronous)
+            if should_use_hybrid:
+                results = self.hybrid_search(
+                    query, match_count, filter_metadata, search_type
+                )
+            else:
+                if search_type == "code_examples":
+                    results = self.search_code_examples(
+                        query, match_count, filter_metadata
+                    )
+                else:
+                    results = self.search_documents(query, match_count, filter_metadata)
+
+            # Apply async re-ranking if enabled and model is available
+            if self.use_reranking and self.reranking_model and results:
+                logger.debug("Applying async reranking to search results")
+                results = await self.rerank_results_async(query, results, executor)
+
+            return results
+
+        except Exception as e:
+            logger.warning(
+                f"Async search with reranking failed: {e}, falling back to sync"
+            )
+            # Graceful fallback to synchronous operation
+            return self.search_with_reranking(
+                query, match_count, filter_metadata, search_type, use_hybrid
+            )
 
     def fuse_search_results(
         self,
@@ -409,7 +556,12 @@ def add_documents_to_vector_db(
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_documents_to_qdrant(
-            urls, chunk_numbers, contents, enhanced_metadatas, url_to_full_document, batch_size
+            urls,
+            chunk_numbers,
+            contents,
+            enhanced_metadatas,
+            url_to_full_document,
+            batch_size,
         )
     )
 
@@ -572,13 +724,20 @@ def add_code_examples_to_vector_db(
         enhanced_metadata = metadata.copy()
         if file_ids and i < len(file_ids) and file_ids[i]:
             enhanced_metadata["file_id"] = file_ids[i]
-            logger.debug(f"Added file_id '{file_ids[i]}' to metadata for code example {i}")
+            logger.debug(
+                f"Added file_id '{file_ids[i]}' to metadata for code example {i}"
+            )
         enhanced_metadatas.append(enhanced_metadata)
 
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_code_examples_to_qdrant(
-            urls, chunk_numbers, code_examples, summaries, enhanced_metadatas, batch_size
+            urls,
+            chunk_numbers,
+            code_examples,
+            summaries,
+            enhanced_metadatas,
+            batch_size,
         )
     )
 
