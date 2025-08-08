@@ -1,25 +1,26 @@
-# MCP Crawl4AI RAG Server - Project Overview
+# Project Overview - Crawl4AI MCP RAG
 
 ## Purpose
-Advanced web crawling and RAG (Retrieval Augmented Generation) capabilities for AI agents through an MCP (Model Context Protocol) server. Integrates Crawl4AI, Qdrant vector database, and Neo4j knowledge graph to provide intelligent web crawling, GitHub repository indexing, vector search, and AI hallucination detection.
+**Advanced Web Crawling and RAG Capabilities for AI Agents** - A powerful Model Context Protocol (MCP) server that integrates Crawl4AI, Qdrant, and Neo4j to provide AI agents and coding assistants with intelligent web crawling, GitHub repository indexing, vector search, and AI hallucination detection capabilities.
 
-## Key Capabilities
-- **Web Crawling**: Single page and intelligent multi-page crawling with sitemap detection
-- **GitHub Integration**: Repository cloning and documentation indexing
-- **Vector Search**: Semantic search with RAG capabilities using Qdrant
-- **Code Analysis**: Tree-sitter based multi-language parsing for knowledge graphs
-- **Hallucination Detection**: Neo4j-based validation of AI-generated code
-- **Multi-Provider Support**: Flexible API configuration with fallback support
-
-## Target Users
-- AI coding assistants
-- Claude Code users
-- AI agents requiring web crawling and RAG capabilities
-- Developers building documentation search systems
+## Key Features
+- **Web Crawling**: Intelligent crawling with auto-detection of sitemaps and recursive crawling
+- **GitHub Integration**: Clone and index GitHub repositories with markdown documentation
+- **Vector Search**: Semantic search using Qdrant vector database with reranking
+- **Knowledge Graph**: Neo4j integration for code structure analysis and AI hallucination detection  
+- **RAG Strategies**: Multiple strategies including contextual embeddings, hybrid search, agentic RAG
+- **Multi-Provider Support**: OpenAI, Azure OpenAI, DeepInfra, and other OpenAI-compatible providers
+- **GPU Acceleration**: Optional GPU support for reranking models
+- **Redis Caching**: Optional Redis integration for embedding caching
 
 ## Architecture
-- **MCP Server**: FastMCP-based async server
-- **Vector DB**: Qdrant for semantic search
+- **MCP Server**: FastMCP-based server with async tools
+- **Vector Database**: Qdrant for semantic search and storage
+- **Web Crawler**: Crawl4AI with smart URL detection and GitHub integration
 - **Knowledge Graph**: Neo4j for code structure analysis  
-- **Web Crawler**: Crawl4AI with smart detection
-- **Device Manager**: Auto GPU/CPU detection with fallback
+- **Device Manager**: Automatic GPU/CPU detection and fallback
+
+## Target Users
+- AI coding assistants and agents
+- Developers building RAG applications
+- Users needing intelligent web crawling and document indexing capabilities

@@ -1,71 +1,166 @@
-# Essential Commands
+# Essential Commands - Crawl4AI MCP RAG
 
-## Development Setup
+## Setup & Installation Commands
+
+### Initial Setup
 ```bash
-# Initial setup
-git clone <repository>
+# Clone and install dependencies
+git clone https://github.com/coleam00/mcp-crawl4ai-rag.git
 cd mcp-crawl4ai-rag
-uv sync                    # Install dependencies
-
-# Windows setup
-setup.bat                  # Start Docker services
-
-# Linux/Mac setup  
-docker-compose up -d       # Start services
-
-# Configuration
-cp .env.example .env       # Copy environment template
-# Edit .env with your API keys
+uv sync
 ```
 
-## Running the Server
+### Windows Setup (Recommended)
+```cmd
+# Start Docker services (Qdrant, Neo4j, Redis)
+setup.bat
+
+# Start the MCP server
+start.bat
+```
+
+### Manual Docker Management
 ```bash
-# Windows
-start.bat                  # Convenience script
+# Start all services
+docker-compose up -d
 
-# Linux/Mac/Windows
-uv run -m src             # Primary method (module execution)
-python run_server.py     # Alternative method
+# View service logs
+docker-compose logs qdrant
+docker-compose logs neo4j
+docker-compose logs redis
+
+# Stop all services
+docker-compose down --volumes
 ```
 
-## Testing
+## Development Commands
+
+### Running the Server
 ```bash
-uv run pytest                              # Run all tests
-uv run pytest tests/test_mcp_basic.py      # MCP functionality
-uv run pytest tests/test_qdrant_wrapper.py # Vector database  
-uv run pytest tests/integration_test.py    # Full integration
+# Primary method (module execution)
+uv run -m src
+
+# Alternative method
+uv run run_server.py
+
+# With specific transport
+TRANSPORT=sse uv run -m src
+TRANSPORT=stdio uv run -m src
 ```
 
-## Code Quality
+### Testing Commands
 ```bash
-uv run ruff check         # Linting
-uv run ruff format        # Formatting
-uv run ruff check --fix   # Auto-fix linting issues
+# Run all tests
+uv run pytest
+
+# Specific test suites
+uv run pytest tests/test_mcp_basic.py          # MCP functionality
+uv run pytest tests/test_qdrant_wrapper.py     # Vector database
+uv run pytest tests/integration_test.py        # Full integration
+uv run pytest tests/test_hybrid_search.py      # Hybrid search
+uv run pytest tests/performance_benchmark.py   # Performance tests
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run tests with coverage
+uv run pytest --cov=src
 ```
 
-## Docker Services
+### Code Quality Commands
 ```bash
-docker-compose logs qdrant    # View Qdrant logs
-docker-compose logs neo4j     # View Neo4j logs
-docker-compose restart        # Restart all services
-docker-compose down --volumes # Stop and clean up
+# Lint and auto-fix code issues
+uv run ruff check --fix
+
+# Format code
+uv run ruff format
+
+# Type checking (if mypy is configured)
+mypy src/
 ```
 
-## Utilities
+## Utility Commands
+
+### Database Management
 ```bash
 # Clean vector database
 uv run python scripts/clean_qdrant.py
 
-# Fix dimension mismatches  
+# Fix dimension mismatches
 uv run python scripts/define_qdrant_dimensions.py
 
-# Analyze code for hallucinations
-uv run python knowledge_graphs/ai_hallucination_detector.py script.py
+# Clean all databases
+uv run python scripts/cleanup_databases.py
 ```
 
-## Windows System Commands
-- `dir` (list files)
-- `type` (view file contents)
-- `mkdir` (create directory)
-- `rmdir /s` (remove directory)
-- `findstr` (search in files)
+### Debugging & Analysis
+```bash
+# Analyze repository for hallucinations
+uv run python knowledge_graphs/ai_hallucination_detector.py script.py
+
+# Debug specific components
+python debug_neo4j_test.py
+python debug_analysis_test.py
+```
+
+## Windows-Specific Commands
+```cmd
+# Check service status
+netstat -an | find "6333"    # Qdrant
+netstat -an | find "7474"    # Neo4j  
+netstat -an | find "6379"    # Redis
+netstat -an | find "8051"    # MCP Server
+
+# Kill process on port (if needed)
+taskkill /F /PID <process_id>
+
+# Service health check
+curl -s http://localhost:6333/health    # Qdrant health
+curl -s http://localhost:7474           # Neo4j web interface
+```
+
+## Environment Configuration
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit environment configuration
+# (Configure API keys, database URLs, RAG strategies)
+```
+
+## Package Management
+```bash
+# Install new dependencies
+uv add package_name
+
+# Install development dependencies  
+uv add --group dev package_name
+
+# Update all dependencies
+uv sync --upgrade
+
+# Check outdated packages
+uv tree
+```
+
+## Git Workflow
+```bash
+# Standard git operations
+git status
+git add .
+git commit -m "message"
+git push
+
+# Branch management
+git checkout -b feature-branch
+git merge main
+```
+
+## Quick Health Check
+```bash
+# Verify all services are running
+curl -s http://localhost:6333/health && echo "Qdrant OK"
+curl -s http://localhost:7474 && echo "Neo4j OK" 
+docker exec mcp-redis redis-cli ping && echo "Redis OK"
+curl -s http://localhost:8051 && echo "MCP Server OK"
+```

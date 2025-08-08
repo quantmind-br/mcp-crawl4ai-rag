@@ -1,35 +1,38 @@
-# Technology Stack
+# Tech Stack - Crawl4AI MCP RAG
 
 ## Core Technologies
-- **Python**: 3.12+ (required)
-- **MCP**: Model Context Protocol v1.7.1 for AI agent integration
-- **FastMCP**: Async MCP server framework
-- **Crawl4AI**: v0.6.2 for web crawling capabilities
-- **Qdrant**: Vector database for semantic search and storage
-- **Neo4j**: Graph database for knowledge graph and code analysis
+- **Python**: 3.12+ (primary language)
+- **uv**: Package manager for dependency management
+- **FastMCP**: MCP server framework for async tool implementation
+- **Docker**: Container orchestration for databases
 
-## AI/ML Libraries
-- **OpenAI**: v1.71.0 for LLM integration
-- **FastEmbed**: v0.4.0+ for embeddings
-- **Sentence-Transformers**: v5.0.0+ for additional embedding models
-- **PyTorch**: CUDA-enabled for GPU acceleration
-- **Tree-sitter**: Multi-language code parsing
+## AI/ML Stack
+- **Crawl4AI**: Web crawling and content extraction (v0.6.2)
+- **OpenAI**: Chat models and embeddings API integration
+- **sentence-transformers**: Local embedding models (v5.0.0+)
+- **PyTorch**: GPU acceleration support with CUDA 12.1
+- **fastembed**: Fast embedding computation (v0.4.0+)
+
+## Database Technologies
+- **Qdrant**: Vector database for semantic search (v1.12.0+)
+- **Neo4j**: Knowledge graph database for code analysis (v5.28.1+)
+- **Redis**: Caching layer for embeddings (v5.0.0+)
 
 ## Development Tools
-- **uv**: Modern Python package manager (preferred)
-- **pytest**: v8.4.1+ for testing
-- **ruff**: v0.12.7+ for linting and formatting
-- **Docker**: Required for Qdrant and Neo4j services
+- **pytest**: Testing framework (v8.4.1+)
+- **ruff**: Linting and formatting (v0.12.7+)
+- **tenacity**: Retry logic and resilience (v8.0.0+)
 
-## Supported Tree-sitter Languages
-- Python, JavaScript, Java, Go, Rust, C/C++, C#, PHP, Ruby, Kotlin
+## Multi-Language Parsing
+- **tree-sitter**: Syntax parsing for multiple languages
+  - Python, JavaScript, TypeScript, Java, Go, Rust
+  - C, C++, C#, PHP, Ruby, Kotlin
 
-## Infrastructure
-- **Redis**: Optional caching layer
-- **Docker Compose**: Service orchestration
-- **Windows/Linux/Mac**: Cross-platform support
+## Transport Protocols
+- **SSE (Server-Sent Events)**: Default transport for web clients
+- **stdio**: Standard input/output for CLI integration
 
-## API Providers
-- **OpenAI**: Primary LLM/embeddings provider
-- **DeepInfra**: Cost-effective alternative
-- **Azure OpenAI**: Enterprise option
+## Environment
+- **Windows**: Primary development platform (with .bat scripts)
+- **Linux/Mac**: Cross-platform support with shell scripts
+- **Docker**: Cross-platform database services
