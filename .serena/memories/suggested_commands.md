@@ -1,64 +1,45 @@
-# Essential Commands - Crawl4AI MCP RAG
+# Suggested Commands
 
-## Setup & Installation Commands
-
-### Initial Setup
+## Development Setup
 ```bash
-# Clone and install dependencies
-git clone https://github.com/coleam00/mcp-crawl4ai-rag.git
-cd mcp-crawl4ai-rag
+# Install dependencies
 uv sync
-```
 
-### Windows Setup (Recommended)
-```cmd
-# Start Docker services (Qdrant, Neo4j, Redis)
+# Setup Docker services (Windows)
 setup.bat
 
-# Start the MCP server
-start.bat
-```
-
-### Manual Docker Management
-```bash
-# Start all services
+# Setup Docker services (Linux/Mac)
 docker-compose up -d
 
-# View service logs
-docker-compose logs qdrant
-docker-compose logs neo4j
-docker-compose logs redis
-
-# Stop all services
-docker-compose down --volumes
+# Create environment file
+cp .env.example .env
+# Then edit .env with your API keys
 ```
 
-## Development Commands
-
-### Running the Server
+## Running the Application
 ```bash
-# Primary method (module execution)
+# Start server (Windows)
+start.bat
+
+# Start server (Linux/Mac)
 uv run -m src
 
-# Alternative method
+# Alternative entry point
 uv run run_server.py
 
-# With specific transport
-TRANSPORT=sse uv run -m src
-TRANSPORT=stdio uv run -m src
+# Check server health
+curl http://localhost:8051/health
 ```
 
-### Testing Commands
+## Testing
 ```bash
 # Run all tests
 uv run pytest
 
-# Specific test suites
-uv run pytest tests/test_mcp_basic.py          # MCP functionality
-uv run pytest tests/test_qdrant_wrapper.py     # Vector database
-uv run pytest tests/integration_test.py        # Full integration
-uv run pytest tests/test_hybrid_search.py      # Hybrid search
-uv run pytest tests/performance_benchmark.py   # Performance tests
+# Run specific test files
+uv run pytest tests/test_mcp_basic.py
+uv run pytest tests/test_qdrant_wrapper.py
+uv run pytest tests/integration_test.py
 
 # Run tests with verbose output
 uv run pytest -v
@@ -67,100 +48,55 @@ uv run pytest -v
 uv run pytest --cov=src
 ```
 
-### Code Quality Commands
+## Code Quality
 ```bash
-# Lint and auto-fix code issues
-uv run ruff check --fix
+# Run linter and formatter
+uv run ruff check .
+uv run ruff check . --fix
 
 # Format code
-uv run ruff format
-
-# Type checking (if mypy is configured)
-mypy src/
+uv run ruff format .
 ```
 
-## Utility Commands
-
-### Database Management
+## Utility Scripts
 ```bash
-# Clean vector database
+# Clean Qdrant database
 uv run python scripts/clean_qdrant.py
 
 # Fix dimension mismatches
 uv run python scripts/define_qdrant_dimensions.py
 
-# Clean all databases
-uv run python scripts/cleanup_databases.py
-```
-
-### Debugging & Analysis
-```bash
 # Analyze repository for hallucinations
 uv run python knowledge_graphs/ai_hallucination_detector.py script.py
+```
 
-# Debug specific components
-python debug_neo4j_test.py
-python debug_analysis_test.py
+## Docker Management
+```bash
+# View service logs
+docker-compose logs qdrant
+docker-compose logs neo4j
+docker-compose logs redis
+
+# Restart services
+docker-compose restart
+
+# Stop and remove all services
+docker-compose down --volumes
+
+# Check service status
+docker-compose ps
 ```
 
 ## Windows-Specific Commands
-```cmd
-# Check service status
-netstat -an | find "6333"    # Qdrant
-netstat -an | find "7474"    # Neo4j  
-netstat -an | find "6379"    # Redis
-netstat -an | find "8051"    # MCP Server
+- Use `start.bat` for complete server startup with checks
+- Use `setup.bat` for Docker services initialization
+- Commands use Windows-specific tools like `netstat`, `taskkill`, `curl`
+- Portuguese language messages in batch files
 
-# Kill process on port (if needed)
-taskkill /F /PID <process_id>
-
-# Service health check
-curl -s http://localhost:6333/health    # Qdrant health
-curl -s http://localhost:7474           # Neo4j web interface
-```
-
-## Environment Configuration
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit environment configuration
-# (Configure API keys, database URLs, RAG strategies)
-```
-
-## Package Management
-```bash
-# Install new dependencies
-uv add package_name
-
-# Install development dependencies  
-uv add --group dev package_name
-
-# Update all dependencies
-uv sync --upgrade
-
-# Check outdated packages
-uv tree
-```
-
-## Git Workflow
-```bash
-# Standard git operations
-git status
-git add .
-git commit -m "message"
-git push
-
-# Branch management
-git checkout -b feature-branch
-git merge main
-```
-
-## Quick Health Check
-```bash
-# Verify all services are running
-curl -s http://localhost:6333/health && echo "Qdrant OK"
-curl -s http://localhost:7474 && echo "Neo4j OK" 
-docker exec mcp-redis redis-cli ping && echo "Redis OK"
-curl -s http://localhost:8051 && echo "MCP Server OK"
-```
+## Development Workflow
+1. Start Docker services: `setup.bat` or `docker-compose up -d`
+2. Configure environment: Edit `.env` file
+3. Install dependencies: `uv sync`
+4. Run tests: `uv run pytest`
+5. Start development server: `start.bat` or `uv run -m src`
+6. Lint code before commits: `uv run ruff check . --fix`

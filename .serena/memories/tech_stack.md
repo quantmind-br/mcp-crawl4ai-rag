@@ -1,38 +1,45 @@
-# Tech Stack - Crawl4AI MCP RAG
+# Technology Stack
 
 ## Core Technologies
-- **Python**: 3.12+ (primary language)
-- **uv**: Package manager for dependency management
-- **FastMCP**: MCP server framework for async tool implementation
-- **Docker**: Container orchestration for databases
+- **Python 3.12+**: Primary programming language
+- **MCP 1.7.1**: Model Context Protocol for AI agent integration
+- **FastMCP**: Async MCP server framework
+- **Crawl4AI 0.6.2**: Advanced web crawling engine
+- **Qdrant Client 1.12.0+**: Vector database client
+- **Neo4j 5.28.1+**: Graph database for knowledge representation
 
 ## AI/ML Stack
-- **Crawl4AI**: Web crawling and content extraction (v0.6.2)
-- **OpenAI**: Chat models and embeddings API integration
-- **sentence-transformers**: Local embedding models (v5.0.0+)
-- **PyTorch**: GPU acceleration support with CUDA 12.1
-- **fastembed**: Fast embedding computation (v0.4.0+)
+- **OpenAI 1.71.0**: LLM and embeddings API client
+- **FastEmbed 0.4.0+**: Fast embedding generation
+- **Sentence Transformers 5.0.0+**: Local embedding models
+- **PyTorch 2.5.1**: Deep learning framework with CUDA support
+- **Tree-sitter**: Multi-language parsing for code analysis
 
-## Database Technologies
-- **Qdrant**: Vector database for semantic search (v1.12.0+)
-- **Neo4j**: Knowledge graph database for code analysis (v5.28.1+)
-- **Redis**: Caching layer for embeddings (v5.0.0+)
+## Data & Storage
+- **Qdrant**: Vector database for embeddings and semantic search
+- **Neo4j**: Knowledge graph database for code relationships
+- **Redis 5.0.0+**: Caching layer for embeddings and API responses
 
 ## Development Tools
-- **pytest**: Testing framework (v8.4.1+)
-- **ruff**: Linting and formatting (v0.12.7+)
-- **tenacity**: Retry logic and resilience (v8.0.0+)
+- **uv**: Fast Python package manager (preferred over pip)
+- **pytest 8.4.1+**: Testing framework with async support
+- **Ruff 0.12.7+**: Fast Python linter and formatter
+- **Docker**: Containerization for databases (Qdrant, Neo4j, Redis)
 
 ## Multi-Language Parsing
-- **tree-sitter**: Syntax parsing for multiple languages
-  - Python, JavaScript, TypeScript, Java, Go, Rust
-  - C, C++, C#, PHP, Ruby, Kotlin
+Tree-sitter parsers for:
+- Python, JavaScript, TypeScript
+- Java, Go, Rust, C/C++, C#
+- PHP, Ruby, Kotlin
 
-## Transport Protocols
-- **SSE (Server-Sent Events)**: Default transport for web clients
-- **stdio**: Standard input/output for CLI integration
+## API Providers (Flexible)
+- **OpenAI**: Default provider for chat and embeddings
+- **DeepInfra**: Cost-effective alternative
+- **Azure OpenAI**: Enterprise integration
+- **Custom Providers**: Any OpenAI-compatible API
 
-## Environment
-- **Windows**: Primary development platform (with .bat scripts)
-- **Linux/Mac**: Cross-platform support with shell scripts
-- **Docker**: Cross-platform database services
+## Infrastructure
+- **Docker Compose**: Service orchestration
+- **Windows Support**: Optimized for Windows development
+- **Event Loop Fixes**: Windows-specific async handling
+- **GPU Acceleration**: CUDA support for reranking models

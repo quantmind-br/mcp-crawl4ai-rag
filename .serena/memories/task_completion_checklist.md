@@ -1,143 +1,76 @@
-# Task Completion Checklist - Crawl4AI MCP RAG
+# Task Completion Checklist
 
-## Code Quality Requirements
+## Pre-Completion Requirements
+When completing any development task in this project, ensure these steps are followed:
 
-### 1. Linting and Formatting
+### 1. Code Quality Checks
 ```bash
-# REQUIRED: Run before committing any code changes
-uv run ruff check --fix      # Auto-fix linting issues
-uv run ruff format           # Format code consistently
+# Run linter and fix issues
+uv run ruff check . --fix
+
+# Verify no remaining linting issues
+uv run ruff check .
 ```
 
-### 2. Type Checking (if available)
+### 2. Testing Requirements
 ```bash
-# Check type annotations (if mypy configured)
-mypy src/
+# Run all tests to ensure no regressions
+uv run pytest
+
+# Run specific integration tests if applicable
+uv run pytest tests/integration_test.py
+uv run pytest tests/test_qdrant_wrapper.py
 ```
 
-## Testing Requirements
-
-### 3. Unit Tests
+### 3. Service Validation
 ```bash
-# REQUIRED: Run relevant test suites
-uv run pytest tests/test_<relevant_module>.py -v
+# Ensure Docker services are running
+docker-compose ps
 
-# For core changes, run comprehensive tests
-uv run pytest tests/test_core_*.py
-```
-
-### 4. Integration Tests
-```bash
-# REQUIRED for major changes: Run integration tests
-uv run pytest tests/integration_test.py -v
-
-# For RAG/search changes:
-uv run pytest tests/test_rag_service.py -v
-```
-
-### 5. Performance Validation
-```bash
-# For performance-critical changes: Run benchmarks
-uv run pytest tests/performance_benchmark.py
-```
-
-## Service Validation
-
-### 6. Database Health Checks
-```bash
-# Verify Qdrant is accessible
-curl -s http://localhost:6333/health
-
-# Check Neo4j availability (if using knowledge graph)
-curl -s http://localhost:7474
-
-# Verify Redis (if using caching)
-docker exec mcp-redis redis-cli ping
-```
-
-### 7. Server Startup Validation
-```bash
-# Test server starts correctly
+# Test server startup
 uv run -m src
-# Verify no startup errors in logs
+# Or use start.bat on Windows
+
+# Verify MCP server responds
+curl http://localhost:8051/health
 ```
 
-## Environment and Configuration
+### 4. Environment Configuration
+- Verify `.env` file is properly configured
+- Check all required API keys are present
+- Ensure database connections work (Qdrant, Neo4j, Redis)
 
-### 8. Environment Configuration
-- [ ] Verify `.env` file contains required API keys
-- [ ] Check environment variables are properly loaded
-- [ ] Validate configuration doesn't expose secrets
+### 5. Documentation Updates
+- Update docstrings for new/modified functions
+- Update README.md if public API changes
+- Add comments for complex logic
 
-### 9. Docker Services (if modified)
-```bash
-# Restart and verify Docker services
-docker-compose down --volumes
-docker-compose up -d
+### 6. Performance Considerations
+- Check memory usage for large operations
+- Verify async patterns are properly implemented
+- Test with realistic data volumes
 
-# Check service logs for errors
-docker-compose logs qdrant
-docker-compose logs neo4j
-docker-compose logs redis
-```
+## Critical Validation Steps
+1. **API Integration**: Test with actual API providers (OpenAI, DeepInfra)
+2. **Database Operations**: Verify Qdrant and Neo4j operations work correctly
+3. **Error Handling**: Test failure scenarios and fallback mechanisms
+4. **Resource Cleanup**: Ensure proper cleanup of connections and resources
+5. **Cross-Platform**: Test on Windows (primary target platform)
 
-## Documentation and Code Review
-
-### 10. Documentation Updates
-- [ ] Update docstrings for new/modified functions
-- [ ] Update README.md if public API changed
-- [ ] Add comments for complex logic
-- [ ] Update type hints for all new functions
-
-### 11. Code Review Checklist
-- [ ] Follow naming conventions (snake_case for functions/variables)
-- [ ] Include proper error handling with JSON error responses
-- [ ] Use async/await patterns for I/O operations
-- [ ] Add comprehensive docstrings with Args/Returns sections
-- [ ] Ensure proper resource cleanup in async contexts
+## Pre-Commit Checklist
+- [ ] All tests pass (`uv run pytest`)
+- [ ] Linting passes (`uv run ruff check .`)
+- [ ] Server starts successfully (`uv run -m src`)
+- [ ] No regression in existing functionality
+- [ ] New features have appropriate tests
+- [ ] Documentation is updated
+- [ ] Environment variables documented if added
+- [ ] Error handling implemented for new features
 
 ## Deployment Readiness
-
-### 12. Final Integration Test
-```bash
-# Complete end-to-end test
-uv run pytest tests/integration_test.py -v --tb=short
-```
-
-### 13. Clean State Verification
-```bash
-# Ensure clean database state for tests
-uv run python scripts/clean_qdrant.py  # If needed
-```
-
-## Pre-Commit Verification Commands
-```bash
-# Run this sequence before every commit:
-uv run ruff check --fix
-uv run ruff format  
-uv run pytest tests/ -x  # Stop on first failure
-```
-
-## Performance Verification (for changes affecting core functionality)
-```bash
-# Run performance benchmarks
-uv run pytest tests/performance_benchmark.py
-uv run pytest tests/performance_benchmark_hybrid.py
-```
-
-## Emergency Rollback Procedures
-If issues arise after deployment:
-1. **Stop the server**: `Ctrl+C` or kill MCP server process
-2. **Check logs**: Review console output for error messages
-3. **Restart services**: `docker-compose restart`
-4. **Clean state**: `uv run python scripts/cleanup_databases.py`
-5. **Restart server**: `uv run -m src`
-
-## Success Criteria
-- [ ] All linting passes without errors
-- [ ] All tests pass
-- [ ] Server starts without errors
-- [ ] Database health checks pass
-- [ ] No security issues (secrets properly managed)
-- [ ] Documentation is up-to-date
-- [ ] Code follows project conventions
+- [ ] Docker services start cleanly (`docker-compose up -d`)
+- [ ] MCP server responds to health checks
+- [ ] All required environment variables documented
+- [ ] Integration tests pass with real services
+- [ ] Performance requirements met
+- [ ] Windows compatibility verified (primary platform)

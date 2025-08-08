@@ -1,101 +1,67 @@
-# Project Structure - Crawl4AI MCP RAG
+# Project Structure
 
-## Root Directory Structure
+## Root Directory
 ```
 mcp-crawl4ai-rag/
-├── src/                    # Main source code
-├── tests/                  # Test suites
-├── scripts/                # Utility scripts
-├── knowledge_graphs/       # Knowledge graph components
-├── PRPs/                   # Project Requirements and Plans
-├── .env.example           # Environment configuration template
-├── pyproject.toml         # Python project configuration
-├── docker-compose.yaml    # Docker services definition
-├── setup.bat              # Windows Docker setup script
-├── start.bat              # Windows server startup script
-└── README.md              # Project documentation
+├── src/                     # Main source code
+├── tests/                   # Test suite
+├── scripts/                 # Utility scripts
+├── knowledge_graphs/        # Neo4j knowledge graph tools
+├── .claude/                 # Claude IDE configuration
+├── .serena/                 # Serena project files
+├── pyproject.toml          # Python project configuration
+├── docker-compose.yaml     # Docker services
+├── setup.bat              # Windows setup script
+├── start.bat              # Windows server start script
+└── run_server.py          # Alternative entry point
 ```
 
-## Source Code Organization (src/)
+## Source Code Structure (`src/`)
 ```
 src/
-├── core/                  # Application core
-│   ├── app.py            # Main application and server setup
-│   └── context.py        # Context management and singletons
-├── tools/                # MCP tool implementations
-│   ├── rag_tools.py      # RAG query tools
-│   ├── web_tools.py      # Web crawling tools
-│   ├── github_tools.py   # GitHub integration tools
-│   └── kg_tools.py       # Knowledge graph tools
-├── services/             # Business logic services
-│   └── rag_service.py    # RAG service implementation
-├── clients/              # External service clients
-│   └── qdrant_wrapper.py # Qdrant database client
-├── utils/                # Utility functions
-├── features/             # Feature-specific modules
-├── device_manager.py     # GPU/CPU device management
-├── embedding_cache.py    # Embedding caching logic
-├── embedding_config.py   # Embedding configuration
-├── __main__.py          # Module entry point
-└── __init__.py          # Package initialization
+├── __main__.py             # Module entry point
+├── clients/                # External service clients
+│   ├── llm_api_client.py  # LLM API integration
+│   ├── qdrant_client.py   # Qdrant vector database
+│   └── __init__.py
+├── core/                   # Application core
+│   ├── app.py             # Main application setup
+│   ├── context.py         # Shared context management
+│   └── __init__.py
+├── features/               # Feature implementations
+│   ├── github_processor.py # GitHub repository processing
+│   └── __init__.py
+├── services/               # Business logic services
+│   ├── embedding_service.py      # Embedding generation
+│   ├── rag_service.py            # RAG query processing
+│   ├── unified_indexing_service.py # Multi-destination indexing
+│   └── __init__.py
+├── tools/                  # MCP tool implementations
+│   ├── github_tools.py    # GitHub-related MCP tools
+│   ├── kg_tools.py        # Knowledge graph tools
+│   ├── rag_tools.py       # RAG query tools
+│   ├── web_tools.py       # Web crawling tools
+│   └── __init__.py
+├── utils/                  # Utility functions
+│   ├── file_id_generator.py      # File ID management
+│   ├── grammar_initialization.py # Tree-sitter setup
+│   ├── validation.py             # Input validation
+│   └── __init__.py
+├── device_manager.py      # GPU/CPU detection
+├── embedding_cache.py     # Redis caching
+├── embedding_config.py    # Embedding configuration
+├── event_loop_fix.py      # Windows async fixes
+└── sparse_vector_types.py # Vector type definitions
 ```
 
-## Test Structure (tests/)
-```
-tests/
-├── fixtures/             # Test data and fixtures
-├── conftest.py          # Pytest configuration
-├── test_*.py            # Individual test modules
-├── integration_test.py  # Integration tests
-├── performance_*.py     # Performance benchmarks
-└── test_summary.md      # Test documentation
-```
+## Testing Structure (`tests/`)
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Full system testing with databases
+- **Performance Tests**: Benchmarking and load testing
+- **Fixtures**: Test data and mock configurations
 
-## Key Test Categories
-- **MCP Tests**: Core MCP functionality (`test_mcp_basic.py`)
-- **Database Tests**: Qdrant integration (`test_qdrant_wrapper.py`)  
-- **Service Tests**: RAG service logic (`test_rag_service.py`)
-- **Integration Tests**: End-to-end functionality (`integration_test.py`)
-- **Performance Tests**: Benchmarks (`performance_benchmark.py`)
-
-## Scripts Directory
-```
-scripts/
-├── clean_qdrant.py           # Vector database cleanup
-├── define_qdrant_dimensions.py # Fix dimension mismatches
-├── cleanup_databases.py      # Clean all databases
-└── README.md                 # Script documentation
-```
-
-## Configuration Directories
-- **`.claude/`**: Claude Code integration settings
-- **`.crush/`**: Project-specific caching
-- **`.cursor/`**: Cursor IDE settings  
-- **`.gemini/`**: Gemini integration commands
-- **`.kiro/`**: Additional tooling configuration
-- **`.serena/`**: Serena semantic analysis cache
-
-## Docker & Deployment
-- **`docker-compose.yaml`**: Defines Qdrant, Neo4j, and Redis services
-- **`Dockerfile`**: Application containerization (if needed)
-- **`setup.bat`**: Windows Docker initialization
-- **`start.bat`**: Windows server startup with health checks
-
-## Environment & Configuration
-- **`.env.example`**: Comprehensive environment template
-- **`pyproject.toml`**: Python dependencies and project metadata
-- **`pytest.ini`**: Test runner configuration
-- **`.gitignore`**: Version control exclusions
-
-## Entry Points
-- **`src/__main__.py`**: Primary module entry point
-- **`run_server.py`**: Alternative server startup script
-- **CLI Integration**: `uv run -m src` (recommended)
-
-## Key Architectural Patterns
-- **Modular Design**: Clear separation of concerns across directories
-- **Async Architecture**: Event-driven with async/await patterns
-- **Singleton Pattern**: Context and service management
-- **Factory Pattern**: Application and tool creation
-- **Service Layer**: Business logic abstraction
-- **Client Abstraction**: External service wrappers
+## Key Entry Points
+- `src/__main__.py`: Primary entry point (`uv run -m src`)
+- `run_server.py`: Alternative entry point for standalone execution
+- `setup.bat`: Windows Docker services setup
+- `start.bat`: Complete Windows server startup script
