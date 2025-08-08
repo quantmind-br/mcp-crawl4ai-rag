@@ -18,10 +18,13 @@ import subprocess
 import shutil
 from pathlib import Path
 from typing import List, Dict, Any, Set
-import ast
+# ast import removed - using Tree-sitter exclusively
 
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
+
+# Import Tree-sitter components
+from knowledge_graphs.parser_factory import get_global_factory
 
 # Load environment variables first
 load_dotenv()
@@ -47,9 +50,12 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jCodeAnalyzer:
-    """Analyzes code for direct Neo4j insertion"""
+    """Multi-language code analyzer for direct Neo4j insertion using Tree-sitter"""
 
     def __init__(self):
+        # Initialize parser factory
+        self.parser_factory = get_global_factory()
+
         # External modules to ignore
         self.external_modules = {
             # Python standard library
@@ -178,161 +184,82 @@ class Neo4jCodeAnalyzer:
             "oauthlib",
         }
 
-    def analyze_python_file(
+    def analyze_file(
         self, file_path: Path, repo_root: Path, project_modules: Set[str]
     ) -> Dict[str, Any]:
-        """Extract structure for direct Neo4j insertion"""
+        """Multi-language file analysis using Tree-sitter parsers"""
         try:
+            # Get appropriate parser for this file
+            parser = self.parser_factory.get_parser_for_file(str(file_path))
+            if not parser:
+                logger.debug(f"No parser available for {file_path}")
+                return None
+
+            # Read file content
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            tree = ast.parse(content)
-            relative_path = str(file_path.relative_to(repo_root))
-            module_name = self._get_importable_module_name(
-                file_path, repo_root, relative_path
-            )
+            # Parse using Tree-sitter
+            result = parser.parse(content, str(file_path))
 
-            # Extract structure
-            classes = []
-            functions = []
-            imports = []
+            if result.errors:
+                logger.warning(f"Parse errors in {file_path}: {result.errors}")
+                if len(result.errors) > 3:  # Too many errors, skip this file
+                    return None
 
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    # Extract class with its methods and attributes
-                    methods = []
-                    attributes = []
+            # Filter imports for internal modules (language-specific logic)
+            filtered_imports = []
+            if parser.get_language_name() == "python":
+                # Use Python-specific import filtering
+                filtered_imports = [
+                    imp
+                    for imp in result.imports
+                    if self._is_likely_internal_python(imp, project_modules)
+                ]
+            else:
+                # For other languages, use simpler filtering for now
+                filtered_imports = [
+                    imp
+                    for imp in result.imports
+                    if self._is_likely_internal_generic(imp, project_modules)
+                ]
 
-                    for item in node.body:
-                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                            if not item.name.startswith("_"):  # Public methods only
-                                # Extract comprehensive parameter info
-                                params = self._extract_function_parameters(item)
+            # Tree-sitter already returns dictionary format, just ensure 'args' field for compatibility
+            processed_classes = []
+            for cls in result.classes:
+                # Ensure methods have 'args' field for Neo4j compatibility
+                processed_methods = []
+                for method in cls.get("methods", []):
+                    if "args" not in method:
+                        method["args"] = method.get("params", [])
+                    processed_methods.append(method)
 
-                                # Get return type annotation
-                                return_type = (
-                                    self._get_name(item.returns)
-                                    if item.returns
-                                    else "Any"
-                                )
+                cls["methods"] = processed_methods
+                processed_classes.append(cls)
 
-                                # Create detailed parameter list for Neo4j storage
-                                params_detailed = []
-                                for p in params:
-                                    param_str = f"{p['name']}:{p['type']}"
-                                    if p["optional"] and p["default"] is not None:
-                                        param_str += f"={p['default']}"
-                                    elif p["optional"]:
-                                        param_str += "=None"
-                                    if p["kind"] != "positional":
-                                        param_str = f"[{p['kind']}] {param_str}"
-                                    params_detailed.append(param_str)
-
-                                methods.append(
-                                    {
-                                        "name": item.name,
-                                        "params": params,  # Full parameter objects
-                                        "params_detailed": params_detailed,  # Detailed string format
-                                        "return_type": return_type,
-                                        "args": [
-                                            arg.arg
-                                            for arg in item.args.args
-                                            if arg.arg != "self"
-                                        ],  # Keep for backwards compatibility
-                                    }
-                                )
-                        elif isinstance(item, ast.AnnAssign) and isinstance(
-                            item.target, ast.Name
-                        ):
-                            # Type annotated attributes
-                            if not item.target.id.startswith("_"):
-                                attributes.append(
-                                    {
-                                        "name": item.target.id,
-                                        "type": self._get_name(item.annotation)
-                                        if item.annotation
-                                        else "Any",
-                                    }
-                                )
-
-                    classes.append(
-                        {
-                            "name": node.name,
-                            "full_name": f"{module_name}.{node.name}",
-                            "methods": methods,
-                            "attributes": attributes,
-                        }
-                    )
-
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    # Only top-level functions
-                    if not any(
-                        node in cls_node.body
-                        for cls_node in ast.walk(tree)
-                        if isinstance(cls_node, ast.ClassDef)
-                    ):
-                        if not node.name.startswith("_"):
-                            # Extract comprehensive parameter info
-                            params = self._extract_function_parameters(node)
-
-                            # Get return type annotation
-                            return_type = (
-                                self._get_name(node.returns) if node.returns else "Any"
-                            )
-
-                            # Create detailed parameter list for Neo4j storage
-                            params_detailed = []
-                            for p in params:
-                                param_str = f"{p['name']}:{p['type']}"
-                                if p["optional"] and p["default"] is not None:
-                                    param_str += f"={p['default']}"
-                                elif p["optional"]:
-                                    param_str += "=None"
-                                if p["kind"] != "positional":
-                                    param_str = f"[{p['kind']}] {param_str}"
-                                params_detailed.append(param_str)
-
-                            # Simple format for backwards compatibility
-                            params_list = [f"{p['name']}:{p['type']}" for p in params]
-
-                            functions.append(
-                                {
-                                    "name": node.name,
-                                    "full_name": f"{module_name}.{node.name}",
-                                    "params": params,  # Full parameter objects
-                                    "params_detailed": params_detailed,  # Detailed string format
-                                    "params_list": params_list,  # Simple string format for backwards compatibility
-                                    "return_type": return_type,
-                                    "args": [
-                                        arg.arg for arg in node.args.args
-                                    ],  # Keep for backwards compatibility
-                                }
-                            )
-
-                elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                    # Track internal imports only
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            if self._is_likely_internal(alias.name, project_modules):
-                                imports.append(alias.name)
-                    elif isinstance(node, ast.ImportFrom) and node.module:
-                        if node.module.startswith(".") or self._is_likely_internal(
-                            node.module, project_modules
-                        ):
-                            imports.append(node.module)
+            # Ensure functions have 'args' field for Neo4j compatibility
+            processed_functions = []
+            for func in result.functions:
+                if "args" not in func:
+                    func["args"] = func.get("params", [])
+                processed_functions.append(func)
 
             return {
-                "module_name": module_name,
-                "file_path": relative_path,
-                "classes": classes,
-                "functions": functions,
-                "imports": list(set(imports)),  # Remove duplicates
-                "line_count": len(content.splitlines()),
+                "module_name": result.module_name,
+                "file_path": str(file_path.relative_to(repo_root)),
+                "classes": processed_classes,
+                "functions": processed_functions,
+                "imports": filtered_imports,
+                "line_count": result.line_count,
+                "language": result.language,
+                "errors": result.errors,
             }
 
         except Exception as e:
             logger.warning(f"Could not analyze {file_path}: {e}")
             return None
+
+    # AST-based Python parser removed - using Tree-sitter exclusively
 
     def _is_likely_internal(self, import_name: str, project_modules: Set[str]) -> bool:
         """Check if an import is likely internal to the project"""
@@ -362,6 +289,74 @@ class Neo4jCodeAnalyzer:
             return True
 
         return False
+
+    def _is_likely_internal_python(
+        self, import_name: str, project_modules: Set[str]
+    ) -> bool:
+        """Python-specific import filtering (reuses existing logic)"""
+        return self._is_likely_internal(import_name, project_modules)
+
+    def _is_likely_internal_generic(
+        self, import_name: str, project_modules: Set[str]
+    ) -> bool:
+        """Generic import filtering for non-Python languages"""
+        if not import_name:
+            return False
+
+        # Remove common prefixes/suffixes for different languages
+        clean_import = import_name.strip().strip("\"';")
+
+        # Check if it's a relative import (language-agnostic patterns)
+        if clean_import.startswith("./") or clean_import.startswith("../"):
+            return True
+
+        # Check against project modules
+        base_module = clean_import.split(".")[0].split("/")[0]
+        for project_module in project_modules:
+            if clean_import.startswith(project_module) or base_module == project_module:
+                return True
+
+        # Heuristic: if it doesn't look like a standard library, consider it internal
+        common_external = {
+            "react",
+            "vue",
+            "angular",
+            "lodash",
+            "axios",
+            "express",
+            "fs",
+            "path",
+            "java.util",
+            "java.io",
+            "javax",
+            "org.springframework",
+            "com.google",
+            "std",
+            "core",
+            "alloc",
+            "collections",
+            "serde",
+            "tokio",
+            "System",
+            "Microsoft",
+            "Newtonsoft",
+            "Entity",
+            "fmt",
+            "net/http",
+            "encoding/json",
+            "os",
+            "io",
+            "jquery",
+            "bootstrap",
+            "moment",
+            "uuid",
+        }
+
+        if any(ext in clean_import.lower() for ext in common_external):
+            return False
+
+        # If unsure and it looks reasonable, consider it internal
+        return len(base_module) > 2 and not base_module.startswith("_")
 
     def _get_importable_module_name(
         self, file_path: Path, repo_root: Path, relative_path: str
@@ -412,110 +407,7 @@ class Neo4jCodeAnalyzer:
         # Final fallback: use the default
         return default_module
 
-    def _extract_function_parameters(self, func_node):
-        """Comprehensive parameter extraction from function definition"""
-        params = []
-
-        # Regular positional arguments
-        for i, arg in enumerate(func_node.args.args):
-            if arg.arg == "self":
-                continue
-
-            param_info = {
-                "name": arg.arg,
-                "type": self._get_name(arg.annotation) if arg.annotation else "Any",
-                "kind": "positional",
-                "optional": False,
-                "default": None,
-            }
-
-            # Check if this argument has a default value
-            defaults_start = len(func_node.args.args) - len(func_node.args.defaults)
-            if i >= defaults_start:
-                default_idx = i - defaults_start
-                if default_idx < len(func_node.args.defaults):
-                    param_info["optional"] = True
-                    param_info["default"] = self._get_default_value(
-                        func_node.args.defaults[default_idx]
-                    )
-
-            params.append(param_info)
-
-        # *args parameter
-        if func_node.args.vararg:
-            params.append(
-                {
-                    "name": f"*{func_node.args.vararg.arg}",
-                    "type": self._get_name(func_node.args.vararg.annotation)
-                    if func_node.args.vararg.annotation
-                    else "Any",
-                    "kind": "var_positional",
-                    "optional": True,
-                    "default": None,
-                }
-            )
-
-        # Keyword-only arguments (after *)
-        for i, arg in enumerate(func_node.args.kwonlyargs):
-            param_info = {
-                "name": arg.arg,
-                "type": self._get_name(arg.annotation) if arg.annotation else "Any",
-                "kind": "keyword_only",
-                "optional": True,  # All kwonly args are optional unless explicitly required
-                "default": None,
-            }
-
-            # Check for default value
-            if (
-                i < len(func_node.args.kw_defaults)
-                and func_node.args.kw_defaults[i] is not None
-            ):
-                param_info["default"] = self._get_default_value(
-                    func_node.args.kw_defaults[i]
-                )
-            else:
-                param_info["optional"] = False  # No default = required kwonly arg
-
-            params.append(param_info)
-
-        # **kwargs parameter
-        if func_node.args.kwarg:
-            params.append(
-                {
-                    "name": f"**{func_node.args.kwarg.arg}",
-                    "type": self._get_name(func_node.args.kwarg.annotation)
-                    if func_node.args.kwarg.annotation
-                    else "Dict[str, Any]",
-                    "kind": "var_keyword",
-                    "optional": True,
-                    "default": None,
-                }
-            )
-
-        return params
-
-    def _get_default_value(self, default_node):
-        """Extract default value from AST node"""
-        try:
-            if isinstance(default_node, ast.Constant):
-                return repr(default_node.value)
-            elif isinstance(default_node, ast.Name):
-                return default_node.id
-            elif isinstance(default_node, ast.Attribute):
-                return self._get_name(default_node)
-            elif isinstance(default_node, ast.List):
-                return "[]"
-            elif isinstance(default_node, ast.Dict):
-                return "{}"
-            else:
-                return "..."
-        except Exception:
-            return "..."
-
-    def _get_name(self, node):
-        """Extract name from AST node, handling complex types safely"""
-        if node is None:
-            return "Any"
+        # AST helper methods removed - using Tree-sitter exclusively
 
         try:
             if isinstance(node, ast.Name):
@@ -693,8 +585,9 @@ class DirectNeo4jExtractor:
             await self.driver.close()
 
     def clone_repo(self, repo_url: str, target_dir: str) -> str:
-        """Clone repository with shallow clone"""
+        """Clone repository with Windows long path support and selective file exclusion"""
         logger.info(f"Cloning repository to: {target_dir}")
+
         if os.path.exists(target_dir):
             logger.info(f"Removing existing directory: {target_dir}")
             try:
@@ -716,16 +609,103 @@ class DirectNeo4jExtractor:
                     f"Could not fully remove {target_dir}: {e}. Proceeding anyway..."
                 )
 
-        logger.info(f"Running git clone from {repo_url}")
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, target_dir], check=True
-        )
-        logger.info("Repository cloned successfully")
+        try:
+            logger.info(f"Running git clone from {repo_url}")
+
+            # First, try normal clone with Windows long path support
+            clone_cmd = ["git", "clone", "--depth", "1", repo_url, target_dir]
+
+            # On Windows, enable long path support
+            if os.name == "nt":  # Windows
+                # Configure git for long paths before cloning
+                try:
+                    subprocess.run(
+                        ["git", "config", "--global", "core.longpaths", "true"],
+                        check=False,
+                        capture_output=True,
+                    )
+                    logger.info("Enabled git long paths support")
+                except Exception as e:
+                    logger.warning(f"Could not enable git long paths: {e}")
+
+            # Attempt to clone
+            result = subprocess.run(
+                clone_cmd, check=False, capture_output=True, text=True
+            )
+
+            if result.returncode != 0:
+                logger.warning(f"Standard clone failed: {result.stderr}")
+
+                # If clone failed, try with sparse-checkout to exclude problematic directories
+                logger.info(
+                    "Attempting clone with sparse-checkout to exclude test files..."
+                )
+
+                # Remove partial clone if it exists
+                if os.path.exists(target_dir):
+                    shutil.rmtree(target_dir, onerror=handle_remove_readonly)
+
+                # Clone with no-checkout first
+                subprocess.run(
+                    [
+                        "git",
+                        "clone",
+                        "--depth",
+                        "1",
+                        "--no-checkout",
+                        repo_url,
+                        target_dir,
+                    ],
+                    check=True,
+                )
+
+                # Navigate to repo directory and setup sparse-checkout
+                original_cwd = os.getcwd()
+                try:
+                    os.chdir(target_dir)
+
+                    # Enable sparse-checkout
+                    subprocess.run(
+                        ["git", "config", "core.sparseCheckout", "true"], check=True
+                    )
+
+                    # Create sparse-checkout file to exclude problematic test directories
+                    sparse_file = os.path.join(".git", "info", "sparse-checkout")
+                    os.makedirs(os.path.dirname(sparse_file), exist_ok=True)
+
+                    with open(sparse_file, "w") as f:
+                        f.write("/*\n")  # Include everything by default
+                        f.write(
+                            "!tests/baselines/reference/tsserver/configuredProjects/\n"
+                        )  # Exclude problematic dirs
+                        f.write(
+                            "!tests/baselines/reference/tsserver/projectReferences/\n"
+                        )
+                        f.write(
+                            "!tests/baselines/reference/*/\n"
+                        )  # Exclude other long test paths
+
+                    # Checkout with sparse-checkout rules
+                    subprocess.run(["git", "checkout", "HEAD"], check=True)
+                    logger.info("Repository cloned successfully with sparse-checkout")
+
+                finally:
+                    os.chdir(original_cwd)
+            else:
+                logger.info("Repository cloned successfully")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git clone failed: {e}")
+            raise RuntimeError(f"Failed to clone repository: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error during clone: {e}")
+            raise RuntimeError(f"Failed to clone repository: {e}")
+
         return target_dir
 
-    def get_python_files(self, repo_path: str) -> List[Path]:
-        """Get Python files, focusing on main source directories"""
-        python_files = []
+    def get_source_files(self, repo_path: str) -> List[Path]:
+        """Get source files for all supported languages, focusing on main source directories"""
+        source_files = []
         exclude_dirs = {
             "tests",
             "test",
@@ -738,11 +718,18 @@ class DirectNeo4jExtractor:
             "dist",
             ".pytest_cache",
             "docs",
+            "documentation",
             "examples",
             "example",
             "demo",
             "benchmark",
+            "target",  # Rust build dir
+            "bin",  # Go/C build dir
+            ".gradle",  # Java build system
+            ".maven",  # Java build system
         }
+
+        # Extensions are checked via parser factory's is_supported_file method
 
         for root, dirs, files in os.walk(repo_path):
             dirs[:] = [
@@ -750,15 +737,32 @@ class DirectNeo4jExtractor:
             ]
 
             for file in files:
-                if file.endswith(".py") and not file.startswith("test_"):
-                    file_path = Path(root) / file
-                    if file_path.stat().st_size < 500_000 and file not in [
-                        "setup.py",
-                        "conftest.py",
-                    ]:
-                        python_files.append(file_path)
+                file_path = Path(root) / file
 
-        return python_files
+                # Check if file is supported by any parser
+                if self.analyzer.parser_factory.is_supported_file(str(file_path)):
+                    # Skip test files (multiple patterns for different languages)
+                    if any(
+                        pattern in file.lower()
+                        for pattern in [
+                            "test_",
+                            "_test",
+                            ".test.",
+                            "spec_",
+                            "_spec",
+                            ".spec.",
+                            "setup.py",
+                            "conftest.py",
+                            "__pycache__",
+                        ]
+                    ):
+                        continue
+
+                    # Size limit (avoid very large files)
+                    if file_path.stat().st_size < 500_000:
+                        source_files.append(file_path)
+
+        return source_files
 
     async def analyze_repository(self, repo_url: str, temp_dir: str = None):
         """Analyze repository and create nodes/relationships in Neo4j"""
@@ -777,35 +781,60 @@ class DirectNeo4jExtractor:
         repo_path = Path(self.clone_repo(repo_url, temp_dir))
 
         try:
-            logger.info("Getting Python files...")
-            python_files = self.get_python_files(str(repo_path))
-            logger.info(f"Found {len(python_files)} Python files to analyze")
+            logger.info("Getting source files...")
+            source_files = self.get_source_files(str(repo_path))
+            logger.info(f"Found {len(source_files)} source files to analyze")
 
-            # First pass: identify project modules
+            # Group files by language for better logging
+            files_by_language = {}
+            for file_path in source_files:
+                language = self.analyzer.parser_factory.detect_language(str(file_path))
+                if language not in files_by_language:
+                    files_by_language[language] = []
+                files_by_language[language].append(file_path)
+
+            logger.info("Files by language:")
+            for lang, files in files_by_language.items():
+                logger.info(f"  {lang}: {len(files)} files")
+
+            # First pass: identify project modules (language-agnostic)
             logger.info("Identifying project modules...")
             project_modules = set()
-            for file_path in python_files:
+            for file_path in source_files:
                 relative_path = str(file_path.relative_to(repo_path))
-                module_parts = (
-                    relative_path.replace("/", ".").replace(".py", "").split(".")
-                )
-                if len(module_parts) > 0 and not module_parts[0].startswith("."):
-                    project_modules.add(module_parts[0])
+                # Extract potential module names from path structure
+                path_parts = relative_path.replace("\\", "/").split("/")
+                if len(path_parts) > 0 and not path_parts[0].startswith("."):
+                    project_modules.add(path_parts[0])
+                    # Also add subdirectories as potential modules
+                    if len(path_parts) > 1:
+                        project_modules.add(
+                            f"{path_parts[0]}.{path_parts[1].split('.')[0]}"
+                        )
 
             logger.info(f"Identified project modules: {sorted(project_modules)}")
 
             # Second pass: analyze files and collect data
-            logger.info("Analyzing Python files...")
+            logger.info("Analyzing source files...")
             modules_data = []
-            for i, file_path in enumerate(python_files):
+            for i, file_path in enumerate(source_files):
                 if i % 20 == 0:
+                    language = self.analyzer.parser_factory.detect_language(
+                        str(file_path)
+                    )
                     logger.info(
-                        f"Analyzing file {i + 1}/{len(python_files)}: {file_path.name}"
+                        f"Analyzing file {i + 1}/{len(source_files)} [{language}]: {file_path.name}"
                     )
 
-                analysis = self.analyzer.analyze_python_file(
+                # Try new multi-language analysis first
+                analysis = self.analyzer.analyze_file(
                     file_path, repo_path, project_modules
                 )
+
+                # Skip files that Tree-sitter cannot parse
+                if not analysis:
+                    logger.debug(f"Tree-sitter parser could not analyze: {file_path}")
+
                 if analysis:
                     modules_data.append(analysis)
 
@@ -815,7 +844,7 @@ class DirectNeo4jExtractor:
             logger.info("Creating nodes and relationships in Neo4j...")
             await self._create_graph(repo_name, modules_data)
 
-            # Print summary
+            # Print summary with language breakdown
             total_classes = sum(len(mod["classes"]) for mod in modules_data)
             total_methods = sum(
                 len(cls["methods"]) for mod in modules_data for cls in mod["classes"]
@@ -823,12 +852,29 @@ class DirectNeo4jExtractor:
             total_functions = sum(len(mod["functions"]) for mod in modules_data)
             total_imports = sum(len(mod["imports"]) for mod in modules_data)
 
-            print(f"\\n=== Direct Neo4j Repository Analysis for {repo_name} ===")
+            # Language breakdown
+            lang_stats = {}
+            for mod in modules_data:
+                lang = mod.get("language", "unknown")
+                if lang not in lang_stats:
+                    lang_stats[lang] = {"files": 0, "classes": 0, "functions": 0}
+                lang_stats[lang]["files"] += 1
+                lang_stats[lang]["classes"] += len(mod["classes"])
+                lang_stats[lang]["functions"] += len(mod["functions"])
+
+            print(
+                f"\\n=== Multi-Language Neo4j Repository Analysis for {repo_name} ==="
+            )
             print(f"Files processed: {len(modules_data)}")
             print(f"Classes created: {total_classes}")
             print(f"Methods created: {total_methods}")
             print(f"Functions created: {total_functions}")
             print(f"Import relationships: {total_imports}")
+            print("\\nLanguage breakdown:")
+            for lang, stats in sorted(lang_stats.items()):
+                print(
+                    f"  {lang}: {stats['files']} files, {stats['classes']} classes, {stats['functions']} functions"
+                )
 
             logger.info(f"Successfully created Neo4j graph for {repo_name}")
 
@@ -870,6 +916,29 @@ class DirectNeo4jExtractor:
             relationships_created = 0
 
             for i, mod in enumerate(modules_data):
+                # Skip if mod is not a dictionary (safety check)
+                if not isinstance(mod, dict):
+                    logger.warning(
+                        f"Skipping invalid module data at index {i}: {type(mod)}"
+                    )
+                    continue
+
+                # Ensure required fields exist
+                if not all(
+                    key in mod
+                    for key in [
+                        "file_path",
+                        "module_name",
+                        "classes",
+                        "functions",
+                        "imports",
+                    ]
+                ):
+                    logger.warning(
+                        f"Skipping module with missing required fields: {mod.get('file_path', 'unknown')}"
+                    )
+                    continue
+
                 # 1. Create File node
                 await session.run(
                     """
@@ -878,13 +947,15 @@ class DirectNeo4jExtractor:
                         path: $path,
                         module_name: $module_name,
                         line_count: $line_count,
+                        language: $language,
                         created_at: datetime()
                     })
                 """,
                     name=mod["file_path"].split("/")[-1],
                     path=mod["file_path"],
                     module_name=mod["module_name"],
-                    line_count=mod["line_count"],
+                    line_count=mod.get("line_count", 0),
+                    language=mod.get("language", "unknown"),
                 )
                 nodes_created += 1
 
@@ -901,7 +972,15 @@ class DirectNeo4jExtractor:
                 relationships_created += 1
 
                 # 3. Create Class nodes and relationships
-                for cls in mod["classes"]:
+                for cls in mod.get("classes", []):
+                    if (
+                        not isinstance(cls, dict)
+                        or "name" not in cls
+                        or "full_name" not in cls
+                    ):
+                        logger.warning(f"Skipping invalid class data: {cls}")
+                        continue
+
                     # Create Class node using MERGE to avoid duplicates
                     await session.run(
                         """
@@ -926,7 +1005,11 @@ class DirectNeo4jExtractor:
                     relationships_created += 1
 
                     # 4. Create Method nodes - use MERGE to avoid duplicates
-                    for method in cls["methods"]:
+                    for method in cls.get("methods", []):
+                        if not isinstance(method, dict) or "name" not in method:
+                            logger.warning(f"Skipping invalid method data: {method}")
+                            continue
+
                         method_full_name = f"{cls['full_name']}.{method['name']}"
                         # Create method with unique ID to avoid conflicts
                         method_id = f"{cls['full_name']}::{method['name']}"
@@ -945,14 +1028,16 @@ class DirectNeo4jExtractor:
                             name=method["name"],
                             full_name=method_full_name,
                             method_id=method_id,
-                            args=method["args"],
+                            args=method.get("args", []),
                             params_list=[
-                                f"{p['name']}:{p['type']}" for p in method["params"]
+                                f"{p.get('name', '')}:{p.get('type', '')}"
+                                for p in method.get("params", [])
+                                if isinstance(p, dict)
                             ],  # Simple format
                             params_detailed=method.get(
                                 "params_detailed", []
                             ),  # Detailed format
-                            return_type=method["return_type"],
+                            return_type=method.get("return_type", "Any"),
                         )
                         nodes_created += 1
 
@@ -969,7 +1054,11 @@ class DirectNeo4jExtractor:
                         relationships_created += 1
 
                     # 5. Create Attribute nodes - use MERGE to avoid duplicates
-                    for attr in cls["attributes"]:
+                    for attr in cls.get("attributes", []):
+                        if not isinstance(attr, dict) or "name" not in attr:
+                            logger.warning(f"Skipping invalid attribute data: {attr}")
+                            continue
+
                         attr_full_name = f"{cls['full_name']}.{attr['name']}"
                         # Create attribute with unique ID to avoid conflicts
                         attr_id = f"{cls['full_name']}::{attr['name']}"
@@ -984,7 +1073,7 @@ class DirectNeo4jExtractor:
                             name=attr["name"],
                             full_name=attr_full_name,
                             attr_id=attr_id,
-                            type=attr["type"],
+                            type=attr.get("type", "Any"),
                         )
                         nodes_created += 1
 
@@ -1001,7 +1090,11 @@ class DirectNeo4jExtractor:
                         relationships_created += 1
 
                 # 6. Create Function nodes (top-level) - use MERGE to avoid duplicates
-                for func in mod["functions"]:
+                for func in mod.get("functions", []):
+                    if not isinstance(func, dict) or "name" not in func:
+                        logger.warning(f"Skipping invalid function data: {func}")
+                        continue
+
                     func_id = f"{mod['file_path']}::{func['name']}"
                     await session.run(
                         """
@@ -1015,16 +1108,16 @@ class DirectNeo4jExtractor:
                                      f.created_at = datetime()
                     """,
                         name=func["name"],
-                        full_name=func["full_name"],
+                        full_name=func.get("full_name", func["name"]),
                         func_id=func_id,
-                        args=func["args"],
+                        args=func.get("args", []),
                         params_list=func.get(
                             "params_list", []
                         ),  # Simple format for backwards compatibility
                         params_detailed=func.get(
                             "params_detailed", []
                         ),  # Detailed format
-                        return_type=func["return_type"],
+                        return_type=func.get("return_type", "Any"),
                     )
                     nodes_created += 1
 
@@ -1041,21 +1134,24 @@ class DirectNeo4jExtractor:
                     relationships_created += 1
 
                 # 7. Create Import relationships
-                for import_name in mod["imports"]:
-                    # Try to find the target file
-                    await session.run(
-                        """
-                        MATCH (source:File {path: $source_path})
-                        OPTIONAL MATCH (target:File) 
-                        WHERE target.module_name = $import_name OR target.module_name STARTS WITH $import_name
-                        WITH source, target
-                        WHERE target IS NOT NULL
-                        MERGE (source)-[:IMPORTS]->(target)
-                    """,
-                        source_path=mod["file_path"],
-                        import_name=import_name,
-                    )
-                    relationships_created += 1
+                imports_list = mod.get("imports", [])
+                if isinstance(imports_list, list):
+                    for import_name in imports_list:
+                        if isinstance(import_name, str):
+                            # Try to find the target file
+                            await session.run(
+                                """
+                                MATCH (source:File {path: $source_path})
+                                OPTIONAL MATCH (target:File) 
+                                WHERE target.module_name = $import_name OR target.module_name STARTS WITH $import_name
+                                WITH source, target
+                                WHERE target IS NOT NULL
+                                MERGE (source)-[:IMPORTS]->(target)
+                            """,
+                                source_path=mod["file_path"],
+                                import_name=import_name,
+                            )
+                            relationships_created += 1
 
                 if (i + 1) % 10 == 0:
                     logger.info(f"Processed {i + 1}/{len(modules_data)} files...")

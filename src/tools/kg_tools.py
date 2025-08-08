@@ -10,6 +10,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, Any
+from ..utils.validation import validate_github_url
 from mcp.server.fastmcp import Context
 
 # Add knowledge_graphs folder to path for importing knowledge graph modules
@@ -46,25 +47,7 @@ def validate_script_path(script_path: str) -> Dict[str, Any]:
         return {"valid": False, "error": f"Cannot read script file: {str(e)}"}
 
 
-def validate_github_url(repo_url: str) -> Dict[str, Any]:
-    """Validate GitHub repository URL."""
-    if not repo_url or not isinstance(repo_url, str):
-        return {"valid": False, "error": "Repository URL is required"}
-
-    repo_url = repo_url.strip()
-
-    # Basic GitHub URL validation
-    if not ("github.com" in repo_url.lower() or repo_url.endswith(".git")):
-        return {"valid": False, "error": "Please provide a valid GitHub repository URL"}
-
-    # Check URL format
-    if not (repo_url.startswith("https://") or repo_url.startswith("git@")):
-        return {
-            "valid": False,
-            "error": "Repository URL must start with https:// or git@",
-        }
-
-    return {"valid": True, "repo_name": repo_url.split("/")[-1].replace(".git", "")}
+# validate_github_url moved to utils/validation.py to avoid duplication
 
 
 async def _handle_repos_command(session, command: str) -> str:
@@ -74,7 +57,7 @@ async def _handle_repos_command(session, command: str) -> str:
 
     repos = []
     async for record in result:
-        repos.append(record["name"])
+        repos.append(record.get("name"))
 
     return json.dumps(
         {
@@ -110,7 +93,8 @@ async def _handle_explore_command(session, command: str, repo_name: str) -> str:
     RETURN count(f) as file_count
     """
     result = await session.run(files_query, repo_name=repo_name)
-    file_count = (await result.single())["file_count"]
+    file_record = await result.single()
+    file_count = file_record.get("file_count", 0) if file_record else 0
 
     # Get class count
     classes_query = """
@@ -118,7 +102,8 @@ async def _handle_explore_command(session, command: str, repo_name: str) -> str:
     RETURN count(DISTINCT c) as class_count
     """
     result = await session.run(classes_query, repo_name=repo_name)
-    class_count = (await result.single())["class_count"]
+    class_record = await result.single()
+    class_count = class_record.get("class_count", 0) if class_record else 0
 
     # Get function count
     functions_query = """
@@ -126,7 +111,8 @@ async def _handle_explore_command(session, command: str, repo_name: str) -> str:
     RETURN count(DISTINCT func) as function_count
     """
     result = await session.run(functions_query, repo_name=repo_name)
-    function_count = (await result.single())["function_count"]
+    function_record = await result.single()
+    function_count = function_record.get("function_count", 0) if function_record else 0
 
     # Get method count
     methods_query = """
@@ -134,7 +120,8 @@ async def _handle_explore_command(session, command: str, repo_name: str) -> str:
     RETURN count(DISTINCT m) as method_count
     """
     result = await session.run(methods_query, repo_name=repo_name)
-    method_count = (await result.single())["method_count"]
+    method_record = await result.single()
+    method_count = method_record.get("method_count", 0) if method_record else 0
 
     return json.dumps(
         {
@@ -178,7 +165,9 @@ async def _handle_classes_command(session, command: str, repo_name: str = None) 
 
     classes = []
     async for record in result:
-        classes.append({"name": record["name"], "full_name": record["full_name"]})
+        classes.append(
+            {"name": record.get("name"), "full_name": record.get("full_name")}
+        )
 
     return json.dumps(
         {
@@ -216,8 +205,8 @@ async def _handle_class_command(session, command: str, class_name: str) -> str:
             indent=2,
         )
 
-    actual_name = class_record["name"]
-    full_name = class_record["full_name"]
+    actual_name = class_record.get("name") if class_record else None
+    full_name = class_record.get("full_name") if class_record else None
 
     # Get methods
     methods_query = """
@@ -231,12 +220,12 @@ async def _handle_class_command(session, command: str, class_name: str) -> str:
     methods = []
     async for record in result:
         # Use detailed params if available, fall back to simple params
-        params_to_use = record["params_detailed"] or record["params_list"] or []
+        params_to_use = record.get("params_detailed") or record.get("params_list") or []
         methods.append(
             {
-                "name": record["name"],
+                "name": record.get("name"),
                 "parameters": params_to_use,
-                "return_type": record["return_type"] or "Any",
+                "return_type": record.get("return_type") or "Any",
             }
         )
 
@@ -251,7 +240,9 @@ async def _handle_class_command(session, command: str, class_name: str) -> str:
 
     attributes = []
     async for record in result:
-        attributes.append({"name": record["name"], "type": record["type"] or "Any"})
+        attributes.append(
+            {"name": record.get("name"), "type": record.get("type") or "Any"}
+        )
 
     return json.dumps(
         {
@@ -307,15 +298,15 @@ async def _handle_method_command(
     methods = []
     async for record in result:
         # Use detailed params if available, fall back to simple params
-        params_to_use = record["params_detailed"] or record["params_list"] or []
+        params_to_use = record.get("params_detailed") or record.get("params_list") or []
         methods.append(
             {
-                "class_name": record["class_name"],
-                "class_full_name": record["class_full_name"],
-                "method_name": record["method_name"],
+                "class_name": record.get("class_name"),
+                "class_full_name": record.get("class_full_name"),
+                "method_name": record.get("method_name"),
                 "parameters": params_to_use,
-                "return_type": record["return_type"] or "Any",
-                "legacy_args": record["args"] or [],
+                "return_type": record.get("return_type") or "Any",
+                "legacy_args": record.get("args") or [],
             }
         )
 
@@ -440,14 +431,14 @@ async def parse_github_repository(ctx: Context, repo_url: str) -> str:
             )
 
         # Validate repository URL
-        validation = validate_github_url(repo_url)
-        if not validation["valid"]:
+        is_valid, error_msg = validate_github_url(repo_url)
+        if not is_valid:
             return json.dumps(
-                {"success": False, "repo_url": repo_url, "error": validation["error"]},
+                {"success": False, "repo_url": repo_url, "error": error_msg},
                 indent=2,
             )
 
-        repo_name = validation["repo_name"]
+        repo_name = repo_url.split("/")[-1].replace(".git", "")
 
         # Parse the repository (this includes cloning, analysis, and Neo4j storage)
         logger.info(f"Starting repository analysis for: {repo_name}")
@@ -490,14 +481,15 @@ async def parse_github_repository(ctx: Context, repo_url: str) -> str:
             record = await result.single()
 
             if record:
+                # Access record fields using get() method for safer access
                 stats = {
-                    "repository": record["repo_name"],
-                    "files_processed": record["files_count"],
-                    "classes_created": record["classes_count"],
-                    "methods_created": record["methods_count"],
-                    "functions_created": record["functions_count"],
-                    "attributes_created": record["attributes_count"],
-                    "sample_modules": record["sample_modules"] or [],
+                    "repository": record.get("repo_name"),
+                    "files_processed": record.get("files_count", 0),
+                    "classes_created": record.get("classes_count", 0),
+                    "methods_created": record.get("methods_count", 0),
+                    "functions_created": record.get("functions_count", 0),
+                    "attributes_created": record.get("attributes_count", 0),
+                    "sample_modules": record.get("sample_modules") or [],
                 }
             else:
                 return json.dumps(
