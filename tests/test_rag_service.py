@@ -247,7 +247,7 @@ class TestRagService:
             ]
 
             # Execute
-            results = self.rag_service.search_with_reranking("test query")
+            self.rag_service.search_with_reranking("test query")
 
             # Verify
             mock_hybrid.assert_called_once_with("test query", 10, None, "documents")

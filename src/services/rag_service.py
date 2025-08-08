@@ -358,6 +358,7 @@ def add_documents_to_vector_db(
     metadatas: List[Dict[str, Any]],
     url_to_full_document: Dict[str, str],
     batch_size: int = 100,
+    file_ids: Optional[List[str]] = None,
 ) -> None:
     """
     Add documents to Qdrant crawled_pages collection.
@@ -370,6 +371,7 @@ def add_documents_to_vector_db(
         metadatas: List of document metadata
         url_to_full_document: Dictionary mapping URLs to their full document content
         batch_size: Size of each batch for insertion
+        file_ids: Optional list of file_id strings for cross-system linking with Neo4j
     """
     # Import required functions and modules
     import concurrent.futures
@@ -398,10 +400,19 @@ def add_documents_to_vector_db(
     )
     logger.info(f"Use contextual embeddings: {use_contextual_embeddings}")
 
+    # Add file_id to metadatas if provided
+    enhanced_metadatas = []
+    for i, metadata in enumerate(metadatas):
+        enhanced_metadata = metadata.copy()
+        if file_ids and i < len(file_ids) and file_ids[i]:
+            enhanced_metadata["file_id"] = file_ids[i]
+            logger.debug(f"Added file_id '{file_ids[i]}' to metadata for document {i}")
+        enhanced_metadatas.append(enhanced_metadata)
+
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_documents_to_qdrant(
-            urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size
+            urls, chunk_numbers, contents, enhanced_metadatas, url_to_full_document, batch_size
         )
     )
 
@@ -522,6 +533,7 @@ def add_code_examples_to_vector_db(
     summaries: List[str],
     metadatas: List[Dict[str, Any]],
     batch_size: int = 100,
+    file_ids: Optional[List[str]] = None,
 ):
     """
     Add code examples to Qdrant code_examples collection.
@@ -534,6 +546,7 @@ def add_code_examples_to_vector_db(
         summaries: List of code example summaries
         metadatas: List of metadata dictionaries
         batch_size: Size of each batch for insertion
+        file_ids: Optional list of file_id strings for cross-system linking with Neo4j
     """
     # Import required functions and modules
     from qdrant_client.models import PointStruct
@@ -556,10 +569,19 @@ def add_code_examples_to_vector_db(
     if not urls:
         return
 
+    # Add file_id to metadatas if provided
+    enhanced_metadatas = []
+    for i, metadata in enumerate(metadatas):
+        enhanced_metadata = metadata.copy()
+        if file_ids and i < len(file_ids) and file_ids[i]:
+            enhanced_metadata["file_id"] = file_ids[i]
+            logger.debug(f"Added file_id '{file_ids[i]}' to metadata for code example {i}")
+        enhanced_metadatas.append(enhanced_metadata)
+
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_code_examples_to_qdrant(
-            urls, chunk_numbers, code_examples, summaries, metadatas, batch_size
+            urls, chunk_numbers, code_examples, summaries, enhanced_metadatas, batch_size
         )
     )
 

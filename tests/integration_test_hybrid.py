@@ -197,7 +197,7 @@ class TestHybridSearchIntegration:
         # Check sparse vector configuration
         sparse_config = collection_info.config.params.sparse_vectors["text-sparse"]
         assert sparse_config.modifier == Modifier.IDF
-        assert sparse_config.index.on_disk == False
+        assert not sparse_config.index.on_disk
 
         # Cleanup
         try:
@@ -253,7 +253,7 @@ def test_performance_benchmark_comparison():
         # Test search performance
         search_start = import_time.time()
 
-        search_results = wrapper.client.search_batch(
+        wrapper.client.search_batch(
             collection_name=collection_name,
             requests=[{"name": "text-dense", "vector": base_embedding, "limit": 10}],
         )

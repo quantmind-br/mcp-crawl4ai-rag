@@ -373,7 +373,7 @@ class TestEventLoopFixIntegration:
                         mock_policy = Mock()
                         mock_policy_class.return_value = mock_policy
 
-                        with patch("asyncio.set_event_loop_policy") as mock_set_policy:
+                        with patch("asyncio.set_event_loop_policy"):
                             with patch(
                                 "src.event_loop_fix.get_current_event_loop_policy",
                                 return_value="WindowsSelectorEventLoopPolicy",
@@ -405,7 +405,7 @@ class TestEventLoopFixIntegration:
                         mock_policy = Mock()
                         mock_policy_class.return_value = mock_policy
 
-                        with patch("asyncio.set_event_loop_policy") as mock_set_policy:
+                        with patch("asyncio.set_event_loop_policy"):
                             with patch(
                                 "src.event_loop_fix.get_current_event_loop_policy",
                                 return_value="WindowsProactorEventLoopPolicy",
@@ -572,4 +572,5 @@ class TestEventLoopFixEdgeCases:
         with patch.dict(sys.modules, {"playwright": None, "crawl4ai": None}):
             result = is_playwright_imported()
             assert result is True  # Ainda detecta como importado mesmo que None
+
 

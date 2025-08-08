@@ -38,7 +38,6 @@ try:
         get_chat_client,
         get_embeddings_client,
         get_chat_fallback_client,
-        get_embeddings_fallback_client,
     )
 except ImportError:
     from clients.llm_api_client import (

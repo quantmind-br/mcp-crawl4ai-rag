@@ -101,7 +101,7 @@ class TestEventLoopConfiguration:
         from src.event_loop_fix import setup_event_loop, validate_event_loop_setup
 
         # Run setup
-        result = setup_event_loop()
+        setup_event_loop()
 
         # Validate configuration
         info = validate_event_loop_setup()

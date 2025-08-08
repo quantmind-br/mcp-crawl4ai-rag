@@ -240,7 +240,7 @@ class TestEventLoopPolicyConfiguration:
 
         with patch(
             "src.event_loop_fix.asyncio.WindowsSelectorEventLoopPolicy"
-        ) as mock_policy_class:
+        ):
             result = setup_event_loop()
 
             mock_set_policy.assert_called()

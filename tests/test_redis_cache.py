@@ -58,7 +58,7 @@ def test_redis_cache():
     # 3. Teste de Cache Miss (primeira busca)
     print("3. TESTE CACHE MISS:")
     test_text = "Este é um texto de teste para cache de embeddings"
-    test_key = f"test_embedding_{hash(test_text)}"
+    f"test_embedding_{hash(test_text)}"
 
     start_time = time.time()
     result_miss = cache.get_batch(

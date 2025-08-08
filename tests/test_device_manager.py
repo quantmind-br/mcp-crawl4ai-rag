@@ -522,3 +522,4 @@ class TestDeviceManagerIntegration:
         assert "device" in kwargs
         assert kwargs["device"] == "cpu"
 
+

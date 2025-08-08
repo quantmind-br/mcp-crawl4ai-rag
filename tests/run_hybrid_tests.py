@@ -42,7 +42,7 @@ def test_imports():
         from clients.qdrant_client import QdrantClientWrapper
 
         # Test wrapper initialization
-        wrapper = QdrantClientWrapper(device="cpu")
+        QdrantClientWrapper(device="cpu")
         print("✅ All imports successful")
         return True
 

@@ -300,10 +300,10 @@ class TestWebToolsCrawlingFunctions:
         )
 
         # Evita efeitos externos patchando funções de persistência
-        with patch("src.tools.web_tools.update_source_info") as mock_update:
+        with patch("src.tools.web_tools.update_source_info"):
             with patch(
                 "src.tools.web_tools.add_documents_to_vector_db"
-            ) as mock_add:
+            ):
                 result = await crawl_single_page(mock_context, "https://example.com")
 
         assert isinstance(result, str)
@@ -328,10 +328,10 @@ class TestWebToolsCrawlingFunctions:
                 with patch(
                     "src.tools.web_tools.extract_source_summary"
                 ) as mock_extract:
-                    with patch("src.tools.web_tools.update_source_info") as mock_update:
+                    with patch("src.tools.web_tools.update_source_info"):
                         with patch(
                             "src.tools.web_tools.add_documents_to_vector_db"
-                        ) as mock_add:
+                        ):
                             mock_extract.return_value = "Resumo do conteúdo"
 
                             result = await smart_crawl_url(
@@ -358,10 +358,10 @@ class TestWebToolsCrawlingFunctions:
                     ) as mock_extract:
                         with patch(
                             "src.tools.web_tools.update_source_info"
-                        ) as mock_update:
+                        ):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
-                            ) as mock_add:
+                            ):
                                 mock_parse.return_value = [
                                     "https://example.com/page1",
                                     "https://example.com/page2",
@@ -404,10 +404,10 @@ class TestWebToolsCrawlingFunctions:
                     ) as mock_extract:
                         with patch(
                             "src.tools.web_tools.update_source_info"
-                        ) as mock_update:
+                        ):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
-                            ) as mock_add:
+                            ):
                                 mock_crawl.return_value = [
                                     {
                                         "url": "https://example.com",
@@ -500,10 +500,10 @@ class TestWebToolsIntegration:
                     ) as mock_extract:
                         with patch(
                             "src.tools.web_tools.update_source_info"
-                        ) as mock_update:
+                        ):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
-                            ) as mock_add:
+                            ):
                                 mock_crawl.return_value = [
                                     {
                                         "url": "https://example.com",

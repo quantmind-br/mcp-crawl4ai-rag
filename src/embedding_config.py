@@ -142,7 +142,7 @@ def validate_embeddings_config() -> bool:
 
     # Validate dimensions configuration using singleton (no duplicate printing)
     try:
-        dims = get_embedding_dimensions()
+        get_embedding_dimensions()
         # Note: validation message is printed by singleton, no need to print again
         return True
     except Exception as e:

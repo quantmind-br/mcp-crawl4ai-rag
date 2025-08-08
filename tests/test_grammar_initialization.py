@@ -4,7 +4,6 @@ Tests for Tree-sitter grammar initialization.
 
 import pytest
 import unittest.mock as mock
-from pathlib import Path
 
 from src.utils.grammar_initialization import (
     check_essential_grammars,

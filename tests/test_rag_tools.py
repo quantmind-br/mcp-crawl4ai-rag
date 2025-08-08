@@ -622,3 +622,4 @@ class TestRAGToolsIntegration:
             assert call_args[0][1] == "consulta geral"  # query
             assert call_args[0][2] is None  # source (sem filtro)
 
+

@@ -1020,3 +1020,374 @@ class GitHubMetadataExtractor:
             self.logger.warning(f"Error extracting git info: {e}")
 
         return git_info
+
+
+class GitHubProcessor:
+    """
+    Unified GitHub processor that dispatches requests to appropriate processing systems.
+    
+    This class serves as the main entry point for GitHub repository processing,
+    coordinating between RAG-only, Neo4j-only, and unified processing approaches
+    while maintaining backward compatibility with existing functionality.
+    """
+    
+    def __init__(self):
+        """Initialize the GitHub processor with all required components."""
+        self.repo_manager = GitHubRepoManager()
+        self.metadata_extractor = GitHubMetadataExtractor()
+        self.file_discovery = MultiFileDiscovery()
+        self.logger = logging.getLogger(__name__)
+    
+    def clone_repository_temp(
+        self, 
+        repo_url: str, 
+        max_size_mb: int = 500,
+        temp_dir_prefix: str = None
+    ) -> Dict[str, Any]:
+        """
+        Clone repository to temporary directory with enhanced error handling.
+        
+        This method provides a unified interface for repository cloning that
+        can be used by all processing systems (RAG, Neo4j, and unified).
+        
+        Args:
+            repo_url: GitHub repository URL
+            max_size_mb: Maximum repository size in MB
+            temp_dir_prefix: Optional prefix for temporary directory name
+            
+        Returns:
+            Dictionary with clone results and metadata
+        """
+        try:
+            self.logger.info(f"Dispatching clone request for {repo_url}")
+            
+            # Clone repository using existing manager
+            temp_directory = self.repo_manager.clone_repository(repo_url, max_size_mb)
+            
+            # Extract repository metadata
+            repo_metadata = self.metadata_extractor.extract_repo_metadata(repo_url, temp_directory)
+            
+            return {
+                "success": True,
+                "temp_directory": temp_directory,
+                "repo_url": repo_url,
+                "metadata": repo_metadata,
+                "size_mb": self.repo_manager._get_directory_size_mb(temp_directory)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Repository cloning failed for {repo_url}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "repo_url": repo_url
+            }
+    
+    def discover_repository_files(
+        self,
+        repo_path: str,
+        file_types: List[str] = None,
+        max_files: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Discover files in repository with support for multiple file types.
+        
+        Args:
+            repo_path: Path to cloned repository
+            file_types: List of file extensions to discover (default: [".md"])
+            max_files: Maximum number of files to discover
+            
+        Returns:
+            List of discovered files with metadata
+        """
+        if file_types is None:
+            file_types = [".md"]
+        
+        self.logger.info(f"Discovering files of types {file_types} in {repo_path}")
+        
+        try:
+            if set(file_types) == {".md"}:
+                # Use specialized markdown discovery for backward compatibility
+                return self.file_discovery.discover_markdown_files(
+                    repo_path, max_files, min_size_bytes=100, max_size_bytes=1_000_000
+                )
+            else:
+                # Use multi-file discovery for other types
+                return self.file_discovery.discover_files(repo_path, file_types, max_files)
+                
+        except Exception as e:
+            self.logger.error(f"File discovery failed: {e}")
+            return []
+    
+    async def dispatch_processing_request(
+        self,
+        repo_url: str,
+        destination: str = "both",
+        file_types: List[str] = None,
+        max_files: int = 50,
+        chunk_size: int = 5000,
+        max_size_mb: int = 500
+    ) -> Dict[str, Any]:
+        """
+        Dispatch processing request to the appropriate system based on destination.
+        
+        This is the main unified entry point that routes requests to:
+        - RAG-only processing (existing smart_crawl_github)
+        - Neo4j-only processing (existing parse_github_repository)  
+        - Unified processing (new unified indexing service)
+        
+        Args:
+            repo_url: GitHub repository URL
+            destination: Processing destination ("qdrant", "neo4j", or "both")
+            file_types: File extensions to process (default: [".md"])
+            max_files: Maximum number of files to process
+            chunk_size: Chunk size for RAG processing
+            max_size_mb: Maximum repository size limit
+            
+        Returns:
+            Dictionary with processing results and statistics
+        """
+        if file_types is None:
+            file_types = [".md"]
+        
+        self.logger.info(
+            f"Dispatching processing request for {repo_url} to destination '{destination}'"
+        )
+        
+        try:
+            # Import processing services dynamically to avoid circular imports
+            if destination.lower() == "qdrant":
+                # Route to existing RAG-only processing
+                return await self._dispatch_to_rag_only(
+                    repo_url, file_types, max_files, chunk_size, max_size_mb
+                )
+            elif destination.lower() == "neo4j":
+                # Route to existing Neo4j-only processing  
+                return await self._dispatch_to_neo4j_only(
+                    repo_url, file_types, max_files, max_size_mb
+                )
+            elif destination.lower() == "both":
+                # Route to new unified processing
+                return await self._dispatch_to_unified_processing(
+                    repo_url, file_types, max_files, chunk_size, max_size_mb
+                )
+            else:
+                raise ValueError(f"Invalid destination: {destination}. Must be 'qdrant', 'neo4j', or 'both'")
+                
+        except Exception as e:
+            self.logger.error(f"Processing dispatch failed for {repo_url}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "repo_url": repo_url,
+                "destination": destination
+            }
+    
+    async def _dispatch_to_rag_only(
+        self,
+        repo_url: str,
+        file_types: List[str],
+        max_files: int,
+        chunk_size: int,
+        max_size_mb: int
+    ) -> Dict[str, Any]:
+        """
+        Dispatch to existing RAG-only processing (smart_crawl_github).
+        
+        Args:
+            repo_url: Repository URL
+            file_types: File types to process
+            max_files: Maximum files
+            chunk_size: Chunk size
+            max_size_mb: Size limit
+            
+        Returns:
+            Processing results from smart_crawl_github
+        """
+        try:
+            # Import the existing smart_crawl_github function
+            from ..tools.github_tools import smart_crawl_github
+            
+            # Call existing function with MCP context simulation
+            # Note: This would need proper MCP context in actual implementation
+            result = await smart_crawl_github(
+                ctx=None,  # Would need proper context
+                repo_url=repo_url,
+                file_types=file_types,
+                max_files=max_files,
+                chunk_size=chunk_size,
+                max_size_mb=max_size_mb
+            )
+            
+            return {
+                "success": True,
+                "result": result,
+                "processing_type": "rag_only",
+                "destination": "qdrant"
+            }
+            
+        except ImportError:
+            # Fallback if smart_crawl_github not available yet
+            self.logger.warning("smart_crawl_github not available, using fallback")
+            return {
+                "success": False,
+                "error": "RAG-only processing not yet implemented",
+                "processing_type": "rag_only",
+                "destination": "qdrant"
+            }
+        except Exception as e:
+            self.logger.error(f"RAG-only processing failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_type": "rag_only",
+                "destination": "qdrant"
+            }
+    
+    async def _dispatch_to_neo4j_only(
+        self,
+        repo_url: str,
+        file_types: List[str],
+        max_files: int,
+        max_size_mb: int
+    ) -> Dict[str, Any]:
+        """
+        Dispatch to existing Neo4j-only processing (parse_github_repository).
+        
+        Args:
+            repo_url: Repository URL
+            file_types: File types to process
+            max_files: Maximum files
+            max_size_mb: Size limit
+            
+        Returns:
+            Processing results from parse_github_repository
+        """
+        try:
+            # Import the existing parse_github_repository function
+            from ..tools.github_tools import parse_github_repository
+            
+            # Call existing function with MCP context simulation
+            result = await parse_github_repository(
+                ctx=None,  # Would need proper context
+                repo_url=repo_url
+            )
+            
+            return {
+                "success": True,
+                "result": result,
+                "processing_type": "neo4j_only",
+                "destination": "neo4j"
+            }
+            
+        except ImportError:
+            # Fallback if parse_github_repository not available yet
+            self.logger.warning("parse_github_repository not available, using fallback")
+            return {
+                "success": False,
+                "error": "Neo4j-only processing not yet implemented",
+                "processing_type": "neo4j_only", 
+                "destination": "neo4j"
+            }
+        except Exception as e:
+            self.logger.error(f"Neo4j-only processing failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_type": "neo4j_only",
+                "destination": "neo4j"
+            }
+    
+    async def _dispatch_to_unified_processing(
+        self,
+        repo_url: str,
+        file_types: List[str],
+        max_files: int,
+        chunk_size: int,
+        max_size_mb: int
+    ) -> Dict[str, Any]:
+        """
+        Dispatch to new unified processing service.
+        
+        Args:
+            repo_url: Repository URL
+            file_types: File types to process
+            max_files: Maximum files
+            chunk_size: Chunk size
+            max_size_mb: Size limit
+            
+        Returns:
+            Processing results from unified indexing service
+        """
+        try:
+            # Import the unified processing service and models
+            from ..services.unified_indexing_service import process_repository_unified
+            from ..models.unified_indexing_models import IndexingDestination
+            
+            # Process using unified service
+            response = await process_repository_unified(
+                repo_url=repo_url,
+                destination=IndexingDestination.BOTH,
+                file_types=file_types,
+                max_files=max_files,
+                chunk_size=chunk_size,
+                max_size_mb=max_size_mb
+            )
+            
+            return {
+                "success": response.success,
+                "result": response.to_json_summary(),
+                "processing_type": "unified",
+                "destination": "both",
+                "cross_system_links": response.cross_system_links_created
+            }
+            
+        except ImportError as e:
+            self.logger.error(f"Unified processing service not available: {e}")
+            return {
+                "success": False,
+                "error": f"Unified processing not available: {str(e)}",
+                "processing_type": "unified",
+                "destination": "both"
+            }
+        except Exception as e:
+            self.logger.error(f"Unified processing failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_type": "unified",
+                "destination": "both"
+            }
+    
+    def cleanup(self):
+        """Clean up all temporary resources."""
+        try:
+            self.repo_manager.cleanup()
+            self.logger.info("GitHub processor cleanup completed")
+        except Exception as e:
+            self.logger.error(f"Cleanup failed: {e}")
+    
+    def get_supported_file_types(self) -> List[str]:
+        """
+        Get list of supported file types for processing.
+        
+        Returns:
+            List of supported file extensions
+        """
+        return list(self.file_discovery.SUPPORTED_EXTENSIONS)
+    
+    def get_processing_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about the processor's capabilities and limits.
+        
+        Returns:
+            Dictionary with processor statistics and limits
+        """
+        return {
+            "supported_file_types": len(self.file_discovery.SUPPORTED_EXTENSIONS),
+            "file_extensions": list(self.file_discovery.SUPPORTED_EXTENSIONS),
+            "size_limits": self.file_discovery.FILE_SIZE_LIMITS,
+            "processing_modes": ["rag_only", "neo4j_only", "unified"],
+            "destinations": ["qdrant", "neo4j", "both"],
+            "temp_directories_active": len(self.repo_manager.temp_dirs)
+        }

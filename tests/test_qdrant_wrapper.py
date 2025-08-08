@@ -45,7 +45,7 @@ class TestQdrantClientWrapper:
         """Test initialization with default configuration."""
 
         # Setup mock
-        mock_client_instance = self._setup_mock_client(mock_qdrant_client)
+        self._setup_mock_client(mock_qdrant_client)
 
         # Test
         wrapper = QdrantClientWrapper()
@@ -62,7 +62,7 @@ class TestQdrantClientWrapper:
         """Test initialization with custom configuration."""
 
         # Setup mock
-        mock_client_instance = self._setup_mock_client(mock_qdrant_client)
+        self._setup_mock_client(mock_qdrant_client)
 
         # Test
         wrapper = QdrantClientWrapper(host="custom-host", port=9999)
@@ -76,7 +76,7 @@ class TestQdrantClientWrapper:
         """Test point ID generation consistency."""
 
         # Setup mock
-        mock_client_instance = self._setup_mock_client(mock_qdrant_client)
+        self._setup_mock_client(mock_qdrant_client)
 
         wrapper = QdrantClientWrapper()
 
@@ -100,7 +100,7 @@ class TestQdrantClientWrapper:
         """Test search result normalization."""
 
         # Setup mock
-        mock_client_instance = self._setup_mock_client(mock_qdrant_client)
+        self._setup_mock_client(mock_qdrant_client)
 
         wrapper = QdrantClientWrapper()
 

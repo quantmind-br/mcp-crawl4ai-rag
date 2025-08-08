@@ -45,7 +45,7 @@ def check_essential_grammars() -> Dict[str, bool]:
             language_func = getattr(module, func_name)
 
             # Test that we can actually get a language capsule
-            language_capsule = language_func()
+            language_func()
             availability[lang_name] = True
             logger.debug(f"✓ {lang_name} Tree-sitter language available")
 
