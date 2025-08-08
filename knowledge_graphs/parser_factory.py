@@ -291,7 +291,7 @@ class ParserFactory:
             logger.debug(f"Created new parser for language: {language}")
             return parser
 
-        # No parser class registered - use TreeSitterParser as default
+        # No parser class registered - try TreeSitterParser as default, with fallback
         try:
             # Import here to avoid circular imports
             from knowledge_graphs.tree_sitter_parser import TreeSitterParser
@@ -307,7 +307,20 @@ class ParserFactory:
 
         except ImportError as e:
             logger.error(f"Could not import TreeSitterParser: {e}")
-            return None
+            # Fallback to simple heuristic parser to maintain functionality when Tree-sitter is unavailable
+            try:
+                from knowledge_graphs.simple_fallback_parser import SimpleFallbackParser
+
+                parser = SimpleFallbackParser(language)
+                self._cache_parser(language, parser)
+                self.stats["parsers_created"] += 1
+                logger.debug(
+                    f"Using SimpleFallbackParser for language: {language} (Tree-sitter unavailable)"
+                )
+                return parser
+            except Exception as fe:
+                logger.error(f"Failed to create fallback parser for {language}: {fe}")
+                return None
         except Exception as e:
             logger.error(f"Failed to create parser for language {language}: {e}")
             return None

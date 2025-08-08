@@ -1,0 +1,27 @@
+description = "Prime Gemini CLI with core knowledge about your project"
+
+prompt = """
+# Prime Context for Gemini CLI
+
+Use shell commands to get an understanding of the project structure.
+
+First, get the directory tree:
+!{tree -I 'node_modules|__pycache__|.git' -L 3}
+
+Start by reading the GEMINI.md file if it exists to get an understanding of the project:
+@GEMINI.md
+
+Read the README.md file to get an understanding of the project:
+@README.md
+
+Read key files in the root directory and src/ directory to understand the project structure.
+
+List any additional files that are important to understand the project.
+
+Explain back to me:
+- Project structure
+- Project purpose and goals  
+- Key files and their purposes
+- Any important dependencies
+- Any important configuration files
+"""

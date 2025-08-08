@@ -15,10 +15,6 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -35,6 +31,9 @@ from qdrant_client.models import (
     Modifier,
 )
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Load environment variables
+load_dotenv()
 
 # Import dynamic dimension utilities
 try:
@@ -278,6 +277,7 @@ class QdrantClientWrapper:
             return True
         except Exception:
             return False
+
     def _ensure_collections_exist(self):
         """Initialize collections, validating dimensions and creating if necessary."""
         collections_config = get_active_collections_config()
@@ -349,7 +349,9 @@ class QdrantClientWrapper:
 
                     if sparse_vectors_config:
                         # Create hybrid collection with named vectors
-                        logging.info(f"Creating hybrid collection {name} with named vectors")
+                        logging.info(
+                            f"Creating hybrid collection {name} with named vectors"
+                        )
                         self.client.create_collection(
                             collection_name=name,
                             vectors_config=vectors_config,
@@ -358,7 +360,9 @@ class QdrantClientWrapper:
                         logging.info(f"✅ Created hybrid collection {name}")
                     else:
                         # Create legacy collection with single vector
-                        logging.info(f"Creating legacy collection {name} with single vector")
+                        logging.info(
+                            f"Creating legacy collection {name} with single vector"
+                        )
                         self.client.create_collection(
                             collection_name=name, vectors_config=vectors_config
                         )
@@ -715,6 +719,7 @@ class QdrantClientWrapper:
 
             if self.use_hybrid_search:
                 from qdrant_client.models import SparseVector
+
                 dummy_sparse = SparseVector(indices=[0], values=[0.0])
                 point = PointStruct(
                     id=point_id,
@@ -1027,9 +1032,15 @@ class QdrantClientWrapper:
         try:
             # Import sparse vector creation function
             try:
-                from ..services.embedding_service import create_sparse_embedding, create_embedding
+                from ..services.embedding_service import (
+                    create_sparse_embedding,
+                    create_embedding,
+                )
             except ImportError:
-                from services.embedding_service import create_sparse_embedding, create_embedding
+                from services.embedding_service import (
+                    create_sparse_embedding,
+                    create_embedding,
+                )
 
             # Create embeddings if not provided
             if query_embedding is None:
@@ -1166,9 +1177,15 @@ class QdrantClientWrapper:
         try:
             # Import sparse vector creation function
             try:
-                from ..services.embedding_service import create_sparse_embedding, create_embedding
+                from ..services.embedding_service import (
+                    create_sparse_embedding,
+                    create_embedding,
+                )
             except ImportError:
-                from services.embedding_service import create_sparse_embedding, create_embedding
+                from services.embedding_service import (
+                    create_sparse_embedding,
+                    create_embedding,
+                )
 
             # Create embeddings if not provided
             if query_embedding is None:

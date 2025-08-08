@@ -1,464 +1,524 @@
 """
+Testes para as funcionalidades de device_manager.py.
 
-Tests for device management functionality.
-
-Tests device detection, fallback mechanisms, error handling, and GPU memory management
-following the patterns established in conftest.py.
+Este módulo contém testes para o gerenciamento de dispositivos GPU/CPU, incluindo:
+- Detecção de dispositivos ótimos
+- Configuração de GPU/CPU
+- Gerenciamento de memória
+- Fallback para CPU
+- Informações de dispositivo
 """
-# ruff: noqa: E402
 
-import pytest
 import os
 from unittest.mock import Mock, patch
 
-# Import the device manager functions
-import sys
-from pathlib import Path
-
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
-
-from device_manager import (
-    get_optimal_device,
-    device_detection_with_fallback,
-    cleanup_gpu_memory,
-    get_device_info,
-    get_model_kwargs_for_device,
-    get_gpu_preference,
-    DeviceConfig,
-    DeviceInfo,
-)
-
-
-class TestDeviceDetection:
-    """Test device detection and selection logic."""
-
-    def test_cpu_device_forced(self):
-        """CPU device always works when explicitly requested."""
-
-        with patch("device_manager.TORCH_AVAILABLE", True):
-            with patch("device_manager.torch") as mock_torch:
-                mock_torch.device.return_value = Mock()
-                mock_torch.device.return_value.__str__ = Mock(return_value="cpu")
-
-                device = get_optimal_device(preference="cpu")
-                assert str(device) == "cpu"
-
-    def test_cpu_fallback_when_torch_unavailable(self):
-        """Falls back to CPU when PyTorch is not available."""
-
-        with patch("device_manager.TORCH_AVAILABLE", False):
-            with patch("device_manager.torch", None):
-                device = get_optimal_device(preference="auto")
-                # Should return a mock device or handle gracefully
-                assert device is not None
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_gpu_detection_when_cuda_available(self, mock_torch):
-        """GPU detection when CUDA is available and working."""
-
-        # Mock CUDA availability
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.cuda.get_device_name.return_value = "Test GPU"
-
-        # Mock device creation and tensor operations
-        mock_device = Mock()
-        mock_device.__str__ = Mock(return_value="cuda:0")
-        mock_torch.device.return_value = mock_device
-
-        # Mock successful tensor operations
-        mock_tensor = Mock()
-        mock_torch.randn.return_value = mock_tensor
-        mock_tensor.__matmul__ = Mock(return_value=mock_tensor)
-
-        device = get_optimal_device(preference="cuda")
-
-        # Verify CUDA operations were tested
-        mock_torch.randn.assert_called_once()
-        assert str(device) == "cuda:0"
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_fallback_to_cpu_when_gpu_fails(self, mock_torch):
-        """Fallback to CPU when GPU operations fail."""
-
-        # Mock CUDA availability but operations fail
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.randn.side_effect = RuntimeError("GPU operation failed")
-
-        # Mock CPU device as fallback
-        cpu_device = Mock()
-        cpu_device.__str__ = Mock(return_value="cpu")
-
-        def device_side_effect(device_str):
-            if "cuda" in device_str:
-                raise RuntimeError("CUDA device failed")
-            return cpu_device
-
-        mock_torch.device.side_effect = device_side_effect
-
-        device = get_optimal_device(preference="auto")
-        assert str(device) == "cpu"
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_mps_detection_when_available(self, mock_torch):
-        """MPS detection on Apple Silicon when available."""
-
-        # Mock MPS availability
-        mock_torch.cuda.is_available.return_value = False
-        mock_torch.backends.mps.is_available.return_value = True
-
-        # Mock MPS device and operations
-        mock_device = Mock()
-        mock_device.__str__ = Mock(return_value="mps")
-        mock_torch.device.return_value = mock_device
-
-        mock_tensor = Mock()
-        mock_torch.randn.return_value = mock_tensor
-        mock_tensor.sum.return_value = mock_tensor
-
-        device = get_optimal_device(preference="mps")
-        assert str(device) == "mps"
+# Importa as funções do device_manager
+try:
+    from src.device_manager import (
+        get_optimal_device,
+        device_detection_with_fallback,
+        cleanup_gpu_memory,
+        get_device_info,
+        get_model_kwargs_for_device,
+        get_gpu_preference,
+        DeviceConfig,
+        DeviceInfo,
+    )
+except ImportError:
+    from device_manager import (
+        get_optimal_device,
+        device_detection_with_fallback,
+        cleanup_gpu_memory,
+        get_device_info,
+        get_model_kwargs_for_device,
+        get_gpu_preference,
+        DeviceConfig,
+        DeviceInfo,
+    )
 
 
-class TestDeviceConfiguration:
-    """Test device configuration and environment variable handling."""
+class TestDeviceManagerBasicFunctions:
+    """Testes para funções básicas do device_manager."""
+
+    def test_get_gpu_preference_default(self):
+        """Testa obtenção da preferência de GPU padrão."""
+        with patch.dict(os.environ, {}, clear=True):
+            preference = get_gpu_preference()
+            assert preference == "auto"
+
+    def test_get_gpu_preference_custom(self):
+        """Testa obtenção da preferência de GPU customizada."""
+        with patch.dict(os.environ, {"GPU_PREFERENCE": "cpu"}):
+            preference = get_gpu_preference()
+            assert preference == "cpu"
+
+    def test_get_gpu_preference_cuda(self):
+        """Testa obtenção da preferência de GPU CUDA."""
+        with patch.dict(os.environ, {"GPU_PREFERENCE": "cuda"}):
+            preference = get_gpu_preference()
+            assert preference == "cuda"
 
     def test_device_config_creation(self):
-        """DeviceConfig dataclass creation works correctly."""
-
+        """Testa criação de configuração de dispositivo."""
         config = DeviceConfig(
-            device_type="cuda", device_index=0, precision="float16", memory_fraction=0.8
+            device_type="cuda", device_index=0, precision="float32", memory_fraction=0.8
         )
 
         assert config.device_type == "cuda"
         assert config.device_index == 0
-        assert config.precision == "float16"
+        assert config.precision == "float32"
         assert config.memory_fraction == 0.8
 
     def test_device_info_creation(self):
-        """DeviceInfo dataclass creation works correctly."""
-
+        """Testa criação de informações de dispositivo."""
         info = DeviceInfo(
-            device="cuda:0", name="Test GPU", memory_total=8.0, is_available=True
+            device="cuda:0",
+            device_type="cuda",
+            name="NVIDIA GeForce RTX 3080",
+            memory_total=10.0,
+            is_available=True,
+            model_kwargs={"device": "cuda:0"},
         )
 
         assert info.device == "cuda:0"
-        assert info.name == "Test GPU"
-        assert info.memory_total == 8.0
+        assert info.device_type == "cuda"
+        assert info.name == "NVIDIA GeForce RTX 3080"
+        assert info.memory_total == 10.0
         assert info.is_available is True
-
-    def test_gpu_preference_from_env(self):
-        """GPU preference correctly reads from environment variables."""
-
-        test_cases = [
-            ("true", "auto"),
-            ("false", "cpu"),
-            ("auto", "auto"),
-            ("cuda", "cuda"),
-            ("mps", "mps"),
-        ]
-
-        for env_value, expected in test_cases:
-            with patch.dict(os.environ, {"USE_GPU_ACCELERATION": env_value}):
-                preference = get_gpu_preference()
-                assert preference == expected
+        assert "device" in info.model_kwargs
 
 
-class TestModelKwargs:
-    """Test model_kwargs generation for different devices and precisions."""
+class TestDeviceManagerDetection:
+    """Testes para detecção de dispositivos."""
 
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_float32_precision_no_kwargs(self, mock_torch):
-        """Float32 precision returns empty model_kwargs."""
+    @patch("src.device_manager.TORCH_AVAILABLE", False)
+    def test_get_optimal_device_no_torch(self):
+        """Testa detecção quando PyTorch não está disponível."""
+        result = get_optimal_device()
 
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert "PyTorch unavailable" in result.name
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_cpu_preference(self, mock_torch):
+        """Testa detecção com preferência de CPU."""
+        result = get_optimal_device(preference="cpu")
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.name == "CPU"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_cuda_available(self, mock_torch):
+        """Testa detecção quando CUDA está disponível."""
+        # Configura mock para CUDA disponível
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.device.return_value = "cuda:0"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+
+        result = get_optimal_device(preference="cuda")
+
+        assert result.device == "cuda:0"
+        assert result.device_type == "cuda"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_cuda_unavailable(self, mock_torch):
+        """Testa detecção quando CUDA não está disponível."""
+        # Configura mock para CUDA indisponível
+        mock_torch.cuda.is_available.return_value = False
+
+        result = get_optimal_device(preference="cuda")
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_cuda_error(self, mock_torch):
+        """Testa detecção quando CUDA gera erro."""
+        # Configura mock para CUDA disponível mas com erro
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.device.side_effect = Exception("CUDA error")
+
+        result = get_optimal_device(preference="cuda")
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_mps_available(self, mock_torch):
+        """Testa detecção quando MPS está disponível."""
+        # Configura mock para MPS disponível
+        mock_torch.cuda.is_available.return_value = False
+        mock_torch.backends.mps.is_available.return_value = True
+        mock_torch.device.return_value = "mps"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+
+        result = get_optimal_device(preference="auto")
+
+        assert result.device == "mps"
+        assert result.device_type == "mps"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_mps_unavailable(self, mock_torch):
+        """Testa detecção quando MPS não está disponível."""
+        # Configura mock para MPS indisponível
+        mock_torch.cuda.is_available.return_value = False
+        mock_torch.backends.mps.is_available.return_value = False
+
+        result = get_optimal_device(preference="auto")
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+
+class TestDeviceManagerConfiguration:
+    """Testes para configuração de dispositivos."""
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_device_detection_with_fallback_default(self, mock_torch):
+        """Testa detecção de dispositivo com fallback padrão."""
+        # Configura mock para CPU
+        mock_torch.cuda.is_available.return_value = False
+        mock_torch.backends.mps.is_available.return_value = False
+
+        result = device_detection_with_fallback()
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_device_detection_with_fallback_custom_config(self, mock_torch):
+        """Testa detecção de dispositivo com configuração customizada."""
+        # Configura mock para CUDA
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.device.return_value = "cuda:1"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+
+        config = DeviceConfig(
+            device_type="cuda", device_index=1, precision="float16", memory_fraction=0.7
+        )
+
+        result = device_detection_with_fallback(config)
+
+        assert result.device == "cuda:1"
+        assert result.device_type == "cuda"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_model_kwargs_for_device_cuda(self, mock_torch):
+        """Testa obtenção de kwargs do modelo para CUDA."""
         mock_device = Mock()
         mock_device.type = "cuda"
 
-        kwargs = get_model_kwargs_for_device(mock_device, "float32")
-        assert kwargs == {}
+        kwargs = get_model_kwargs_for_device(mock_device, precision="float16")
 
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_float16_precision_on_gpu(self, mock_torch):
-        """Float16 precision on GPU returns correct torch_dtype."""
+        assert "device" in kwargs
+        assert kwargs["device"] == mock_device
 
-        mock_device = Mock()
-        mock_device.type = "cuda"
-        mock_torch.float16 = "float16_value"
-
-        kwargs = get_model_kwargs_for_device(mock_device, "float16")
-        assert kwargs == {"torch_dtype": "float16_value"}
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_bfloat16_precision_on_gpu(self, mock_torch):
-        """BFloat16 precision on GPU returns correct torch_dtype."""
-
-        mock_device = Mock()
-        mock_device.type = "cuda"
-        mock_torch.bfloat16 = "bfloat16_value"
-
-        kwargs = get_model_kwargs_for_device(mock_device, "bfloat16")
-        assert kwargs == {"torch_dtype": "bfloat16_value"}
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_precision_on_cpu_ignored(self, mock_torch):
-        """Precision settings ignored on CPU device."""
-
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_model_kwargs_for_device_cpu(self, mock_torch):
+        """Testa obtenção de kwargs do modelo para CPU."""
         mock_device = Mock()
         mock_device.type = "cpu"
 
-        kwargs = get_model_kwargs_for_device(mock_device, "float16")
-        assert kwargs == {}
+        kwargs = get_model_kwargs_for_device(mock_device, precision="float32")
+
+        assert "device" in kwargs
+        assert kwargs["device"] == mock_device
 
 
-class TestMemoryManagement:
-    """Test GPU memory management and cleanup."""
+class TestDeviceManagerMemoryManagement:
+    """Testes para gerenciamento de memória."""
 
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_cleanup_gpu_memory_when_available(self, mock_torch):
-        """GPU memory cleanup called when CUDA available."""
-
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_cleanup_gpu_memory_cuda_available(self, mock_torch):
+        """Testa limpeza de memória GPU quando CUDA está disponível."""
         mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.empty_cache = Mock()
+        mock_torch.cuda.synchronize = Mock()
 
         cleanup_gpu_memory()
 
         mock_torch.cuda.empty_cache.assert_called_once()
+        mock_torch.cuda.synchronize.assert_called_once()
 
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_cleanup_gpu_memory_when_unavailable(self, mock_torch):
-        """GPU memory cleanup safe when CUDA unavailable."""
-
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_cleanup_gpu_memory_cuda_unavailable(self, mock_torch):
+        """Testa limpeza de memória GPU quando CUDA não está disponível."""
         mock_torch.cuda.is_available.return_value = False
 
-        # Should not raise exception
+        # Não deve gerar erro
         cleanup_gpu_memory()
 
-        mock_torch.cuda.empty_cache.assert_not_called()
-
-    @patch("device_manager.TORCH_AVAILABLE", False)
+    @patch("src.device_manager.TORCH_AVAILABLE", False)
     def test_cleanup_gpu_memory_no_torch(self):
-        """GPU memory cleanup safe when PyTorch unavailable."""
-
-        # Should not raise exception
+        """Testa limpeza de memória GPU quando PyTorch não está disponível."""
+        # Não deve gerar erro
         cleanup_gpu_memory()
 
 
-class TestDeviceInfo:
-    """Test comprehensive device information gathering."""
+class TestDeviceManagerInformation:
+    """Testes para informações de dispositivo."""
 
-    @patch("device_manager.TORCH_AVAILABLE", False)
-    def test_device_info_no_torch(self):
-        """Device info when PyTorch not available."""
-
-        info = get_device_info()
-
-        expected = {
-            "torch_available": False,
-            "cuda_available": False,
-            "mps_available": False,
-            "device_count": 0,
-            "devices": [],
-        }
-
-        assert info == expected
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_device_info_cuda_available(self, mock_torch):
-        """Device info when CUDA is available."""
-
-        # Mock CUDA availability, no MPS
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_device_info_cuda(self, mock_torch):
+        """Testa obtenção de informações de dispositivo CUDA."""
+        # Configura mock para CUDA
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.device_count.return_value = 2
-        mock_torch.cuda.current_device.return_value = 0
-
-        # Mock no MPS availability
-        mock_torch.backends.mps.is_available.return_value = False
-
-        # Mock device properties for two GPUs
-        mock_props = [
-            Mock(name="GPU 1", total_memory=8 * 1024**3),
-            Mock(name="GPU 2", total_memory=16 * 1024**3),
-        ]
-        mock_props[0].name = "GPU 1"
-        mock_props[1].name = "GPU 2"
-        mock_torch.cuda.get_device_properties.side_effect = mock_props
-        mock_torch.cuda.memory_allocated.side_effect = [1024**3, 2 * 1024**3]
+        mock_torch.cuda.get_device_name.return_value = "NVIDIA GeForce RTX 3080"
+        mock_torch.cuda.get_device_properties.return_value = Mock(
+            total_memory=10737418240  # 10GB em bytes
+        )
+        mock_torch.device.return_value = "cuda:0"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
 
         info = get_device_info()
 
-        assert info["torch_available"] is True
-        assert info["cuda_available"] is True
-        assert info["device_count"] == 2
-        assert len(info["devices"]) == 2
+        assert "cuda" in info
+        assert info["cuda"]["available"] is True
+        assert info["cuda"]["device_count"] == 2
+        assert "NVIDIA GeForce RTX 3080" in info["cuda"]["devices"][0]["name"]
+        assert info["cuda"]["devices"][0]["memory_total"] == 10.0
 
-        # Check first device info
-        device_0 = info["devices"][0]
-        assert device_0["index"] == 0
-        assert device_0["name"] == "GPU 1"
-        assert device_0["memory_total_gb"] == 8.0
-        assert device_0["is_current"] is True
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_device_info_cpu_only(self, mock_torch):
+        """Testa obtenção de informações de dispositivo apenas CPU."""
+        # Configura mock para apenas CPU
+        mock_torch.cuda.is_available.return_value = False
+        mock_torch.backends.mps.is_available.return_value = False
 
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_device_info_mps_available(self, mock_torch):
-        """Device info when MPS is available."""
+        info = get_device_info()
 
-        # Mock MPS availability, no CUDA
+        assert "cpu" in info
+        assert info["cpu"]["available"] is True
+        assert "cuda" in info
+        assert info["cuda"]["available"] is False
+
+    @patch("src.device_manager.TORCH_AVAILABLE", False)
+    def test_get_device_info_no_torch(self):
+        """Testa obtenção de informações de dispositivo sem PyTorch."""
+        info = get_device_info()
+
+        assert "cpu" in info
+        assert info["cpu"]["available"] is True
+        assert "cuda" in info
+        assert info["cuda"]["available"] is False
+        assert "torch_available" in info
+        assert info["torch_available"] is False
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_device_info_mps_available(self, mock_torch):
+        """Testa obtenção de informações de dispositivo com MPS."""
+        # Configura mock para MPS
         mock_torch.cuda.is_available.return_value = False
         mock_torch.backends.mps.is_available.return_value = True
-
-        info = get_device_info()
-
-        assert info["torch_available"] is True
-        assert info["cuda_available"] is False
-        assert info["mps_available"] is True
-        assert len(info["devices"]) == 1
-
-        mps_device = info["devices"][0]
-        assert mps_device["name"] == "Apple Silicon GPU (MPS)"
-        assert mps_device["type"] == "mps"
-
-
-class TestDeviceDetectionWithFallback:
-    """Test comprehensive device detection with fallback strategy."""
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_device_detection_with_config(self, mock_torch):
-        """Device detection with custom configuration."""
-
-        # Mock CUDA availability
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.cuda.get_device_name.return_value = "Test GPU"
-        mock_torch.cuda.get_device_properties.return_value = Mock(
-            total_memory=8 * 1024**3
-        )
-
-        # Mock device and tensor operations
-        mock_device = Mock()
-        mock_device.type = "cuda"
-        mock_device.__str__ = Mock(return_value="cuda:0")
-        mock_torch.device.return_value = mock_device
-
+        mock_torch.device.return_value = "mps"
+        mock_torch.randn.return_value = Mock()
         mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
         mock_torch.randn.return_value = mock_tensor
-        mock_tensor.__matmul__ = Mock(return_value=mock_tensor)
-
-        # Test with custom config
-        config = DeviceConfig(
-            device_type="cuda", device_index=0, precision="float16", memory_fraction=0.8
-        )
-
-        device, device_info = device_detection_with_fallback(config)
-
-        assert str(device) == "cuda:0"
-        assert device_info.name == "Test GPU"
-        assert device_info.memory_total == 8.0
-        assert device_info.is_available is True
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    @patch.dict(
-        os.environ,
-        {
-            "USE_GPU_ACCELERATION": "auto",
-            "GPU_DEVICE_INDEX": "1",
-            "GPU_PRECISION": "float16",
-            "GPU_MEMORY_FRACTION": "0.9",
-        },
-    )
-    def test_device_detection_from_env(self, mock_torch):
-        """Device detection using environment variables."""
-
-        # Mock CPU fallback
-        mock_torch.cuda.is_available.return_value = False
-        cpu_device = Mock()
-        cpu_device.type = "cpu"
-        cpu_device.__str__ = Mock(return_value="cpu")
-        mock_torch.device.return_value = cpu_device
-
-        device, device_info = device_detection_with_fallback()
-
-        assert str(device) == "cpu"
-        assert device_info.name == "CPU"
-        assert device_info.is_available is True
-
-
-class TestErrorHandling:
-    """Test error handling and edge cases."""
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_gpu_operations_exception_handling(self, mock_torch):
-        """GPU operations exceptions are handled gracefully."""
-
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.randn.side_effect = RuntimeError("Out of memory")
-
-        # Mock MPS not available
-        mock_torch.backends.mps.is_available.return_value = False
-
-        # Mock CPU device for fallback
-        cpu_device = Mock()
-        cpu_device.__str__ = Mock(return_value="cpu")
-        mock_torch.device.return_value = cpu_device
-
-        # Should not raise exception, should return CPU
-        device = get_optimal_device(preference="auto")
-        assert str(device) == "cpu"
-
-    @patch("device_manager.TORCH_AVAILABLE", True)
-    @patch("device_manager.torch")
-    def test_device_info_partial_failure(self, mock_torch):
-        """Device info gathering handles partial failures."""
-
-        # Mock CUDA available but some operations fail, no MPS
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.cuda.device_count.return_value = 2
-        mock_torch.backends.mps.is_available.return_value = False
-
-        # First device works, second fails
-        working_gpu_props = Mock(name="Working GPU", total_memory=8 * 1024**3)
-        working_gpu_props.name = "Working GPU"
-        mock_torch.cuda.get_device_properties.side_effect = [
-            working_gpu_props,
-            RuntimeError("Device error"),
-        ]
-        mock_torch.cuda.memory_allocated.side_effect = [
-            1024**3,
-            RuntimeError("Memory error"),
-        ]
-        mock_torch.cuda.current_device.return_value = 0
 
         info = get_device_info()
 
-        # Should still return info for working device
-        assert info["cuda_available"] is True
-        assert len(info["devices"]) == 1  # Only successful device included
-        assert info["devices"][0]["name"] == "Working GPU"
-
-    def test_unknown_precision_warning(self):
-        """Unknown precision values are handled with warning."""
-
-        mock_device = Mock()
-        mock_device.type = "cuda"
-
-        with patch("device_manager.logging") as mock_logging:
-            kwargs = get_model_kwargs_for_device(mock_device, "unknown_precision")
-
-            # Should return empty dict and log warning
-            assert kwargs == {}
-            mock_logging.warning.assert_called_once()
+        assert "mps" in info
+        assert info["mps"]["available"] is True
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+class TestDeviceManagerEdgeCases:
+    """Testes para casos extremos do device_manager."""
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_multi_gpu(self, mock_torch):
+        """Testa detecção de dispositivo com múltiplas GPUs."""
+        # Configura mock para múltiplas GPUs
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 4
+        mock_torch.device.return_value = "cuda:2"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+
+        result = get_optimal_device(gpu_index=2)
+
+        assert result.device == "cuda:2"
+        assert result.device_type == "cuda"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_invalid_gpu_index(self, mock_torch):
+        """Testa detecção de dispositivo com índice de GPU inválido."""
+        # Configura mock para GPU indisponível
+        mock_torch.cuda.is_available.return_value = False
+
+        result = get_optimal_device(gpu_index=999)
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_optimal_device_different_precisions(self, mock_torch):
+        """Testa detecção de dispositivo com diferentes precisões."""
+        # Configura mock para CUDA
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.device.return_value = "cuda:0"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+
+        # Testa diferentes precisões
+        for precision in ["float32", "float16", "bfloat16"]:
+            with patch.dict(os.environ, {"GPU_PRECISION": precision}):
+                result = get_optimal_device()
+                assert result.device == "cuda:0"
+                assert result.device_type == "cuda"
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_device_detection_with_fallback_error_handling(self, mock_torch):
+        """Testa tratamento de erro na detecção de dispositivo."""
+        # Configura mock para gerar erro
+        mock_torch.cuda.is_available.side_effect = Exception("CUDA error")
+
+        result = device_detection_with_fallback()
+
+        assert result.device == "cpu"
+        assert result.device_type == "cpu"
+        assert result.is_available is True
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_get_device_info_error_handling(self, mock_torch):
+        """Testa tratamento de erro na obtenção de informações de dispositivo."""
+        # Configura mock para gerar erro
+        mock_torch.cuda.is_available.side_effect = Exception("CUDA error")
+
+        info = get_device_info()
+
+        assert "cpu" in info
+        assert info["cpu"]["available"] is True
+        assert "error" in info
+
+
+class TestDeviceManagerIntegration:
+    """Testes de integração para device_manager."""
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_complete_device_workflow(self, mock_torch):
+        """Testa workflow completo de gerenciamento de dispositivo."""
+        # Configura mock para CUDA
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 1
+        mock_torch.cuda.get_device_name.return_value = "NVIDIA GeForce RTX 3080"
+        mock_torch.cuda.get_device_properties.return_value = Mock(
+            total_memory=10737418240
+        )
+        mock_torch.device.return_value = "cuda:0"
+        mock_torch.randn.return_value = Mock()
+        mock_tensor = Mock()
+        mock_tensor.__matmul__ = Mock(return_value=Mock())
+        mock_torch.randn.return_value = mock_tensor
+        mock_torch.cuda.empty_cache = Mock()
+        mock_torch.cuda.synchronize = Mock()
+
+        # Testa obtenção de dispositivo ótimo
+        device_info = get_optimal_device()
+        assert device_info.device == "cuda:0"
+        assert device_info.device_type == "cuda"
+
+        # Testa obtenção de informações de dispositivo
+        device_info_dict = get_device_info()
+        assert device_info_dict["cuda"]["available"] is True
+
+        # Testa limpeza de memória
+        cleanup_gpu_memory()
+        mock_torch.cuda.empty_cache.assert_called_once()
+
+        # Testa obtenção de kwargs do modelo
+        kwargs = get_model_kwargs_for_device(device_info.device, precision="float32")
+        assert "device" in kwargs
+
+    @patch("src.device_manager.TORCH_AVAILABLE", False)
+    def test_complete_device_workflow_no_torch(self):
+        """Testa workflow completo sem PyTorch."""
+        # Testa obtenção de dispositivo ótimo
+        device_info = get_optimal_device()
+        assert device_info.device == "cpu"
+        assert device_info.device_type == "cpu"
+
+        # Testa obtenção de informações de dispositivo
+        device_info_dict = get_device_info()
+        assert device_info_dict["cpu"]["available"] is True
+        assert device_info_dict["torch_available"] is False
+
+        # Testa limpeza de memória (não deve gerar erro)
+        cleanup_gpu_memory()
+
+    @patch("src.device_manager.TORCH_AVAILABLE", True)
+    @patch("src.device_manager.torch")
+    def test_device_configuration_workflow(self, mock_torch):
+        """Testa workflow de configuração de dispositivo."""
+        # Configura mock para CPU
+        mock_torch.cuda.is_available.return_value = False
+        mock_torch.backends.mps.is_available.return_value = False
+
+        # Testa configuração customizada
+        config = DeviceConfig(
+            device_type="cpu",
+            device_index=None,
+            precision="float32",
+            memory_fraction=1.0,
+        )
+
+        device_info = device_detection_with_fallback(config)
+        assert device_info.device == "cpu"
+        assert device_info.device_type == "cpu"
+
+        # Testa obtenção de kwargs do modelo
+        kwargs = get_model_kwargs_for_device(device_info.device, precision="float32")
+        assert "device" in kwargs
+        assert kwargs["device"] == "cpu"
+

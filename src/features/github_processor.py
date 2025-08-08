@@ -588,35 +588,129 @@ class ConfigProcessor(FileTypeProcessor):
 
 
 class MultiFileDiscovery(MarkdownDiscovery):
-    """Enhanced file discovery supporting multiple file types."""
+    """
+    Enhanced file discovery supporting multiple file types via Tree-sitter integration.
+
+    Supports 12 programming languages through Tree-sitter parsers:
+    - Python (.py, .pyi)
+    - JavaScript/TypeScript (.js, .jsx, .mjs, .cjs, .ts, .tsx)
+    - Java (.java)
+    - Go (.go)
+    - Rust (.rs)
+    - C/C++ (.c, .h, .cpp, .cxx, .cc, .hpp, .hxx, .hh)
+    - C# (.cs)
+    - PHP (.php, .php3, .php4, .php5, .phtml)
+    - Ruby (.rb, .rbw)
+    - Kotlin (.kt, .kts)
+
+    Plus configuration and documentation files:
+    - Markdown (.md, .markdown, .mdown, .mkd)
+    - Configuration (.json, .yaml, .yml, .toml)
+    """
 
     SUPPORTED_EXTENSIONS = {
+        # Markdown files
         ".md",
         ".markdown",
         ".mdown",
-        ".mkd",  # Markdown
-        ".py",  # Python
+        ".mkd",
+        # Python files
+        ".py",
+        ".pyi",
+        # JavaScript/TypeScript files
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
         ".ts",
-        ".tsx",  # TypeScript
+        ".tsx",
+        # Java files
+        ".java",
+        # Go files
+        ".go",
+        # Rust files
+        ".rs",
+        # C/C++ files
+        ".c",
+        ".h",
+        ".cpp",
+        ".cxx",
+        ".cc",
+        ".hpp",
+        ".hxx",
+        ".hh",
+        # C# files
+        ".cs",
+        # PHP files
+        ".php",
+        ".php3",
+        ".php4",
+        ".php5",
+        ".phtml",
+        # Ruby files
+        ".rb",
+        ".rbw",
+        # Kotlin files
+        ".kt",
+        ".kts",
+        # Configuration files
         ".json",
         ".yaml",
         ".yml",
-        ".toml",  # Configuration
+        ".toml",
     }
 
-    # File size limits by type
+    # File size limits by type (1MB = 1_000_000 bytes, 500KB = 500_000 bytes)
     FILE_SIZE_LIMITS = {
+        # Python files
         ".py": 1_000_000,  # 1MB for Python files
+        ".pyi": 500_000,  # 500KB for Python interface files
+        # JavaScript/TypeScript files
+        ".js": 1_000_000,  # 1MB for JavaScript files
+        ".jsx": 1_000_000,  # 1MB for React JSX files
+        ".mjs": 1_000_000,  # 1MB for ES6 module files
+        ".cjs": 1_000_000,  # 1MB for CommonJS files
         ".ts": 1_000_000,  # 1MB for TypeScript files
-        ".tsx": 1_000_000,  # 1MB for TypeScript files
+        ".tsx": 1_000_000,  # 1MB for TypeScript React files
+        # Java files
+        ".java": 1_000_000,  # 1MB for Java files
+        # Go files
+        ".go": 1_000_000,  # 1MB for Go files
+        # Rust files
+        ".rs": 1_000_000,  # 1MB for Rust files
+        # C/C++ files
+        ".c": 1_000_000,  # 1MB for C files
+        ".h": 500_000,  # 500KB for header files
+        ".cpp": 1_000_000,  # 1MB for C++ files
+        ".cxx": 1_000_000,  # 1MB for C++ files
+        ".cc": 1_000_000,  # 1MB for C++ files
+        ".hpp": 500_000,  # 500KB for C++ header files
+        ".hxx": 500_000,  # 500KB for C++ header files
+        ".hh": 500_000,  # 500KB for C++ header files
+        # C# files
+        ".cs": 1_000_000,  # 1MB for C# files
+        # PHP files
+        ".php": 1_000_000,  # 1MB for PHP files
+        ".php3": 1_000_000,  # 1MB for PHP files
+        ".php4": 1_000_000,  # 1MB for PHP files
+        ".php5": 1_000_000,  # 1MB for PHP files
+        ".phtml": 1_000_000,  # 1MB for PHP template files
+        # Ruby files
+        ".rb": 1_000_000,  # 1MB for Ruby files
+        ".rbw": 1_000_000,  # 1MB for Ruby Windows files
+        # Kotlin files
+        ".kt": 1_000_000,  # 1MB for Kotlin files
+        ".kts": 500_000,  # 500KB for Kotlin script files
+        # Configuration files (smaller limits for config files)
         ".json": 100_000,  # 100KB for JSON files
         ".yaml": 100_000,  # 100KB for YAML files
         ".yml": 100_000,  # 100KB for YAML files
         ".toml": 100_000,  # 100KB for TOML files
+        # Markdown files
         ".md": 1_000_000,  # 1MB for Markdown files
-        ".markdown": 1_000_000,
-        ".mdown": 1_000_000,
-        ".mkd": 1_000_000,
+        ".markdown": 1_000_000,  # 1MB for Markdown files
+        ".mdown": 1_000_000,  # 1MB for Markdown files
+        ".mkd": 1_000_000,  # 1MB for Markdown files
     }
 
     def discover_files(
@@ -907,8 +1001,8 @@ class GitHubMetadataExtractor:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                encoding='utf-8',
-                errors='replace',  # Replace invalid characters instead of failing
+                encoding="utf-8",
+                errors="replace",  # Replace invalid characters instead of failing
                 timeout=10,
             )
 

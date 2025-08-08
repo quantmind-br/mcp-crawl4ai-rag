@@ -231,14 +231,18 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     # Initialize Tree-sitter grammars if needed (for knowledge graph features)
     try:
         from ..utils.grammar_initialization import initialize_grammars_if_needed
+
         initialize_grammars_if_needed()
     except ImportError:
         # Fallback for backward compatibility during migration
         try:
             from src.utils.grammar_initialization import initialize_grammars_if_needed
+
             initialize_grammars_if_needed()
         except ImportError:
-            logger.info("Grammar initialization module not available, skipping Tree-sitter setup")
+            logger.info(
+                "Grammar initialization module not available, skipping Tree-sitter setup"
+            )
 
     # Create browser configuration
     browser_config = BrowserConfig(headless=True, verbose=False)

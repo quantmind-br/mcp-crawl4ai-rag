@@ -180,7 +180,7 @@ class SparseVectorEncoder:
 class EmbeddingService:
     """
     Service for creating and managing embeddings with caching support.
-    
+
     This service provides a high-level interface for embedding generation,
     handling both dense and sparse vectors, with Redis caching for performance
     optimization and cost reduction.
@@ -203,12 +203,16 @@ class EmbeddingService:
         """
         try:
             result = self.create_embeddings_batch([text])
-            
+
             # Handle both hybrid mode (tuple) and regular mode (list)
             if isinstance(result, tuple):
                 # Hybrid mode: (dense_vectors, sparse_vectors)
                 dense_vectors, _ = result
-                return dense_vectors[0] if dense_vectors else [0.0] * get_embedding_dimensions()
+                return (
+                    dense_vectors[0]
+                    if dense_vectors
+                    else [0.0] * get_embedding_dimensions()
+                )
             else:
                 # Regular mode: list of embeddings
                 return result[0] if result else [0.0] * get_embedding_dimensions()
@@ -231,7 +235,9 @@ class EmbeddingService:
         """
         return self._sparse_encoder.encode(text)
 
-    def create_sparse_embeddings_batch(self, texts: List[str]) -> List[SparseVectorConfig]:
+    def create_sparse_embeddings_batch(
+        self, texts: List[str]
+    ) -> List[SparseVectorConfig]:
         """
         Create sparse vector embeddings for multiple texts using BM25.
 
@@ -265,7 +271,9 @@ class EmbeddingService:
         """
         if not texts:
             # Return appropriate empty structure based on hybrid search mode
-            use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+            use_hybrid_search = (
+                os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+            )
             if use_hybrid_search:
                 return ([], [])  # (dense_vectors, sparse_vectors)
             return []
@@ -355,7 +363,9 @@ class EmbeddingService:
 
         for retry in range(max_retries):
             try:
-                embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
+                embeddings_model = os.getenv(
+                    "EMBEDDINGS_MODEL", "text-embedding-3-small"
+                )
                 client = get_embeddings_client()
                 response = client.embeddings.create(
                     model=embeddings_model,
@@ -405,7 +415,9 @@ class EmbeddingService:
                     )
                     return embeddings
 
-    def generate_contextual_embedding(self, full_document: str, chunk: str) -> Tuple[str, bool]:
+    def generate_contextual_embedding(
+        self, full_document: str, chunk: str
+    ) -> Tuple[str, bool]:
         """
         Generate contextual information for a chunk within a document to improve retrieval.
 
@@ -427,7 +439,9 @@ class EmbeddingService:
         )
 
         if not model_choice:
-            logging.warning("No chat model configured. Set CHAT_MODEL environment variable.")
+            logging.warning(
+                "No chat model configured. Set CHAT_MODEL environment variable."
+            )
             return chunk, False
 
         # Optimize prompt for better token efficiency
@@ -638,6 +652,7 @@ Please give a short succinct context to situate this chunk within the overall do
         """
         url, content, full_document = args
         return self.generate_contextual_embedding(full_document, content)
+
 
 # Health check function for backward compatibility
 def health_check_gpu_acceleration() -> Dict[str, Any]:

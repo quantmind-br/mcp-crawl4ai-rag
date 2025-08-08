@@ -240,7 +240,9 @@ async def smart_crawl_github(
 
         # Generate and update source summary
         repo_summary = extract_source_summary(base_source_id, repo_content[:5000])
-        update_source_info(qdrant_client, base_source_id, repo_summary, total_word_count)
+        update_source_info(
+            qdrant_client, base_source_id, repo_summary, total_word_count
+        )
 
         # Store processed documents using new format
         if processed_documents:

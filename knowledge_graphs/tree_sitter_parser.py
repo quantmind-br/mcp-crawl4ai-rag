@@ -12,7 +12,7 @@ from pathlib import Path
 
 # Tree-sitter imports
 import tree_sitter
-from tree_sitter import Language, Parser, Node
+from tree_sitter import Language, Parser, Node, Query
 
 # Local imports
 from knowledge_graphs.language_parser import (

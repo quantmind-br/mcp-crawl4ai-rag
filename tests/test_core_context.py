@@ -18,17 +18,15 @@ class TestCrawl4AIContext:
     def test_context_dataclass_creation(self):
         """Test that context can be created with required fields."""
         from src.core.context import Crawl4AIContext
-        
+
         mock_crawler = Mock()
         mock_client = Mock()
         mock_cache = Mock()
-        
+
         context = Crawl4AIContext(
-            crawler=mock_crawler,
-            qdrant_client=mock_client,
-            embedding_cache=mock_cache
+            crawler=mock_crawler, qdrant_client=mock_client, embedding_cache=mock_cache
         )
-        
+
         assert context.crawler is mock_crawler
         assert context.qdrant_client is mock_client
         assert context.embedding_cache is mock_cache
@@ -36,13 +34,11 @@ class TestCrawl4AIContext:
     def test_context_optional_fields(self):
         """Test that optional fields default to None."""
         from src.core.context import Crawl4AIContext
-        
+
         context = Crawl4AIContext(
-            crawler=Mock(),
-            qdrant_client=Mock(),
-            embedding_cache=Mock()
+            crawler=Mock(), qdrant_client=Mock(), embedding_cache=Mock()
         )
-        
+
         # Optional fields should default to None
         assert context.reranker is None
         assert context.knowledge_validator is None
@@ -53,51 +49,49 @@ class TestCrawl4AIContext:
     def test_context_all_fields_provided(self):
         """Test context with all fields provided."""
         from src.core.context import Crawl4AIContext
-        
+
         mocks = {
-            'crawler': Mock(),
-            'qdrant_client': Mock(),
-            'embedding_cache': Mock(),
-            'reranker': Mock(),
-            'knowledge_validator': Mock(),
-            'repo_extractor': Mock(),
-            'embedding_service': Mock(),
-            'rag_service': Mock()
+            "crawler": Mock(),
+            "qdrant_client": Mock(),
+            "embedding_cache": Mock(),
+            "reranker": Mock(),
+            "knowledge_validator": Mock(),
+            "repo_extractor": Mock(),
+            "embedding_service": Mock(),
+            "rag_service": Mock(),
         }
-        
+
         context = Crawl4AIContext(**mocks)
-        
+
         for field_name, mock_obj in mocks.items():
             assert getattr(context, field_name) is mock_obj
 
     def test_context_dataclass_fields(self):
         """Test that context has expected fields with correct types."""
         from src.core.context import Crawl4AIContext
-        
+
         expected_fields = {
-            'crawler',
-            'qdrant_client', 
-            'embedding_cache',
-            'reranker',
-            'knowledge_validator',
-            'repo_extractor',
-            'embedding_service',
-            'rag_service'
+            "crawler",
+            "qdrant_client",
+            "embedding_cache",
+            "reranker",
+            "knowledge_validator",
+            "repo_extractor",
+            "embedding_service",
+            "rag_service",
         }
-        
+
         actual_fields = {field.name for field in fields(Crawl4AIContext)}
         assert actual_fields == expected_fields
 
     def test_context_repr(self):
         """Test context string representation."""
         from src.core.context import Crawl4AIContext
-        
+
         context = Crawl4AIContext(
-            crawler=Mock(),
-            qdrant_client=Mock(), 
-            embedding_cache=Mock()
+            crawler=Mock(), qdrant_client=Mock(), embedding_cache=Mock()
         )
-        
+
         repr_str = repr(context)
         assert "Crawl4AIContext" in repr_str
         assert "crawler=" in repr_str
@@ -106,13 +100,11 @@ class TestCrawl4AIContext:
     def test_context_immutability(self):
         """Test that context fields can be modified (not frozen)."""
         from src.core.context import Crawl4AIContext
-        
+
         context = Crawl4AIContext(
-            crawler=Mock(),
-            qdrant_client=Mock(),
-            embedding_cache=Mock()
+            crawler=Mock(), qdrant_client=Mock(), embedding_cache=Mock()
         )
-        
+
         # Should be able to modify fields (context is not frozen)
         new_mock = Mock()
         context.crawler = new_mock
@@ -121,48 +113,46 @@ class TestCrawl4AIContext:
     def test_context_field_access(self):
         """Test accessing context fields through attribute access."""
         from src.core.context import Crawl4AIContext
-        
+
         mock_crawler = Mock()
         mock_client = Mock()
         mock_cache = Mock()
-        
+
         context = Crawl4AIContext(
-            crawler=mock_crawler,
-            qdrant_client=mock_client,
-            embedding_cache=mock_cache
+            crawler=mock_crawler, qdrant_client=mock_client, embedding_cache=mock_cache
         )
-        
+
         # Test attribute access works
-        assert hasattr(context, 'crawler')
-        assert hasattr(context, 'qdrant_client')
-        assert hasattr(context, 'embedding_cache')
-        assert hasattr(context, 'reranker')
-        
+        assert hasattr(context, "crawler")
+        assert hasattr(context, "qdrant_client")
+        assert hasattr(context, "embedding_cache")
+        assert hasattr(context, "reranker")
+
         # Test getting attributes
-        assert getattr(context, 'crawler') is mock_crawler
-        assert getattr(context, 'qdrant_client') is mock_client
-        assert getattr(context, 'embedding_cache') is mock_cache
-        assert getattr(context, 'reranker') is None
+        assert getattr(context, "crawler") is mock_crawler
+        assert getattr(context, "qdrant_client") is mock_client
+        assert getattr(context, "embedding_cache") is mock_cache
+        assert getattr(context, "reranker") is None
 
     def test_context_type_hints(self):
         """Test that context has proper type hints."""
         from src.core.context import Crawl4AIContext
-        
+
         # This test ensures the dataclass is properly typed
         # The actual type checking would be done by mypy/pyright
-        annotations = getattr(Crawl4AIContext, '__annotations__', {})
-        
+        annotations = getattr(Crawl4AIContext, "__annotations__", {})
+
         # Should have type annotations for all fields
         expected_annotations = {
-            'crawler',
-            'qdrant_client', 
-            'embedding_cache',
-            'reranker',
-            'knowledge_validator',
-            'repo_extractor',
-            'embedding_service',
-            'rag_service'
+            "crawler",
+            "qdrant_client",
+            "embedding_cache",
+            "reranker",
+            "knowledge_validator",
+            "repo_extractor",
+            "embedding_service",
+            "rag_service",
         }
-        
+
         actual_annotations = set(annotations.keys())
         assert actual_annotations == expected_annotations

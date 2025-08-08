@@ -407,56 +407,6 @@ class Neo4jCodeAnalyzer:
         # Final fallback: use the default
         return default_module
 
-        # AST helper methods removed - using Tree-sitter exclusively
-
-        try:
-            if isinstance(node, ast.Name):
-                return node.id
-            elif isinstance(node, ast.Attribute):
-                if hasattr(node, "value"):
-                    return f"{self._get_name(node.value)}.{node.attr}"
-                else:
-                    return node.attr
-            elif isinstance(node, ast.Subscript):
-                # Handle List[Type], Dict[K,V], etc.
-                base = self._get_name(node.value)
-                if hasattr(node, "slice"):
-                    if isinstance(node.slice, ast.Name):
-                        return f"{base}[{node.slice.id}]"
-                    elif isinstance(node.slice, ast.Tuple):
-                        elts = [self._get_name(elt) for elt in node.slice.elts]
-                        return f"{base}[{', '.join(elts)}]"
-                    elif isinstance(node.slice, ast.Constant):
-                        return f"{base}[{repr(node.slice.value)}]"
-                    elif isinstance(node.slice, ast.Attribute):
-                        return f"{base}[{self._get_name(node.slice)}]"
-                    elif isinstance(node.slice, ast.Subscript):
-                        return f"{base}[{self._get_name(node.slice)}]"
-                    else:
-                        # Try to get the name of the slice, fallback to Any if it fails
-                        try:
-                            slice_name = self._get_name(node.slice)
-                            return f"{base}[{slice_name}]"
-                        except Exception:
-                            return f"{base}[Any]"
-                return base
-            elif isinstance(node, ast.Constant):
-                return str(node.value)
-            elif isinstance(node, ast.Str):  # Python < 3.8
-                return f'"{node.s}"'
-            elif isinstance(node, ast.Tuple):
-                elts = [self._get_name(elt) for elt in node.elts]
-                return f"({', '.join(elts)})"
-            elif isinstance(node, ast.List):
-                elts = [self._get_name(elt) for elt in node.elts]
-                return f"[{', '.join(elts)}]"
-            else:
-                # Fallback for complex types - return a simple string representation
-                return "Any"
-        except Exception:
-            # If anything goes wrong, return a safe default
-            return "Any"
-
 
 class DirectNeo4jExtractor:
     """Creates nodes and relationships directly in Neo4j"""

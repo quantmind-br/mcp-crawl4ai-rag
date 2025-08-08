@@ -82,12 +82,10 @@ async def perform_rag_query(
     try:
         # Get clients from context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
-        reranker = getattr(ctx.request_context.lifespan_context, 'reranker', None)
+        reranker = getattr(ctx.request_context.lifespan_context, "reranker", None)
 
         # Perform the search using the utility function
-        results = search_documents(
-            qdrant_client, query, source, match_count, reranker
-        )
+        results = search_documents(qdrant_client, query, source, match_count, reranker)
 
         return json.dumps(results, indent=2)
     except Exception as e:
@@ -118,7 +116,7 @@ async def search_code_examples(
     try:
         # Get clients from context
         qdrant_client = ctx.request_context.lifespan_context.qdrant_client
-        reranker = getattr(ctx.request_context.lifespan_context, 'reranker', None)
+        reranker = getattr(ctx.request_context.lifespan_context, "reranker", None)
 
         # Perform the search using the utility function
         results = search_code_examples_impl(

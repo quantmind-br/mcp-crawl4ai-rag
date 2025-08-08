@@ -19,6 +19,6 @@ from core.app import run_server  # noqa: E402
 if __name__ == "__main__":
     # Apply Windows ConnectionResetError fix before starting event loop
     setup_event_loop()
-    
+
     # Run the server with the new core structure
     asyncio.run(run_server())

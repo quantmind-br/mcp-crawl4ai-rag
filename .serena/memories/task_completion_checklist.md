@@ -1,61 +1,48 @@
 # Task Completion Checklist
 
-## Before Making Changes
-- [ ] Read relevant existing code to understand patterns and conventions
-- [ ] Check if similar functionality already exists to avoid duplication
-- [ ] Understand the MCP tool structure and async patterns used
-- [ ] Verify environment configuration requirements
-
-## During Development
-- [ ] Follow existing code style and naming conventions
-- [ ] Use type hints for all function parameters and return types
-- [ ] Implement proper error handling with try/except blocks
-- [ ] Add comprehensive docstrings using Google/NumPy style
-- [ ] Use async/await patterns for I/O operations
-- [ ] Return JSON responses from MCP tools with consistent structure
-- [ ] Test with different API providers if applicable
-- [ ] Consider GPU/CPU fallback scenarios where relevant
-
-## Code Quality Checks
-- [ ] **No linting specified** - Follow existing code patterns for consistency
-- [ ] **No formatting tool specified** - Maintain existing indentation and style
-- [ ] **No type checking tool specified** - Use type hints but manual verification
-- [ ] Ensure proper import organization (standard, third-party, local)
-- [ ] Check for proper exception handling and logging
+## Code Quality Steps
+1. **Lint and Format**: Run `uv run ruff check --fix && uv run ruff format`
+2. **Type Checking**: Ensure all type hints are correct and complete
+3. **Test Coverage**: Run relevant tests with `uv run pytest`
+4. **Documentation**: Update docstrings and comments as needed
 
 ## Testing Requirements
-- [ ] Run all existing tests: `uv run pytest`
-- [ ] Run specific relevant tests for the area you modified
-- [ ] Test with Docker services running: `uv run pytest tests/integration_test.py`
-- [ ] If modifying MCP tools, test: `uv run pytest tests/test_mcp_basic.py`
-- [ ] If modifying Qdrant integration, test: `uv run pytest tests/test_qdrant_wrapper.py`
-- [ ] Run performance benchmarks if performance-critical changes: `uv run pytest tests/performance_benchmark.py`
-- [ ] Test with both SSE and stdio transports if modifying MCP server
+- **Unit Tests**: Test individual functions and classes
+- **Integration Tests**: Test MCP tool functionality end-to-end
+- **Performance Tests**: Validate response times and resource usage
+- **Error Handling**: Test failure scenarios and edge cases
 
-## Environment Testing
-- [ ] Test with different API providers (OpenAI, DeepInfra, etc.)
-- [ ] Test with various RAG strategy flag combinations
-- [ ] Test with and without Docker services running
-- [ ] Test GPU acceleration if modifying reranking features
-- [ ] Verify Windows batch script compatibility if applicable
+## Pre-Commit Validation
+1. All tests pass: `uv run pytest`
+2. Code formatting clean: `uv run ruff format --check`
+3. No linting errors: `uv run ruff check`
+4. Dependencies up to date: `uv sync`
+5. Environment variables configured: Check `.env` file
+
+## Docker Services Health Check
+```bash
+# Verify services are running
+docker-compose ps
+
+# Check service logs for errors
+docker-compose logs qdrant
+docker-compose logs neo4j
+```
+
+## MCP Integration Testing
+1. Server starts without errors
+2. MCP tools are properly registered
+3. Client can connect (Claude Desktop, CLI, etc.)
+4. All tool functions return expected responses
+
+## Performance Validation
+- Server startup < 10 seconds
+- MCP tool responses < 5 seconds for basic operations
+- Memory usage stays within reasonable bounds
+- No resource leaks during extended operation
 
 ## Documentation Updates
-- [ ] Update relevant docstrings and inline comments
-- [ ] Update CLAUDE.md if architecture or commands change
-- [ ] Update README.md if user-facing features change
-- [ ] Update .env.example if new environment variables are added
-
-## Final Verification
-- [ ] Ensure the MCP server starts correctly: `start.bat` or `uv run -m src`
-- [ ] Test basic MCP functionality through a client
-- [ ] Verify Docker services are properly utilized
-- [ ] Check that no secrets or API keys are hardcoded
-- [ ] Confirm backward compatibility with existing configurations
-- [ ] Test error scenarios and ensure graceful error handling
-
-## Deployment Considerations
-- [ ] Verify Windows compatibility if using batch scripts
-- [ ] Test both development and production-like environments
-- [ ] Ensure proper resource cleanup (GPU memory, database connections)
-- [ ] Test with resource constraints (limited memory, CPU)
-- [ ] Verify proper logging and monitoring capabilities
+- Update README.md if adding new features
+- Update `.env.example` for new environment variables
+- Document any breaking changes
+- Add usage examples for new MCP tools

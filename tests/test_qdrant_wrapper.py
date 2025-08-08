@@ -26,15 +26,17 @@ class TestQdrantClientWrapper:
     def _setup_mock_client(self, mock_qdrant_client):
         """Helper method to setup mock client with proper collections mock."""
         mock_client_instance = Mock()
-        
+
         # Mock collections to return empty list (no existing collections)
         mock_collections = Mock()
         mock_collections.collections = []
         mock_client_instance.get_collections.return_value = mock_collections
-        
+
         # Mock get_collection to raise exception (collection doesn't exist)
-        mock_client_instance.get_collection.side_effect = Exception("Collection not found")
-        
+        mock_client_instance.get_collection.side_effect = Exception(
+            "Collection not found"
+        )
+
         mock_qdrant_client.return_value = mock_client_instance
         return mock_client_instance
 
@@ -90,6 +92,7 @@ class TestQdrantClientWrapper:
         assert isinstance(id1, str)
         # Verify it's a valid UUID format
         import uuid
+
         uuid.UUID(id1)  # This will raise ValueError if not a valid UUID
 
     @patch("src.clients.qdrant_client.QdrantClient")
@@ -305,10 +308,14 @@ class TestUtilityFunctions:
         mock_wrapper.return_value = mock_instance
 
         # Test
+        # Ensure singleton is reset so our mock is used
+        import src.clients.qdrant_client as qc
+
+        qc._qdrant_client_instance = None
         client = get_qdrant_client()
 
         # Verify
-        assert client == mock_instance
+        assert client is mock_instance
         mock_wrapper.assert_called_once()
 
     @patch("src.clients.qdrant_client.QdrantClientWrapper")

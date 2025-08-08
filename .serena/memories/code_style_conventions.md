@@ -1,79 +1,68 @@
 # Code Style and Conventions
 
-## General Python Conventions
-- **Python 3.12+** syntax and features
-- **Type hints** for all function parameters and return values
-- **Async/await** patterns for I/O operations
-- **Docstrings** using Google/NumPy style with Args/Returns sections
-- **Error handling** with try/except blocks and context logging
+## Python Style
+- **Formatter**: Ruff (replaces Black)
+- **Linter**: Ruff (replaces Flake8, isort, etc.)
+- **Line Length**: 88 characters (Ruff default)
+- **Python Version**: 3.12+ features allowed
 
-## Code Organization Patterns
+## Import Organization
 ```python
-# Import order: standard library, third-party, local imports
+# Standard library imports
+import asyncio
 import os
-import json
-from typing import Dict, List, Optional
 
-from crawl4ai import AsyncWebCrawler
+# Third-party imports  
+from mcp import types
 from qdrant_client import QdrantClient
 
-from .clients.qdrant_client import QdrantClientWrapper
+# Local imports
+from .core.context import AppContext
+from .services.embedding_service import EmbeddingService
 ```
 
-## Async Function Patterns
+## Type Hints
+- **Required**: All function parameters and return types
+- **Style**: Use modern Python 3.12+ syntax (e.g., `list[str]` not `List[str]`)
+- **Optional**: Use `Optional[Type]` or `Type | None`
+
+## Docstrings
 ```python
-@mcp.tool()
-async def function_name(ctx: Context, param: str) -> str:
+def function_name(param: str) -> dict[str, Any]:
     """
     Brief description of the function.
-
+    
     Args:
-        ctx: The MCP server provided context
         param: Description of parameter
-
+        
     Returns:
         Description of return value
+        
+    Raises:
+        SpecificError: When this error occurs
     """
-    try:
-        # Implementation
-        result = await some_async_operation()
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, indent=2)
 ```
 
-## Error Handling Conventions
-- Use **tenacity** for retrying failed operations (especially API calls)
-- Implement **graceful fallbacks** (GPU → CPU, contextual → basic embeddings)
-- **Log errors** with context using the configured logger
-- Return **JSON responses** from MCP tools with success/error structure
+## Error Handling
+- Use specific exception types
+- Include context in error messages
+- Log errors appropriately
+- Use `tenacity` for retries where appropriate
 
-## File and Directory Structure
-- `src/` - Main source code
-  - `clients/` - API and database client wrappers
-  - `services/` - Business logic services
-  - `features/` - Feature-specific implementations
-  - `utils/` - Utility functions and helpers
-- `tests/` - Test files with `test_` prefix
-- `knowledge_graphs/` - Neo4j integration scripts
-- `scripts/` - Utility scripts for database management
+## Async/Await
+- Use `async def` for all MCP tool functions
+- Prefer `asyncio.gather()` for parallel operations
+- Use context managers for resource management
 
-## Variable Naming
-- **snake_case** for variables, functions, and modules
-- **PascalCase** for classes
-- **UPPER_CASE** for constants
-- **Descriptive names** preferred over abbreviations
-- **Context-specific prefixes**: `mock_` for test mocks, `temp_` for temporary variables
+## File Organization
+- One class per file for major components
+- Group related functionality in modules
+- Use `__init__.py` for clean imports
+- Keep tools separate from business logic
 
-## Configuration Patterns
-- **Environment variables** for configuration with `.env` support
-- **Flexible API configuration** supporting multiple providers
-- **Graceful defaults** with fallback options
-- **Validation functions** for configuration correctness
-
-## Testing Conventions
-- **Class-based tests** using `TestClassName` pattern
-- **Descriptive test names** explaining what is being tested
-- **Mocking external services** (APIs, databases) in unit tests
-- **Integration tests** requiring actual Docker services
-- **Async test support** where needed
+## Naming Conventions
+- **Functions/Variables**: `snake_case`
+- **Classes**: `PascalCase`  
+- **Constants**: `UPPER_SNAKE_CASE`
+- **Private members**: Leading underscore `_private`
+- **MCP Tools**: Descriptive names like `crawl_single_page`

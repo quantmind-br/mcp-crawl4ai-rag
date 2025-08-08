@@ -30,7 +30,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-
 def main():
     """Synchronize Qdrant schema with application configuration."""
 
@@ -81,7 +80,9 @@ def main():
                 client.delete_collection(collection_name)
                 print(f"   DELETED '{collection_name}'")
             except Exception:
-                print(f"   Collection '{collection_name}' does not exist. Skipping deletion.")
+                print(
+                    f"   Collection '{collection_name}' does not exist. Skipping deletion."
+                )
 
             # Create new collection with correct schema
             print("   Creating new collection with up-to-date schema...")
@@ -103,7 +104,9 @@ def main():
             )
 
             if is_qdrant_hybrid == is_hybrid:
-                print(f"OK '{collection_name}': Schema is correct (Hybrid: {is_qdrant_hybrid})")
+                print(
+                    f"OK '{collection_name}': Schema is correct (Hybrid: {is_qdrant_hybrid})"
+                )
             else:
                 print(f"ERROR '{collection_name}': Schema mismatch after creation!")
                 raise Exception(f"Failed to correctly create '{collection_name}'")

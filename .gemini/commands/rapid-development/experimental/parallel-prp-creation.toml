@@ -1,0 +1,188 @@
+description = "Create multiple PRP variations in parallel for comparative analysis"
+
+prompt = """
+# Parallel PRP Creation - Multiple Implementation Strategies
+
+Generate parallel PRP variations for comparative analysis and implementation approach validation.
+
+## Parameters
+
+Feature Name: $ARGUMENTS
+
+## Overview
+
+This workflow creates independent PRP variations with different architectural approaches, enabling comparative analysis and strategy selection.
+
+## Parallel Agent Coordination
+
+**CRITICAL**: Execute agents simultaneously using multiple Task tool calls in a single response.
+
+## Agent Specialization Matrix
+
+```yaml
+Agent 1: Performance-Optimized Approach
+  Focus: Scalability, caching, optimization
+  
+Agent 2: Security-First Approach
+  Focus: Security, validation, authentication
+  
+Agent 3: Maintainability-Focused Approach
+  Focus: Clean code, modularity, testing
+  
+Agent 4: Rapid-Development Approach
+  Focus: Quick implementation, minimal complexity
+  
+Agent 5: Enterprise-Grade Approach
+  Focus: Robustness, monitoring, observability
+```
+
+## Parallel Execution
+
+Execute these agents concurrently:
+
+### Agent 1: Performance-Optimized Implementation
+```
+Task: Performance-Optimized PRP Creation
+Prompt: Create a comprehensive PRP for "$ARGUMENTS" with focus on PERFORMANCE AND SCALABILITY.
+
+Your approach should emphasize:
+- High-performance architecture patterns
+- Caching strategies and optimization techniques
+- Database optimization and indexing
+- Async/await patterns and concurrency
+- Memory management and resource efficiency
+
+Research Phase:
+1. Analyze existing codebase for performance patterns
+2. Research high-performance libraries and frameworks
+3. Identify bottlenecks and optimization opportunities
+
+PRP Creation:
+- Use @PRPs/templates/prp_base.md as foundation
+- Focus implementation blueprint on performance patterns
+- Include specific performance validation gates
+
+Output: Save PRP as PRPs/$ARGUMENTS-performance.md
+```
+
+### Agent 2: Security-First Implementation
+```
+Task: Security-First PRP Creation
+Prompt: Create a comprehensive PRP for "$ARGUMENTS" with focus on SECURITY AND DATA PROTECTION.
+
+Your approach should emphasize:
+- Security-by-design architecture patterns
+- Authentication and authorization strategies
+- Input validation and sanitization
+- Data encryption and protection
+
+Research Phase:
+1. Analyze existing security patterns in codebase
+2. Research security frameworks and best practices
+3. Identify potential attack vectors and vulnerabilities
+
+PRP Creation:
+- Use @PRPs/templates/prp_base.md as foundation
+- Focus implementation blueprint on security patterns
+- Include comprehensive security validation gates
+
+Output: Save PRP as PRPs/$ARGUMENTS-security.md
+```
+
+### Agent 3: Maintainability-Focused Implementation
+```
+Task: Maintainability-Focused PRP Creation
+Prompt: Create a comprehensive PRP for "$ARGUMENTS" with focus on CODE QUALITY AND MAINTAINABILITY.
+
+Your approach should emphasize:
+- Clean code principles and SOLID design
+- Comprehensive testing strategies
+- Modular architecture and separation of concerns
+- Documentation and code readability
+
+Research Phase:
+1. Analyze existing code quality patterns in codebase
+2. Research testing frameworks and quality tools
+3. Identify areas for improved modularity
+
+PRP Creation:
+- Use @PRPs/templates/prp_base.md as foundation
+- Focus implementation blueprint on clean code patterns
+- Include comprehensive testing validation gates
+
+Output: Save PRP as PRPs/$ARGUMENTS-maintainable.md
+```
+
+### Agent 4: Rapid-Development Implementation
+```
+Task: Rapid-Development PRP Creation
+Prompt: Create a comprehensive PRP for "$ARGUMENTS" with focus on SPEED OF IMPLEMENTATION.
+
+Your approach should emphasize:
+- Minimal viable implementation patterns
+- Framework utilization and code generation
+- Simplified architecture and reduced complexity
+- Leveraging existing libraries and components
+
+Research Phase:
+1. Analyze existing codebase for reusable components
+2. Research rapid development frameworks and tools
+3. Identify opportunities for code reuse and simplification
+
+PRP Creation:
+- Use @PRPs/templates/prp_base.md as foundation
+- Focus implementation blueprint on rapid delivery patterns
+- Include streamlined validation gates
+
+Output: Save PRP as PRPs/$ARGUMENTS-rapid.md
+```
+
+### Agent 5: Enterprise-Grade Implementation
+```
+Task: Enterprise-Grade PRP Creation
+Prompt: Create a comprehensive PRP for "$ARGUMENTS" with focus on ENTERPRISE ROBUSTNESS.
+
+Your approach should emphasize:
+- Enterprise architecture patterns and scalability
+- Comprehensive monitoring and observability
+- Error handling and resilience patterns
+- Configuration management and deployment
+
+Research Phase:
+1. Analyze existing enterprise patterns in codebase
+2. Research enterprise frameworks and monitoring tools
+3. Identify requirements for production deployment
+
+PRP Creation:
+- Use @PRPs/templates/prp_base.md as foundation
+- Focus implementation blueprint on enterprise patterns
+- Include comprehensive operational validation gates
+
+Output: Save PRP as PRPs/$ARGUMENTS-enterprise.md
+```
+
+## Expected Outputs
+
+Upon completion, you will have 5 PRP variations:
+
+```
+PRPs/
+├── [feature-name]-performance.md     # Performance-optimized approach
+├── [feature-name]-security.md        # Security-first approach
+├── [feature-name]-maintainable.md    # Maintainability-focused approach
+├── [feature-name]-rapid.md           # Rapid-development approach
+├── [feature-name]-enterprise.md      # Enterprise-grade approach
+```
+
+## Selection Criteria
+
+Choose optimal approach based on:
+
+1. **Project Requirements**: Match approach to actual needs
+2. **Team Capabilities**: Align with team expertise and resources
+3. **Timeline Constraints**: Balance quality with delivery speed
+4. **Maintenance Goals**: Consider long-term sustainability
+5. **Performance Needs**: Match optimization level to requirements
+
+This parallel approach maximizes the probability of identifying the optimal implementation strategy by exploring multiple architectural approaches simultaneously.
+"""

@@ -95,7 +95,10 @@ def test_memory_cleanup():
 
     try:
         from device_manager import cleanup_gpu_memory
-        from src.services.embedding_service import cleanup_compute_memory, health_check_gpu_acceleration
+        from src.services.embedding_service import (
+            cleanup_compute_memory,
+            health_check_gpu_acceleration,
+        )
 
         # Test memory cleanup functions
         cleanup_gpu_memory()

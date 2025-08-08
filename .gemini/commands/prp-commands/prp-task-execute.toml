@@ -1,0 +1,66 @@
+description = "Execute task list from existing TASK PRP"
+
+prompt = """
+# Execute TASK PRP
+
+Run through a task list from an existing TASK PRP.
+
+## PRP File: $ARGUMENTS
+
+## Execution Process
+
+1. **Load Tasks**
+   - Read task list from: @PRPs/$ARGUMENTS
+   - Understand context and requirements
+   - Review all dependencies and prerequisites
+   - Create execution plan using TodoWrite tool
+
+2. **Execute Each Task**
+   - Perform ACTION as specified in the task
+   - Run VALIDATE command immediately after each action
+   - If validation fails, apply IF_FAIL debug strategy
+   - Use ROLLBACK approach if task cannot be completed
+   - Document progress and any deviations
+
+3. **Complete Checklist**
+   - Verify all tasks completed successfully
+   - Run final validation as specified in the TASK PRP
+   - Check no regressions introduced
+   - Ensure all acceptance criteria met
+
+## Task Execution Protocol
+
+For each task in the TASK PRP:
+
+1. **Preparation**
+   - Read task requirements thoroughly
+   - Check prerequisites are met
+   - Verify file paths and dependencies exist
+
+2. **Implementation**
+   - Execute the specified ACTION
+   - Follow patterns referenced in context section
+   - Apply gotchas and fixes as documented
+
+3. **Validation**
+   - Run VALIDATE command exactly as specified
+   - Verify expected results are achieved
+   - Check for side effects in related components
+
+4. **Error Handling**
+   - If validation fails, apply IF_FAIL strategy
+   - Debug using documented approaches
+   - If unable to resolve, use ROLLBACK procedure
+   - Document issues for review
+
+## Progress Tracking
+
+Use TodoWrite tool to track:
+- [ ] TASK PRP loaded and analyzed
+- [ ] Each individual task (as listed in the PRP)
+- [ ] Validation gates passed for each task
+- [ ] Final validation completed
+- [ ] No regressions detected
+
+Work through tasks sequentially, validating each before proceeding to ensure systematic completion and immediate issue detection.
+"""

@@ -26,15 +26,19 @@ logger = logging.getLogger(__name__)
 class RagService:
     """
     Service class for Retrieval-Augmented Generation operations.
-    
+
     Handles document search, code search, hybrid search functionality,
     result fusion, and CrossEncoder-based re-ranking.
     """
-    
-    def __init__(self, qdrant_client: QdrantClientWrapper, reranking_model: Optional[CrossEncoder] = None):
+
+    def __init__(
+        self,
+        qdrant_client: QdrantClientWrapper,
+        reranking_model: Optional[CrossEncoder] = None,
+    ):
         """
         Initialize the RAG service.
-        
+
         Args:
             qdrant_client: Qdrant client wrapper for vector database operations
             reranking_model: Optional CrossEncoder model for result re-ranking
@@ -42,8 +46,10 @@ class RagService:
         self.qdrant_client = qdrant_client
         self.reranking_model = reranking_model
         self.use_reranking = os.getenv("USE_RERANKING", "false") == "true"
-        self.use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
-    
+        self.use_hybrid_search = (
+            os.getenv("USE_HYBRID_SEARCH", "false").lower() == "true"
+        )
+
     def search_documents(
         self,
         query: str,
@@ -75,7 +81,7 @@ class RagService:
         except Exception as e:
             logger.error(f"Error searching documents: {e}")
             return []
-    
+
     def search_code_examples(
         self,
         query: str,
@@ -115,7 +121,7 @@ class RagService:
         except Exception as e:
             logger.error(f"Error searching code examples: {e}")
             return []
-    
+
     def update_source_info(self, source_id: str, summary: str, word_count: int):
         """
         Update source information using Qdrant client wrapper.
@@ -129,23 +135,23 @@ class RagService:
             self.qdrant_client.update_source_info(source_id, summary, word_count)
         except Exception as e:
             logger.error(f"Error updating source {source_id}: {e}")
-    
+
     def hybrid_search(
         self,
         query: str,
         match_count: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
-        search_type: str = "documents"
+        search_type: str = "documents",
     ) -> List[Dict[str, Any]]:
         """
         Perform hybrid search combining dense and sparse search results.
-        
+
         Args:
             query: Query text
             match_count: Maximum number of results to return
             filter_metadata: Optional metadata filter
             search_type: Type of search - "documents" or "code_examples"
-            
+
         Returns:
             List of search results with fused scores
         """
@@ -155,24 +161,24 @@ class RagService:
                 return self.search_code_examples(query, match_count, filter_metadata)
             else:
                 return self.search_documents(query, match_count, filter_metadata)
-        
+
         try:
             if search_type == "code_examples":
                 results = self.qdrant_client.hybrid_search_code_examples(
                     query=query,
                     match_count=match_count,
-                    filter_metadata=filter_metadata
+                    filter_metadata=filter_metadata,
                 )
             else:
                 results = self.qdrant_client.hybrid_search_documents(
                     query=query,
                     match_count=match_count,
-                    filter_metadata=filter_metadata
+                    filter_metadata=filter_metadata,
                 )
-            
+
             logger.debug(f"Hybrid search returned {len(results)} results")
             return results
-            
+
         except Exception as e:
             logger.error(f"Error in hybrid search: {e}")
             # Fallback to regular search
@@ -180,7 +186,7 @@ class RagService:
                 return self.search_code_examples(query, match_count, filter_metadata)
             else:
                 return self.search_documents(query, match_count, filter_metadata)
-    
+
     def rerank_results(
         self,
         query: str,
@@ -222,7 +228,9 @@ class RagService:
                 result["rerank_score"] = float(scores[i])
 
             # Sort by rerank score
-            reranked = sorted(results, key=lambda x: x.get("rerank_score", 0), reverse=True)
+            reranked = sorted(
+                results, key=lambda x: x.get("rerank_score", 0), reverse=True
+            )
             logger.debug(
                 f"Reranked results - top score: {reranked[0].get('rerank_score', 0):.4f}"
             )
@@ -234,105 +242,111 @@ class RagService:
         except Exception as e:
             logger.error(f"Error during reranking: {e}")
             return results
-    
+
     def search_with_reranking(
         self,
         query: str,
         match_count: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
         search_type: str = "documents",
-        use_hybrid: bool = None
+        use_hybrid: bool = None,
     ) -> List[Dict[str, Any]]:
         """
         Perform search with optional hybrid search and re-ranking.
-        
+
         Args:
             query: Query text
             match_count: Maximum number of results to return
             filter_metadata: Optional metadata filter
             search_type: Type of search - "documents" or "code_examples"
             use_hybrid: Override hybrid search setting (None uses environment setting)
-            
+
         Returns:
             List of search results, optionally re-ranked
         """
         # Determine if we should use hybrid search
-        should_use_hybrid = use_hybrid if use_hybrid is not None else self.use_hybrid_search
-        
+        should_use_hybrid = (
+            use_hybrid if use_hybrid is not None else self.use_hybrid_search
+        )
+
         # Perform the search
         if should_use_hybrid:
-            results = self.hybrid_search(query, match_count, filter_metadata, search_type)
+            results = self.hybrid_search(
+                query, match_count, filter_metadata, search_type
+            )
         else:
             if search_type == "code_examples":
                 results = self.search_code_examples(query, match_count, filter_metadata)
             else:
                 results = self.search_documents(query, match_count, filter_metadata)
-        
+
         # Apply re-ranking if enabled and model is available
         if self.use_reranking and self.reranking_model and results:
             logger.debug("Applying reranking to search results")
             results = self.rerank_results(query, results)
-        
+
         return results
-    
+
     def fuse_search_results(
         self,
         dense_results: List[Dict[str, Any]],
         sparse_results: List[Dict[str, Any]],
-        k: int = 60
+        k: int = 60,
     ) -> List[Dict[str, Any]]:
         """
         Fuse dense and sparse search results using Reciprocal Rank Fusion (RRF).
-        
+
         Args:
             dense_results: Results from dense vector search
             sparse_results: Results from sparse vector search
             k: RRF parameter (default: 60)
-            
+
         Returns:
             List of fused results sorted by RRF score
         """
         # Create a dictionary to store combined scores
         fused_scores = {}
-        
+
         # Process dense results
         for rank, result in enumerate(dense_results, 1):
-            doc_id = result.get('id', str(result))
+            doc_id = result.get("id", str(result))
             fused_scores[doc_id] = {
-                'result': result,
-                'rrf_score': 1.0 / (k + rank),
-                'dense_rank': rank,
-                'sparse_rank': None
+                "result": result,
+                "rrf_score": 1.0 / (k + rank),
+                "dense_rank": rank,
+                "sparse_rank": None,
             }
-        
+
         # Process sparse results and add to existing or create new entries
         for rank, result in enumerate(sparse_results, 1):
-            doc_id = result.get('id', str(result))
+            doc_id = result.get("id", str(result))
             if doc_id in fused_scores:
                 # Add sparse score to existing entry
-                fused_scores[doc_id]['rrf_score'] += 1.0 / (k + rank)
-                fused_scores[doc_id]['sparse_rank'] = rank
+                fused_scores[doc_id]["rrf_score"] += 1.0 / (k + rank)
+                fused_scores[doc_id]["sparse_rank"] = rank
             else:
                 # Create new entry for sparse-only result
                 fused_scores[doc_id] = {
-                    'result': result,
-                    'rrf_score': 1.0 / (k + rank),
-                    'dense_rank': None,
-                    'sparse_rank': rank
+                    "result": result,
+                    "rrf_score": 1.0 / (k + rank),
+                    "dense_rank": None,
+                    "sparse_rank": rank,
                 }
-        
+
         # Sort by RRF score and extract results
-        sorted_items = sorted(fused_scores.items(), key=lambda x: x[1]['rrf_score'], reverse=True)
-        
+        sorted_items = sorted(
+            fused_scores.items(), key=lambda x: x[1]["rrf_score"], reverse=True
+        )
+
         # Add RRF metadata to results
         fused_results = []
         for doc_id, score_info in sorted_items:
-            result = score_info['result'].copy()
-            result['rrf_score'] = score_info['rrf_score']
-            result['dense_rank'] = score_info['dense_rank']
-            result['sparse_rank'] = score_info['sparse_rank']
+            result = score_info["result"].copy()
+            result["rrf_score"] = score_info["rrf_score"]
+            result["dense_rank"] = score_info["dense_rank"]
+            result["sparse_rank"] = score_info["sparse_rank"]
             fused_results.append(result)
-        
+
         return fused_results
 
 
@@ -347,7 +361,7 @@ def add_documents_to_vector_db(
 ) -> None:
     """
     Add documents to Qdrant crawled_pages collection.
-    
+
     Args:
         client: Qdrant client wrapper
         urls: List of URLs
@@ -360,13 +374,21 @@ def add_documents_to_vector_db(
     # Import required functions and modules
     import concurrent.futures
     from qdrant_client.models import PointStruct
-    
+
     try:
-        from ..services.embedding_service import create_embeddings_batch, create_embedding, create_sparse_embedding, process_chunk_with_context
+        from ..services.embedding_service import (
+            create_embeddings_batch,
+            create_embedding,
+            create_sparse_embedding,
+            process_chunk_with_context,
+        )
         from ..sparse_vector_types import SparseVectorConfig
     except ImportError:
-        from services.embedding_service import create_embeddings_batch, process_chunk_with_context
-    
+        from services.embedding_service import (
+            create_embeddings_batch,
+            process_chunk_with_context,
+        )
+
     if not urls:
         return
 
@@ -470,7 +492,9 @@ def add_documents_to_vector_db(
         # Upsert batch to Qdrant
         try:
             client.upsert_points("crawled_pages", qdrant_points)
-            logger.info(f"Successfully inserted batch {batch_idx + 1}/{len(point_batches)}")
+            logger.info(
+                f"Successfully inserted batch {batch_idx + 1}/{len(point_batches)}"
+            )
         except Exception as e:
             logger.error(f"Error inserting batch {batch_idx + 1}: {e}")
             # Try inserting points individually as fallback
@@ -501,7 +525,7 @@ def add_code_examples_to_vector_db(
 ):
     """
     Add code examples to Qdrant code_examples collection.
-    
+
     Args:
         client: Qdrant client wrapper
         urls: List of URLs
@@ -513,14 +537,22 @@ def add_code_examples_to_vector_db(
     """
     # Import required functions and modules
     from qdrant_client.models import PointStruct
-    
+
     try:
-        from ..services.embedding_service import create_embeddings_batch, create_embedding, create_sparse_embedding
+        from ..services.embedding_service import (
+            create_embeddings_batch,
+            create_embedding,
+            create_sparse_embedding,
+        )
         from ..sparse_vector_types import SparseVectorConfig
     except ImportError:
-        from services.embedding_service import create_embeddings_batch, create_embedding, create_sparse_embedding
+        from services.embedding_service import (
+            create_embeddings_batch,
+            create_embedding,
+            create_sparse_embedding,
+        )
         from sparse_vector_types import SparseVectorConfig
-    
+
     if not urls:
         return
 
@@ -641,14 +673,14 @@ def search_documents(
 ) -> List[Dict[str, Any]]:
     """
     Standalone function for searching documents (used by MCP tools).
-    
+
     Args:
         qdrant_client: Qdrant client instance
         query: Query text
         source: Optional source domain to filter results
         match_count: Maximum number of results to return
         reranker: Optional reranking model
-        
+
     Returns:
         List of matching documents
     """
@@ -656,21 +688,19 @@ def search_documents(
         from ..clients.qdrant_client import QdrantClientWrapper
     except ImportError:
         pass
-    
+
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client, reranking_model=reranker)
-    
+
     # Build filter metadata from source
     filter_metadata = None
     if source:
         filter_metadata = {"source": source}
-    
+
     return rag_service.search_with_reranking(
-        query,
-        match_count,
-        filter_metadata,
-        search_type="documents"
+        query, match_count, filter_metadata, search_type="documents"
     )
+
 
 def search_code_examples(
     qdrant_client,
@@ -681,14 +711,14 @@ def search_code_examples(
 ) -> List[Dict[str, Any]]:
     """
     Standalone function for searching code examples (used by MCP tools).
-    
+
     Args:
         qdrant_client: Qdrant client instance
         query: Query text
         source_id: Optional source ID to filter results
         match_count: Maximum number of results to return
         reranker: Optional reranking model
-        
+
     Returns:
         List of matching code examples
     """
@@ -696,21 +726,22 @@ def search_code_examples(
         from ..clients.qdrant_client import QdrantClientWrapper
     except ImportError:
         pass
-    
+
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client, reranking_model=reranker)
-    
+
     return rag_service.search_with_reranking(
         query,
         match_count,
-        filter_metadata={'source': source_id} if source_id else None,
-        search_type="code_examples"
+        filter_metadata={"source": source_id} if source_id else None,
+        search_type="code_examples",
     )
+
 
 def update_source_info(qdrant_client, source_id: str, summary: str, word_count: int):
     """
     Standalone function for updating source info (used by MCP tools).
-    
+
     Args:
         qdrant_client: Qdrant client instance
         source_id: The source ID (domain)
@@ -721,8 +752,8 @@ def update_source_info(qdrant_client, source_id: str, summary: str, word_count: 
         from ..clients.qdrant_client import QdrantClientWrapper
     except ImportError:
         pass
-    
+
     # Create a temporary RAG service instance
     rag_service = RagService(qdrant_client)
-    
+
     return rag_service.update_source_info(source_id, summary, word_count)

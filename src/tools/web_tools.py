@@ -4,6 +4,7 @@ Web crawling tools for MCP server.
 This module contains tools for crawling web pages, sitemaps, and text files
 using Crawl4AI, with intelligent content extraction and storage.
 """
+
 import asyncio
 import concurrent.futures
 import json
@@ -15,12 +16,18 @@ from xml.etree import ElementTree
 import requests
 import logging
 
-from crawl4ai import CrawlerRunConfig, CacheMode, MemoryAdaptiveDispatcher, AsyncWebCrawler
+from crawl4ai import (
+    CrawlerRunConfig,
+    CacheMode,
+    MemoryAdaptiveDispatcher,
+    AsyncWebCrawler,
+)
 from mcp.server.fastmcp import Context
 
 # Import MCP decorator - will be applied when tools are registered
 try:
     from ..core.app import create_app
+
     # Will get actual mcp instance from parent module
     mcp = None
 except ImportError:
@@ -44,26 +51,27 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 def extract_source_summary(source_id: str, content: str, max_length: int = 500) -> str:
     """
     Extract a summary for a source from its content.
-    
+
     Args:
         source_id: The source ID (domain)
         content: The content to summarize
         max_length: Maximum length of the summary
-        
+
     Returns:
         A summary string
     """
     if not content:
         return f"Empty source: {source_id}"
-    
+
     # Simple truncation-based summary
-    lines = content.strip().split('\n')
+    lines = content.strip().split("\n")
     summary_lines = []
     total_length = 0
-    
+
     for line in lines:
         line = line.strip()
         if line and total_length + len(line) < max_length:
@@ -71,118 +79,152 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
             total_length += len(line) + 1  # +1 for newline
         else:
             break
-    
-    summary = ' '.join(summary_lines)
+
+    summary = " ".join(summary_lines)
     if total_length >= max_length:
-        summary = summary[:max_length-3] + "..."
-    
+        summary = summary[: max_length - 3] + "..."
+
     return summary or f"Content from {source_id}"
 
-def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[Dict[str, Any]]:
+
+def extract_code_blocks(
+    markdown_content: str, min_length: int = 1000
+) -> List[Dict[str, Any]]:
     """
     Extract code blocks from markdown content with context.
-    
+
     Args:
         markdown_content: The markdown content to extract code blocks from
         min_length: Minimum length of code blocks to extract
-        
+
     Returns:
         List of dictionaries containing code blocks with context
     """
     import re
+
     code_blocks = []
-    
+
     # Pattern to find code blocks with context
-    pattern = r'```(\w*)\n(.*?)\n```'
-    
+    # Allow optional leading spaces before ``` and optional trailing spaces
+    pattern = r"(?m)^[ \t]*```(\w*)\s*\n([\s\S]*?)\n[ \t]*```"
+
     # Split content into lines for context extraction
-    lines = markdown_content.split('\n')
-    
+    lines = markdown_content.split("\n")
+
     # Find all matches with their positions
     for match in re.finditer(pattern, markdown_content, re.DOTALL):
         language, code = match.groups()
-        
-        if len(code) >= min_length:
-            # Find the line numbers for context
-            start_pos = match.start()
-            end_pos = match.end()
-            
-            # Count lines before the match
-            lines_before_start = markdown_content[:start_pos].count('\n')
-            lines_after_end = markdown_content[:end_pos].count('\n')
-            
-            # Extract context (3 lines before and after)
-            context_before_lines = max(0, lines_before_start - 3)
-            context_after_lines = min(len(lines), lines_after_end + 3)
-            
-            context_before = '\n'.join(lines[context_before_lines:lines_before_start])
-            context_after = '\n'.join(lines[lines_after_end:context_after_lines])
-            
-            code_blocks.append({
-                'code': code.strip(),
-                'language': language or 'text',
-                'context_before': context_before.strip(),
-                'context_after': context_after.strip(),
-                'index': len(code_blocks),
-                'length': len(code)
-            })
-    
+
+        # Always capture code blocks, but enforce min_length only for storage cases
+        # so tests can lower the threshold and still get blocks.
+        start_pos = match.start()
+        end_pos = match.end()
+
+        # Count lines before the match
+        lines_before_start = markdown_content[:start_pos].count("\n")
+        lines_after_end = markdown_content[:end_pos].count("\n")
+
+        # Extract context (3 lines before and after)
+        context_before_lines = max(0, lines_before_start - 3)
+        context_after_lines = min(len(lines), lines_after_end + 3)
+
+        context_before = "\n".join(lines[context_before_lines:lines_before_start])
+        context_after = "\n".join(lines[lines_after_end:context_after_lines])
+
+        # Ensure nearest preceding header (e.g., Markdown title) is included in context_before
+        # Search upwards from lines_before_start for a line starting with '#'
+        header_line = None
+        for i in range(lines_before_start - 1, -1, -1):
+            line = lines[i].strip()
+            if line.startswith("#"):
+                header_line = line
+                break
+        if header_line and header_line not in context_before:
+            context_before = (header_line + "\n" + context_before).strip()
+
+        block = {
+            "code": code.strip(),
+            "language": language or "text",
+            "context_before": context_before.strip(),
+            "context_after": context_after.strip(),
+            "index": len(code_blocks),
+            "length": len(code),
+        }
+
+        # Apply min_length filter at the end to allow tests to set smaller thresholds
+        if len(block["code"]) >= min_length:
+            code_blocks.append(block)
+
     return code_blocks
 
 
-def generate_code_example_summary(code: str, context_before: str = "", context_after: str = "") -> str:
+def generate_code_example_summary(
+    code: str, context_before: str = "", context_after: str = ""
+) -> str:
     """
     Generate a summary for a code example with context.
-    
+
     Args:
         code: The code to summarize
         context_before: Context before the code block
         context_after: Context after the code block
-        
+
     Returns:
         A summary string
     """
-    lines = code.strip().split('\n')
-    
+    lines = code.strip().split("\n")
+
     # Try to extract language from context or code patterns
     language = ""
-    
+
     # Check for language indicators in context
     context = (context_before + " " + context_after).lower()
-    if "python" in context or code.strip().startswith(("def ", "class ", "import ", "from ")):
+    if "python" in context or code.strip().startswith(
+        ("def ", "class ", "import ", "from ")
+    ):
         language = "Python"
-    elif "javascript" in context or "js" in context or code.strip().startswith(("function", "const ", "let ", "var ")):
+    elif (
+        "javascript" in context
+        or "js" in context
+        or code.strip().startswith(("function", "const ", "let ", "var "))
+    ):
         language = "JavaScript"
-    elif "bash" in context or "shell" in context or code.strip().startswith(("#!/bin/bash", "$", "sudo")):
+    elif (
+        "bash" in context
+        or "shell" in context
+        or code.strip().startswith(("#!/bin/bash", "$", "sudo"))
+    ):
         language = "Bash"
     elif "yaml" in context or code.strip().startswith(("-", "---")):
         language = "YAML"
-    elif "json" in context or (code.strip().startswith("{") and code.strip().endswith("}")):
+    elif "json" in context or (
+        code.strip().startswith("{") and code.strip().endswith("}")
+    ):
         language = "JSON"
-    
+
     # Try to find function/class definitions
     for line in lines:
         line = line.strip()
-        if line.startswith(('def ', 'class ')):
+        if line.startswith(("def ", "class ")):
             return f"{language} code: {line}"
-        elif line.startswith(('function ', 'const ', 'let ', 'var ')):
+        elif line.startswith(("function ", "const ", "let ", "var ")):
             return f"{language} code: {line}"
-        elif line.startswith('#!/'):
+        elif line.startswith("#!/"):
             return f"{language} script: {line}"
-    
+
     # Use context to provide better summary
     if context_before:
-        context_summary = context_before.strip().split('\n')[-1][:50]
+        context_summary = context_before.strip().split("\n")[-1][:50]
         if context_summary:
             return f"{language} code example: {context_summary}..."
-    
+
     # Fallback to first non-empty line
     for line in lines:
         line = line.strip()
-        if line and not line.startswith('#') and not line.startswith('//'):
+        if line and not line.startswith("#") and not line.startswith("//"):
             truncated = line[:100] + "..." if len(line) > 100 else line
             return f"{language} code: {truncated}"
-    
+
     return f"{language} code example ({len(lines)} lines)"
 
 
@@ -222,15 +264,21 @@ def parse_sitemap(sitemap_url: str) -> List[str]:
     Returns:
         List of URLs found in the sitemap
     """
-    resp = requests.get(sitemap_url)
     urls = []
-
-    if resp.status_code == 200:
-        try:
-            tree = ElementTree.fromstring(resp.content)
-            urls = [loc.text for loc in tree.findall(".//{*}loc")]
-        except Exception as e:
-            logger.warning(f"Error parsing sitemap XML: {e}")
+    try:
+        resp = requests.get(sitemap_url)
+        if resp.status_code == 200:
+            try:
+                tree = ElementTree.fromstring(resp.content)
+                urls = [loc.text for loc in tree.findall(".//{*}loc")]
+            except Exception as e:
+                logger.warning(f"Error parsing sitemap XML: {e}")
+        else:
+            logger.warning(
+                f"Sitemap request returned status {resp.status_code} for {sitemap_url}"
+            )
+    except Exception as e:
+        logger.warning(f"Error fetching sitemap '{sitemap_url}': {e}")
 
     return urls
 
@@ -516,6 +564,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
 
             # Extract and process code examples only if enabled
             extract_code_examples = os.getenv("USE_AGENTIC_RAG", "false") == "true"
+            code_examples_count = 0
             if extract_code_examples:
                 code_blocks = extract_code_blocks(result.markdown)
                 if code_blocks:
@@ -570,19 +619,28 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         code_summaries,
                         code_metadatas,
                     )
+                    code_examples_count = len(code_examples)
+
+            links = getattr(result, "links", {}) or {}
+            internal_links = (
+                links.get("internal", []) if isinstance(links, dict) else []
+            )
+            external_links = (
+                links.get("external", []) if isinstance(links, dict) else []
+            )
 
             return json.dumps(
                 {
                     "success": True,
                     "url": url,
                     "chunks_stored": len(chunks),
-                    "code_examples_stored": len(code_blocks) if code_blocks else 0,
+                    "code_examples_stored": code_examples_count,
                     "content_length": len(result.markdown),
                     "total_word_count": total_word_count,
                     "source_id": source_id,
                     "links_count": {
-                        "internal": len(result.links.get("internal", [])),
-                        "external": len(result.links.get("external", [])),
+                        "internal": len(internal_links),
+                        "external": len(external_links),
                     },
                 },
                 indent=2,

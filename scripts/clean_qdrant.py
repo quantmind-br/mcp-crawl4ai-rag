@@ -5,7 +5,7 @@ Interactive Qdrant Database Cleanup Script
 This interactive script safely cleans all data from Qdrant collections with a menu-driven interface.
 It provides options for:
 - Cleaning all collections
-- Cleaning specific collections  
+- Cleaning specific collections
 - Backing up data before cleaning
 - Recreating collections with fresh configuration
 - Listing collections and their information
@@ -288,7 +288,7 @@ def get_user_choice():
     while True:
         try:
             choice = input("\nSelect an option (1-7): ").strip()
-            if choice in ['1', '2', '3', '4', '5', '6', '7']:
+            if choice in ["1", "2", "3", "4", "5", "6", "7"]:
                 return int(choice)
             else:
                 print("Invalid choice. Please enter a number between 1 and 7.")
@@ -302,13 +302,13 @@ def select_collection(cleaner, prompt="Select a collection"):
     if not collections:
         print("No collections found.")
         return None
-    
+
     print("\nAvailable collections:")
     for i, collection_name in enumerate(collections, 1):
         info = cleaner.get_collection_info(collection_name)
-        count = info['vectors_count'] if info else 'unknown'
+        count = info["vectors_count"] if info else "unknown"
         print(f"{i}. {collection_name} ({count} vectors)")
-    
+
     while True:
         try:
             choice = input(f"\n{prompt} (1-{len(collections)}): ").strip()
@@ -316,18 +316,22 @@ def select_collection(cleaner, prompt="Select a collection"):
             if 0 <= index < len(collections):
                 return collections[index]
             else:
-                print(f"Invalid choice. Please enter a number between 1 and {len(collections)}.")
+                print(
+                    f"Invalid choice. Please enter a number between 1 and {len(collections)}."
+                )
         except (ValueError, KeyboardInterrupt):
-            print(f"Invalid input. Please enter a number between 1 and {len(collections)}.")
+            print(
+                f"Invalid input. Please enter a number between 1 and {len(collections)}."
+            )
 
 
 def confirm_action(message):
     """Get user confirmation for destructive actions"""
     while True:
         response = input(f"\n{message} (yes/no): ").strip().lower()
-        if response in ['yes', 'y']:
+        if response in ["yes", "y"]:
             return True
-        elif response in ['no', 'n']:
+        elif response in ["no", "n"]:
             return False
         else:
             print("Please enter 'yes' or 'no'.")
@@ -337,9 +341,9 @@ def ask_for_backup():
     """Ask user if they want to create a backup"""
     while True:
         response = input("\nCreate backup before operation? (yes/no): ").strip().lower()
-        if response in ['yes', 'y']:
+        if response in ["yes", "y"]:
             return True
-        elif response in ['no', 'n']:
+        elif response in ["no", "n"]:
             return False
         else:
             print("Please enter 'yes' or 'no'.")
@@ -348,25 +352,25 @@ def ask_for_backup():
 def main():
     """Main interactive function"""
     print("Starting Interactive Qdrant Database Cleanup...")
-    
+
     # Support both interactive and CLI modes
     if len(sys.argv) > 1:
         # CLI mode (backward compatibility)
         run_cli_mode()
         return
-    
+
     # Initialize cleaner
     try:
         cleaner = QdrantCleaner()
     except Exception as e:
         print(f"Failed to initialize Qdrant cleaner: {e}")
         sys.exit(1)
-    
+
     while True:
         try:
             display_menu()
             choice = get_user_choice()
-            
+
             if choice == 1:
                 # List collections
                 collections = cleaner.list_collections()
@@ -376,29 +380,43 @@ def main():
                     for collection_name in collections:
                         info = cleaner.get_collection_info(collection_name)
                         if info:
-                            print(f"• {collection_name}: {info['vectors_count']} vectors")
+                            print(
+                                f"• {collection_name}: {info['vectors_count']} vectors"
+                            )
                     print()
                 else:
                     print("\nNo collections found.")
-                    
+
             elif choice == 2:
                 # Clean specific collection
-                collection_name = select_collection(cleaner, "Select collection to clean")
+                collection_name = select_collection(
+                    cleaner, "Select collection to clean"
+                )
                 if collection_name:
-                    if confirm_action(f"WARNING: This will CLEAN collection '{collection_name}' (delete all data)."):
+                    if confirm_action(
+                        f"WARNING: This will CLEAN collection '{collection_name}' (delete all data)."
+                    ):
                         backup = ask_for_backup()
                         print(f"\nCleaning collection '{collection_name}'...")
-                        success = cleaner.clean_collection(collection_name, backup=backup)
+                        success = cleaner.clean_collection(
+                            collection_name, backup=backup
+                        )
                         if success:
-                            print(f"SUCCESS: Collection '{collection_name}' cleaned successfully!")
+                            print(
+                                f"SUCCESS: Collection '{collection_name}' cleaned successfully!"
+                            )
                         else:
-                            print(f"ERROR: Failed to clean collection '{collection_name}'. Check logs.")
+                            print(
+                                f"ERROR: Failed to clean collection '{collection_name}'. Check logs."
+                            )
                     else:
                         print("Operation cancelled.")
-                        
+
             elif choice == 3:
                 # Clean all collections
-                if confirm_action("WARNING: This will CLEAN all collections (delete all data)."):
+                if confirm_action(
+                    "WARNING: This will CLEAN all collections (delete all data)."
+                ):
                     backup = ask_for_backup()
                     print("\nCleaning all collections...")
                     success = cleaner.clean_all_collections(backup=backup)
@@ -408,24 +426,34 @@ def main():
                         print("ERROR: Failed to clean some collections. Check logs.")
                 else:
                     print("Operation cancelled.")
-                    
+
             elif choice == 4:
                 # Recreate specific collection
-                collection_name = select_collection(cleaner, "Select collection to recreate")
+                collection_name = select_collection(
+                    cleaner, "Select collection to recreate"
+                )
                 if collection_name:
-                    if confirm_action(f"WARNING: This will DELETE and recreate collection '{collection_name}'."):
+                    if confirm_action(
+                        f"WARNING: This will DELETE and recreate collection '{collection_name}'."
+                    ):
                         print(f"\nRecreating collection '{collection_name}'...")
                         success = cleaner.recreate_collection(collection_name)
                         if success:
-                            print(f"SUCCESS: Collection '{collection_name}' recreated successfully!")
+                            print(
+                                f"SUCCESS: Collection '{collection_name}' recreated successfully!"
+                            )
                         else:
-                            print(f"ERROR: Failed to recreate collection '{collection_name}'. Check logs.")
+                            print(
+                                f"ERROR: Failed to recreate collection '{collection_name}'. Check logs."
+                            )
                     else:
                         print("Operation cancelled.")
-                        
+
             elif choice == 5:
                 # Recreate all collections
-                if confirm_action("WARNING: This will DELETE and recreate ALL collections."):
+                if confirm_action(
+                    "WARNING: This will DELETE and recreate ALL collections."
+                ):
                     print("\nRecreating all collections...")
                     success = cleaner.recreate_all_collections()
                     if success:
@@ -434,23 +462,29 @@ def main():
                         print("ERROR: Failed to recreate some collections. Check logs.")
                 else:
                     print("Operation cancelled.")
-                    
+
             elif choice == 6:
                 # Create backup
-                collection_name = select_collection(cleaner, "Select collection to backup")
+                collection_name = select_collection(
+                    cleaner, "Select collection to backup"
+                )
                 if collection_name:
                     print(f"\nCreating backup of collection '{collection_name}'...")
                     success = cleaner.backup_collection(collection_name)
                     if success:
-                        print(f"SUCCESS: Backup of collection '{collection_name}' created successfully!")
+                        print(
+                            f"SUCCESS: Backup of collection '{collection_name}' created successfully!"
+                        )
                     else:
-                        print(f"ERROR: Failed to backup collection '{collection_name}'. Check logs.")
-                        
+                        print(
+                            f"ERROR: Failed to backup collection '{collection_name}'. Check logs."
+                        )
+
             elif choice == 7:
                 # Exit
                 print("\nGoodbye!")
                 break
-                
+
         except KeyboardInterrupt:
             print("\n\nOperation cancelled by user.")
             break

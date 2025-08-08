@@ -15,6 +15,7 @@ load_dotenv()
 # Global singleton for embeddings configuration to avoid multiple validations
 class EmbeddingsConfigSingleton:
     """Singleton class to manage embeddings configuration validation."""
+
     _instance = None
     _dimensions = None
     _validated = False
@@ -34,9 +35,9 @@ class EmbeddingsConfigSingleton:
     def reset(cls):
         """Reset the singleton for testing purposes."""
         cls._instance = None
-        if hasattr(cls, '_dimensions'):
+        if hasattr(cls, "_dimensions"):
             cls._dimensions = None
-        if hasattr(cls, '_validated'):
+        if hasattr(cls, "_validated"):
             cls._validated = False
 
     def _validate_and_get_dimensions(self):
@@ -97,6 +98,7 @@ class EmbeddingsConfigSingleton:
         # Validation completed - message will be shown by caller
         self._validated = True
 
+
 def get_embedding_dimensions() -> int:
     """
     Get embedding dimensions based on configuration.
@@ -110,7 +112,7 @@ def get_embedding_dimensions() -> int:
     # Check if running in a test environment
     if "PYTEST_CURRENT_TEST" in os.environ:
         return 1024
-    
+
     # Use singleton to ensure validation happens only once
     singleton = EmbeddingsConfigSingleton()
     return singleton.get_dimensions()
