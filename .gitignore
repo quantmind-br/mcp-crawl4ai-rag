@@ -289,6 +289,10 @@ repos/
 crawled_data/
 crawl_results/
 
+# Tree-sitter Grammars (large auto-generated files)
+knowledge_graphs/grammars/
+!knowledge_graphs/grammars/.gitkeep
+
 # AI Development Tools
 
 # Backup files
