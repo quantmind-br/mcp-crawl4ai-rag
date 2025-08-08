@@ -29,6 +29,7 @@ from src.tools.web_tools import (
     crawl_recursive_internal_links,
     crawl_single_page,
     smart_crawl_url,
+    create_base_prefix,
 )
 
 
@@ -226,6 +227,64 @@ class TestWebToolsUtilityFunctions:
         result = process_code_example(args)
         assert isinstance(result, str)
         assert len(result) > 0
+
+    def test_create_base_prefix_root_url(self):
+        """Testa criação de prefixo base para URL raiz."""
+        # Casos com trailing slash
+        assert create_base_prefix("https://opencode.ai/") == "https://opencode.ai/"
+        assert create_base_prefix("http://example.com/") == "http://example.com/"
+
+        # Casos sem trailing slash
+        assert create_base_prefix("https://opencode.ai") == "https://opencode.ai/"
+        assert create_base_prefix("http://example.com") == "http://example.com/"
+
+    def test_create_base_prefix_with_path(self):
+        """Testa criação de prefixo base para URLs com path."""
+        # Casos com trailing slash
+        assert (
+            create_base_prefix("https://docs.anthropic.com/en/")
+            == "https://docs.anthropic.com/en/"
+        )
+        assert (
+            create_base_prefix("https://example.com/docs/")
+            == "https://example.com/docs/"
+        )
+
+        # Casos sem trailing slash
+        assert (
+            create_base_prefix("https://docs.anthropic.com/en")
+            == "https://docs.anthropic.com/en/"
+        )
+        assert (
+            create_base_prefix("https://example.com/docs")
+            == "https://example.com/docs/"
+        )
+
+    def test_create_base_prefix_deep_path(self):
+        """Testa criação de prefixo base para URLs com paths profundos."""
+        assert (
+            create_base_prefix("https://docs.anthropic.com/en/docs/claude-code/")
+            == "https://docs.anthropic.com/en/docs/claude-code/"
+        )
+        assert (
+            create_base_prefix("https://docs.anthropic.com/en/docs/claude-code")
+            == "https://docs.anthropic.com/en/docs/claude-code/"
+        )
+
+    def test_create_base_prefix_url_filtering_examples(self):
+        """Testa exemplos específicos mencionados no problema."""
+        # Exemplo 1: opencode.ai deve incluir opencode.ai/docs/, opencode.ai/docs/cli/
+        base_prefix = create_base_prefix("https://opencode.ai/")
+        assert "https://opencode.ai/docs/".startswith(base_prefix)
+        assert "https://opencode.ai/docs/cli/".startswith(base_prefix)
+        assert "https://opencode.ai/anything".startswith(base_prefix)
+
+        # Exemplo 2: docs.anthropic.com/en deve excluir docs.anthropic.com/pt/*
+        base_prefix = create_base_prefix("https://docs.anthropic.com/en/")
+        assert "https://docs.anthropic.com/en/docs/".startswith(base_prefix)
+        assert "https://docs.anthropic.com/en/docs/claude/".startswith(base_prefix)
+        assert not "https://docs.anthropic.com/pt/docs/".startswith(base_prefix)
+        assert not "https://docs.anthropic.com/fr/docs/".startswith(base_prefix)
 
 
 class TestWebToolsCrawlingFunctions:

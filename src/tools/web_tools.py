@@ -648,6 +648,45 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
         return json.dumps({"success": False, "url": url, "error": str(e)}, indent=2)
 
 
+def create_base_prefix(url: str) -> str:
+    """
+    Create a proper base prefix from URL for crawling scope restriction.
+
+    Examples:
+    - https://opencode.ai/ -> https://opencode.ai/
+    - https://opencode.ai -> https://opencode.ai/
+    - https://docs.anthropic.com/en/ -> https://docs.anthropic.com/en/
+    - https://docs.anthropic.com/en -> https://docs.anthropic.com/en/
+
+    Args:
+        url: Input URL
+
+    Returns:
+        Normalized base prefix for crawling scope
+    """
+    from urllib.parse import urlparse
+
+    parsed_url = urlparse(url)
+    scheme = parsed_url.scheme
+    netloc = parsed_url.netloc
+    path = parsed_url.path
+
+    # Ensure we have a scheme
+    if not scheme:
+        scheme = "https"
+
+    # Build base prefix
+    if not path or path == "/":
+        # Root level: https://example.com/ -> https://example.com/
+        base_prefix = f"{scheme}://{netloc}/"
+    else:
+        # Path specified: ensure it ends with / for proper prefix matching
+        path = path.rstrip("/") + "/"
+        base_prefix = f"{scheme}://{netloc}{path}"
+
+    return base_prefix
+
+
 async def smart_crawl_url(
     ctx: Context,
     url: str,
@@ -701,11 +740,13 @@ async def smart_crawl_url(
             )
             crawl_type = "sitemap"
         else:
-            # For regular URLs, use recursive crawl
+            # For regular URLs, use recursive crawl with proper base prefix
+            base_prefix = create_base_prefix(url)
+
             crawl_results = await crawl_recursive_internal_links(
                 crawler,
                 [url],
-                base_prefix=url,
+                base_prefix=base_prefix,
                 max_depth=max_depth,
                 max_concurrent=max_concurrent,
             )
