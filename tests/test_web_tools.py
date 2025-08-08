@@ -275,15 +275,111 @@ class TestWebToolsCrawlingFunctions:
         mock_crawler = AsyncMock()
         mock_result = Mock()
         mock_result.success = True
+        mock_result.url = "https://example.com"  # Proper string URL
         mock_result.markdown = "Conteúdo da página"
-        mock_crawler.arun.return_value = mock_result
+        mock_result.links = {
+            "internal": []
+        }  # No internal links to avoid infinite recursion in test
+        mock_crawler.arun_many.return_value = [mock_result]
 
         start_urls = ["https://example.com"]
+        base_prefix = "https://example.com"
         result = await crawl_recursive_internal_links(
-            mock_crawler, start_urls, max_depth=2, max_concurrent=5
+            mock_crawler,
+            start_urls,
+            base_prefix=base_prefix,
+            max_depth=2,
+            max_concurrent=5,
         )
 
         assert isinstance(result, list)
+        assert len(result) == 1  # Should have one result
+        assert result[0]["url"] == "https://example.com"
+        assert result[0]["markdown"] == "Conteúdo da página"
+
+    @pytest.mark.asyncio
+    async def test_crawl_recursive_internal_links_respects_base_prefix(self):
+        """Test that crawl_recursive_internal_links respects base_prefix filtering."""
+        mock_crawler = AsyncMock()
+
+        # Mock results with mixed URL prefixes
+        mock_result_1 = Mock()
+        mock_result_1.success = True
+        mock_result_1.url = "https://docs.anthropic.com/en/docs/introduction"
+        mock_result_1.markdown = "Introduction content"
+        mock_result_1.links = {
+            "internal": [
+                {
+                    "href": "https://docs.anthropic.com/en/docs/quickstart"
+                },  # Should be included
+                {
+                    "href": "https://docs.anthropic.com/pt/docs/introducao"
+                },  # Should be filtered out
+                {
+                    "href": "https://docs.anthropic.com/en/api/reference"
+                },  # Should be included
+                {
+                    "href": "https://docs.anthropic.com/fr/docs/introduction"
+                },  # Should be filtered out
+            ]
+        }
+
+        mock_result_2 = Mock()
+        mock_result_2.success = True
+        mock_result_2.url = "https://docs.anthropic.com/en/docs/quickstart"
+        mock_result_2.markdown = "Quickstart content"
+        mock_result_2.links = {
+            "internal": [
+                {
+                    "href": "https://docs.anthropic.com/en/api/reference"
+                },  # Should be included (but already visited)
+                {
+                    "href": "https://docs.anthropic.com/es/docs/inicio"
+                },  # Should be filtered out
+            ]
+        }
+
+        mock_result_3 = Mock()
+        mock_result_3.success = True
+        mock_result_3.url = "https://docs.anthropic.com/en/api/reference"
+        mock_result_3.markdown = "API reference content"
+        mock_result_3.links = {"internal": []}  # No more links
+
+        # Configure mock to return different results for different calls
+        mock_crawler.arun_many.side_effect = [
+            [mock_result_1],  # First depth: start URL
+            [mock_result_2, mock_result_3],  # Second depth: only /en URLs
+        ]
+
+        start_urls = ["https://docs.anthropic.com/en/docs/introduction"]
+        base_prefix = "https://docs.anthropic.com/en"
+
+        result = await crawl_recursive_internal_links(
+            mock_crawler,
+            start_urls,
+            base_prefix=base_prefix,
+            max_depth=3,
+            max_concurrent=5,
+        )
+
+        # Verify results
+        assert isinstance(result, list)
+        assert len(result) == 3  # Should have 3 results (all from /en prefix)
+
+        # Verify all results are from the correct prefix
+        for doc in result:
+            assert doc["url"].startswith(base_prefix), (
+                f"URL {doc['url']} doesn't match prefix {base_prefix}"
+            )
+
+        # Verify specific URLs are included
+        crawled_urls = [doc["url"] for doc in result]
+        assert "https://docs.anthropic.com/en/docs/introduction" in crawled_urls
+        assert "https://docs.anthropic.com/en/docs/quickstart" in crawled_urls
+        assert "https://docs.anthropic.com/en/api/reference" in crawled_urls
+
+        # Verify crawler was called the expected number of times (2 depths - function stops when no new URLs)
+        assert mock_crawler.arun_many.call_count == 2
 
     @pytest.mark.asyncio
     async def test_crawl_single_page(self):
@@ -301,9 +397,7 @@ class TestWebToolsCrawlingFunctions:
 
         # Evita efeitos externos patchando funções de persistência
         with patch("src.tools.web_tools.update_source_info"):
-            with patch(
-                "src.tools.web_tools.add_documents_to_vector_db"
-            ):
+            with patch("src.tools.web_tools.add_documents_to_vector_db"):
                 result = await crawl_single_page(mock_context, "https://example.com")
 
         assert isinstance(result, str)
@@ -329,9 +423,7 @@ class TestWebToolsCrawlingFunctions:
                     "src.tools.web_tools.extract_source_summary"
                 ) as mock_extract:
                     with patch("src.tools.web_tools.update_source_info"):
-                        with patch(
-                            "src.tools.web_tools.add_documents_to_vector_db"
-                        ):
+                        with patch("src.tools.web_tools.add_documents_to_vector_db"):
                             mock_extract.return_value = "Resumo do conteúdo"
 
                             result = await smart_crawl_url(
@@ -356,9 +448,7 @@ class TestWebToolsCrawlingFunctions:
                     with patch(
                         "src.tools.web_tools.extract_source_summary"
                     ) as mock_extract:
-                        with patch(
-                            "src.tools.web_tools.update_source_info"
-                        ):
+                        with patch("src.tools.web_tools.update_source_info"):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
                             ):
@@ -402,9 +492,7 @@ class TestWebToolsCrawlingFunctions:
                     with patch(
                         "src.tools.web_tools.extract_source_summary"
                     ) as mock_extract:
-                        with patch(
-                            "src.tools.web_tools.update_source_info"
-                        ):
+                        with patch("src.tools.web_tools.update_source_info"):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
                             ):
@@ -498,9 +586,7 @@ class TestWebToolsIntegration:
                     with patch(
                         "src.tools.web_tools.extract_source_summary"
                     ) as mock_extract:
-                        with patch(
-                            "src.tools.web_tools.update_source_info"
-                        ):
+                        with patch("src.tools.web_tools.update_source_info"):
                             with patch(
                                 "src.tools.web_tools.add_documents_to_vector_db"
                             ):

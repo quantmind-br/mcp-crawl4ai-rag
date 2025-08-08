@@ -418,6 +418,7 @@ async def crawl_batch(
 async def crawl_recursive_internal_links(
     crawler: AsyncWebCrawler,
     start_urls: List[str],
+    base_prefix: str,
     max_depth: int = 3,
     max_concurrent: int = 10,
 ) -> List[Dict[str, Any]]:
@@ -427,6 +428,7 @@ async def crawl_recursive_internal_links(
     Args:
         crawler: AsyncWebCrawler instance
         start_urls: List of starting URLs
+        base_prefix: URL prefix to restrict crawling scope (only URLs starting with this prefix will be crawled)
         max_depth: Maximum recursion depth
         max_concurrent: Maximum number of concurrent browser sessions
 
@@ -470,7 +472,7 @@ async def crawl_recursive_internal_links(
                 results_all.append({"url": result.url, "markdown": result.markdown})
                 for link in result.links.get("internal", []):
                     next_url = normalize_url(link["href"])
-                    if next_url not in visited:
+                    if next_url not in visited and next_url.startswith(base_prefix):
                         next_level_urls.add(next_url)
 
         current_urls = next_level_urls
@@ -701,7 +703,11 @@ async def smart_crawl_url(
         else:
             # For regular URLs, use recursive crawl
             crawl_results = await crawl_recursive_internal_links(
-                crawler, [url], max_depth=max_depth, max_concurrent=max_concurrent
+                crawler,
+                [url],
+                base_prefix=url,
+                max_depth=max_depth,
+                max_concurrent=max_concurrent,
             )
             crawl_type = "webpage"
 
