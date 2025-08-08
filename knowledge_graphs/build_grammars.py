@@ -288,6 +288,35 @@ class GrammarBuilder:
             return False
 
 
+def build_grammars_if_needed() -> bool:
+    """
+    Build Tree-sitter grammars if they are needed.
+    
+    This function can be called programmatically to ensure grammars are available.
+    It's designed to be safe to call multiple times.
+    
+    Returns:
+        True if grammars are available or were successfully built
+    """
+    try:
+        builder = GrammarBuilder()
+        
+        # For modern tree-sitter, we mainly verify language packages are available
+        logger.info("Verifying Tree-sitter language packages...")
+        
+        if builder.verify_language_packages():
+            logger.info("All Tree-sitter language packages are available")
+            return True
+        else:
+            logger.warning("Some Tree-sitter language packages are not available")
+            logger.warning("Install with: uv add tree-sitter-python tree-sitter-javascript tree-sitter-typescript tree-sitter-java tree-sitter-go")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error during grammar verification: {e}")
+        return False
+
+
 def main():
     """Main entry point for the script."""
     import argparse

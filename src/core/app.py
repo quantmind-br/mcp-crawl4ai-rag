@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class RerankingModelSingleton:
     """Singleton for managing reranking model initialization and lifecycle."""
 
-    _instance: Optional['RerankingModelSingleton'] = None
+    _instance: Optional["RerankingModelSingleton"] = None
     _model: Optional[CrossEncoder] = None
 
     def __new__(cls):
@@ -53,16 +53,24 @@ class RerankingModelSingleton:
                 from device_manager import get_optimal_device, cleanup_gpu_memory
 
             device_info = get_optimal_device()
-            model_name = os.getenv("RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+            model_name = os.getenv(
+                "RERANKING_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
 
             logger.info(f"Initializing reranking model: {model_name}")
-            logger.info(f"Using device: {device_info.device} ({device_info.device_type})")
+            logger.info(
+                f"Using device: {device_info.device} ({device_info.device_type})"
+            )
 
             self._model = CrossEncoder(
                 model_name,
                 device=device_info.device,
                 trust_remote_code=False,
-                **(device_info.model_kwargs if isinstance(device_info.model_kwargs, dict) else {})
+                **(
+                    device_info.model_kwargs
+                    if isinstance(device_info.model_kwargs, dict)
+                    else {}
+                ),
             )
 
             # Warm up the model
@@ -74,7 +82,7 @@ class RerankingModelSingleton:
                 ["test query", "test document"],
                 ["example", "content"],
                 ["search", "result"],
-                ["question", "answer"]
+                ["question", "answer"],
             ][:warmup_samples]
 
             _ = self._model.predict(dummy_pairs)
@@ -91,7 +99,7 @@ class RerankingModelSingleton:
 class KnowledgeGraphSingleton:
     """Singleton for managing knowledge graph components initialization and lifecycle."""
 
-    _instance: Optional['KnowledgeGraphSingleton'] = None
+    _instance: Optional["KnowledgeGraphSingleton"] = None
     _knowledge_validator: Optional = None
     _repo_extractor: Optional = None
     _initialized: bool = False
@@ -111,12 +119,16 @@ class KnowledgeGraphSingleton:
 
         try:
             # Dynamic imports for Neo4j components
-            knowledge_graphs_path = os.path.join(os.path.dirname(__file__), "..", "..", "knowledge_graphs")
+            knowledge_graphs_path = os.path.join(
+                os.path.dirname(__file__), "..", "..", "knowledge_graphs"
+            )
             if knowledge_graphs_path not in sys.path:
                 sys.path.insert(0, knowledge_graphs_path)
 
-            from knowledge_graph_validator import KnowledgeGraphValidator
-            from parse_repo_into_neo4j import DirectNeo4jExtractor
+            from knowledge_graphs.knowledge_graph_validator import (
+                KnowledgeGraphValidator,
+            )
+            from knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
 
             # Get Neo4j connection parameters
             neo4j_uri = os.getenv("NEO4J_URI")
@@ -126,8 +138,12 @@ class KnowledgeGraphSingleton:
             # Test Neo4j connection
             await self._validate_neo4j_connection()
 
-            self._knowledge_validator = KnowledgeGraphValidator(neo4j_uri, neo4j_user, neo4j_password)
-            self._repo_extractor = DirectNeo4jExtractor(neo4j_uri, neo4j_user, neo4j_password)
+            self._knowledge_validator = KnowledgeGraphValidator(
+                neo4j_uri, neo4j_user, neo4j_password
+            )
+            self._repo_extractor = DirectNeo4jExtractor(
+                neo4j_uri, neo4j_user, neo4j_password
+            )
 
             # Initialize components
             await self._knowledge_validator.initialize()
@@ -158,13 +174,16 @@ class KnowledgeGraphSingleton:
         try:
             driver = GraphDatabase.driver(
                 neo4j_uri,
-                auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", ""))
+                auth=(
+                    os.getenv("NEO4J_USER", "neo4j"),
+                    os.getenv("NEO4J_PASSWORD", ""),
+                ),
             )
-            
+
             # Test connection with a simple query (Neo4j driver uses sync methods)
             with driver.session() as session:
                 session.run("RETURN 1")
-            
+
             logger.info("Neo4j connection validated successfully")
 
         except Exception as e:
@@ -209,6 +228,18 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     """
     logger.info("Starting application initialization...")
 
+    # Initialize Tree-sitter grammars if needed (for knowledge graph features)
+    try:
+        from ..utils.grammar_initialization import initialize_grammars_if_needed
+        initialize_grammars_if_needed()
+    except ImportError:
+        # Fallback for backward compatibility during migration
+        try:
+            from src.utils.grammar_initialization import initialize_grammars_if_needed
+            initialize_grammars_if_needed()
+        except ImportError:
+            logger.info("Grammar initialization module not available, skipping Tree-sitter setup")
+
     # Create browser configuration
     browser_config = BrowserConfig(headless=True, verbose=False)
 
@@ -226,6 +257,8 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
             from ..clients.qdrant_client import get_qdrant_client
         except ImportError:
             from clients.qdrant_client import get_qdrant_client
+    # Expor função para facilitar patch em testes
+    globals()["get_qdrant_client"] = get_qdrant_client
 
     qdrant_client = get_qdrant_client()
     logger.info("Qdrant client initialized")
@@ -235,7 +268,8 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
         from ..embedding_cache import get_embedding_cache
     except ImportError:
         from embedding_cache import get_embedding_cache
-
+    # Expor para facilitar patch em testes
+    globals()["get_embedding_cache"] = get_embedding_cache
     embedding_cache = get_embedding_cache()
     logger.info("Embedding cache initialized")
 
@@ -251,12 +285,17 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
                 validate_embeddings_config,
                 get_embedding_dimensions,
             )
+        # Expor para escopo do módulo para facilitar patch nos testes
+        globals()["validate_embeddings_config"] = validate_embeddings_config
+        globals()["get_embedding_dimensions"] = get_embedding_dimensions
         validate_embeddings_config()
         embedding_dims = get_embedding_dimensions()
         logger.info(f"Embedding configuration validated - dimensions: {embedding_dims}")
     except Exception as e:
         logger.warning(f"Embedding configuration validation failed: {e}")
-        logger.warning("Server will continue but embedding functionality may not work correctly")
+        logger.warning(
+            "Server will continue but embedding functionality may not work correctly"
+        )
 
     # Initialize ML models
     reranking_singleton = RerankingModelSingleton()
@@ -330,7 +369,7 @@ def create_app() -> FastMCP:
         instructions="MCP server for RAG and web crawling with Crawl4AI",
         host=host,
         port=port,
-        lifespan=crawl4ai_lifespan
+        lifespan=crawl4ai_lifespan,
     )
 
     logger.info(f"FastMCP application created - Host: {host}, Port: {port}")
@@ -351,12 +390,13 @@ def register_tools(app: FastMCP) -> None:
 
     # For now, tools are registered via decorators in the original crawl4ai_mcp.py file
     # This is a transitional approach until all tools are fully migrated
-    # The tools modules are imported to make them available but registration 
+    # The tools modules are imported to make them available but registration
     # happens through the existing @mcp.tool decorators
 
     # Import web tools module to make tools available
     try:
         from ..tools import web_tools
+
         # Register web tools manually with the app instance
         app.tool()(web_tools.crawl_single_page)
         app.tool()(web_tools.smart_crawl_url)
@@ -367,6 +407,7 @@ def register_tools(app: FastMCP) -> None:
     # Import GitHub tools module to make tools available
     try:
         from ..tools import github_tools
+
         # Register GitHub tools manually with the app instance
         app.tool()(github_tools.smart_crawl_github)
         logger.info("GitHub tools imported and registered")
@@ -376,10 +417,11 @@ def register_tools(app: FastMCP) -> None:
     # Import RAG tools module to make tools available
     try:
         from ..tools import rag_tools
+
         # Register RAG tools manually with the app instance
         app.tool()(rag_tools.get_available_sources)
         app.tool()(rag_tools.perform_rag_query)
-        
+
         # Register search_code_examples only if agentic RAG is enabled
         if os.getenv("USE_AGENTIC_RAG", "false") == "true":
             app.tool()(rag_tools.search_code_examples)
@@ -393,13 +435,22 @@ def register_tools(app: FastMCP) -> None:
     if os.getenv("USE_KNOWLEDGE_GRAPH", "false") == "true":
         try:
             from ..tools import kg_tools
+
             # Register KG tools manually with the app instance
             app.tool()(kg_tools.parse_github_repository)
             app.tool()(kg_tools.check_ai_script_hallucinations)
             app.tool()(kg_tools.query_knowledge_graph)
             logger.info("Knowledge graph tools imported and registered")
         except ImportError as e:
-            logger.warning(f"Knowledge graph tools not available: {e}")
+            # Fallback: use pre-injected module if available (e.g., in tests)
+            if "kg_tools" in globals():
+                kg_tools = globals()["kg_tools"]
+                app.tool()(kg_tools.parse_github_repository)
+                app.tool()(kg_tools.check_ai_script_hallucinations)
+                app.tool()(kg_tools.query_knowledge_graph)
+                logger.info("Knowledge graph tools registered via pre-injected module")
+            else:
+                logger.warning(f"Knowledge graph tools not available: {e}")
     else:
         logger.info("Knowledge graph tools disabled (USE_KNOWLEDGE_GRAPH=false)")
 
@@ -417,7 +468,7 @@ async def run_server() -> None:
 
     # Create the application instance using the new structure
     app = create_app()
-    
+
     # Register all tools
     register_tools(app)
 
