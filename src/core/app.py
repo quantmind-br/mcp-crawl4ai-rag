@@ -26,6 +26,41 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def configure_windows_logging():
+    """
+    Configure logging to suppress Windows ConnectionResetError messages.
+
+    These errors are cosmetic and occur during graceful shutdown on Windows
+    with ProactorEventLoop. They don't affect functionality.
+    """
+    import platform
+
+    if platform.system().lower() == "windows":
+        # Suppress asyncio ConnectionResetError logs that are cosmetic
+        asyncio_logger = logging.getLogger("asyncio")
+
+        class ConnectionResetFilter(logging.Filter):
+            def filter(self, record):
+                # Suppress the specific Windows connection reset errors
+                if record.levelno == logging.ERROR:
+                    message = record.getMessage()
+                    if any(
+                        pattern in message
+                        for pattern in [
+                            "ConnectionResetError: [WinError 10054]",
+                            "_ProactorBasePipeTransport._call_connection_lost",
+                            "Foi forçado o cancelamento de uma conexão existente",
+                            "O nome da rede especificado não está mais disponível",
+                            "Accept failed on a socket",
+                        ]
+                    ):
+                        return False
+                return True
+
+        asyncio_logger.addFilter(ConnectionResetFilter())
+        logger.debug("Applied Windows ConnectionResetError log suppression")
+
+
 class ContextSingleton:
     """Singleton for managing the application context to avoid multiple initializations."""
 
@@ -555,7 +590,14 @@ async def run_server() -> None:
 
     This function creates the application instance and runs it with either
     SSE or stdio transport based on the TRANSPORT environment variable.
+    Includes graceful shutdown handling to minimize Windows connection errors.
     """
+    import asyncio
+    import signal
+
+    # Configure Windows-specific logging to suppress ConnectionResetError messages
+    configure_windows_logging()
+
     logger.info("Starting MCP Crawl4AI RAG server...")
 
     # Create the application instance using the new structure
@@ -568,9 +610,49 @@ async def run_server() -> None:
     transport = os.getenv("TRANSPORT", "sse")
     logger.info(f"Using transport: {transport}")
 
-    if transport == "sse":
-        logger.info("Starting SSE transport server...")
-        await app.run_sse_async()
-    else:
-        logger.info("Starting stdio transport server...")
-        await app.run_stdio_async()
+    # Setup graceful shutdown handling
+    shutdown_event = asyncio.Event()
+
+    def signal_handler():
+        logger.info("Received shutdown signal, initiating graceful shutdown...")
+        shutdown_event.set()
+
+    # Register signal handlers for graceful shutdown
+    try:
+        if hasattr(signal, "SIGINT"):
+            signal.signal(signal.SIGINT, lambda s, f: signal_handler())
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, lambda s, f: signal_handler())
+    except (OSError, ValueError):
+        # Signal handling might not be available in some environments
+        logger.debug("Could not register signal handlers")
+
+    try:
+        if transport == "sse":
+            logger.info("Starting SSE transport server...")
+            await app.run_sse_async()
+        else:
+            logger.info("Starting stdio transport server...")
+            await app.run_stdio_async()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, shutting down...")
+    except Exception as e:
+        logger.error(f"Server error: {e}")
+        raise
+    finally:
+        # Ensure cleanup happens
+        logger.info("Starting server shutdown cleanup...")
+
+        try:
+            # Cleanup application resources
+            await cleanup_application()
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+
+        # Give a brief moment for any pending connections to close gracefully
+        try:
+            await asyncio.sleep(0.2)
+        except Exception:
+            pass
+
+        logger.info("Server shutdown completed")

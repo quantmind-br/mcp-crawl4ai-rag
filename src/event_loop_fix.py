@@ -349,9 +349,9 @@ if __name__ == "__main__":
     print("Testing setup_event_loop()...")
     result = setup_event_loop()
     if result:
-        print(f"✅ Event loop policy configured: {result}")
+        print(f"SUCCESS: Event loop policy configured: {result}")
     else:
-        print("ℹ️  No event loop policy change needed")
+        print("INFO: No event loop policy change needed")
 
     # Display final configuration
     print("\nFinal configuration:")
