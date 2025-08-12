@@ -182,9 +182,7 @@ More text after code block."""
                             with patch(
                                 "src.tools.github_tools.add_documents_to_vector_db"
                             ):
-                                with patch(
-                                    "src.tools.github_tools.update_source_info"
-                                ):
+                                with patch("src.tools.github_tools.update_source_info"):
                                     result = await smart_crawl_github(
                                         mock_context,
                                         "https://github.com/user/repo",

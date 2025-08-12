@@ -357,12 +357,8 @@ This is content with headers."""
 
         # Mock crawl_markdown_file result
         with patch("src.tools.web_tools.crawl_markdown_file") as mock_crawl_file:
-            with patch(
-                "src.tools.web_tools.add_documents_to_vector_db"
-            ):
-                with patch(
-                    "src.tools.web_tools.update_source_info"
-                ):
+            with patch("src.tools.web_tools.add_documents_to_vector_db"):
+                with patch("src.tools.web_tools.update_source_info"):
                     mock_crawl_file.return_value = [
                         {
                             "url": "https://example.com/test.txt",
@@ -396,12 +392,8 @@ This is content with headers."""
         # Mock sitemap parsing and batch crawl
         with patch("src.tools.web_tools.parse_sitemap") as mock_parse_sitemap:
             with patch("src.tools.web_tools.crawl_batch") as mock_crawl_batch:
-                with patch(
-                    "src.tools.web_tools.add_documents_to_vector_db"
-                ):
-                    with patch(
-                        "src.tools.web_tools.update_source_info"
-                    ):
+                with patch("src.tools.web_tools.add_documents_to_vector_db"):
+                    with patch("src.tools.web_tools.update_source_info"):
                         mock_parse_sitemap.return_value = [
                             "https://example.com/page1",
                             "https://example.com/page2",
@@ -444,12 +436,8 @@ This is content with headers."""
         with patch(
             "src.tools.web_tools.crawl_recursive_internal_links"
         ) as mock_crawl_recursive:
-            with patch(
-                "src.tools.web_tools.add_documents_to_vector_db"
-            ):
-                with patch(
-                    "src.tools.web_tools.update_source_info"
-                ):
+            with patch("src.tools.web_tools.add_documents_to_vector_db"):
+                with patch("src.tools.web_tools.update_source_info"):
                     mock_crawl_recursive.return_value = [
                         {"url": "https://example.com/page1", "markdown": "Content 1"}
                     ]
