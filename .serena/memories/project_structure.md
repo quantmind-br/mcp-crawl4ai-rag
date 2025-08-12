@@ -2,66 +2,90 @@
 
 ## Root Directory
 ```
-mcp-crawl4ai-rag/
-├── src/                     # Main source code
-├── tests/                   # Test suite
-├── scripts/                 # Utility scripts
-├── knowledge_graphs/        # Neo4j knowledge graph tools
-├── .claude/                 # Claude IDE configuration
-├── .serena/                 # Serena project files
-├── pyproject.toml          # Python project configuration
-├── docker-compose.yaml     # Docker services
-├── setup.bat              # Windows setup script
-├── start.bat              # Windows server start script
-└── run_server.py          # Alternative entry point
+├── .env.example          # Environment configuration template
+├── docker-compose.yaml   # Docker services (Qdrant, Neo4j, Redis)
+├── pyproject.toml        # Python dependencies and project metadata
+├── pytest.ini           # Test configuration
+├── setup.bat            # Windows service initialization script
+├── start.bat            # Windows server startup script
+└── run_server.py        # Alternative server entry point
 ```
 
-## Source Code Structure (`src/`)
+## Source Code (`src/`)
 ```
 src/
-├── __main__.py             # Module entry point
-├── clients/                # External service clients
-│   ├── llm_api_client.py  # LLM API integration
-│   ├── qdrant_client.py   # Qdrant vector database
-│   └── __init__.py
-├── core/                   # Application core
-│   ├── app.py             # Main application setup
-│   ├── context.py         # Shared context management
-│   └── __init__.py
-├── features/               # Feature implementations
-│   ├── github_processor.py # GitHub repository processing
-│   └── __init__.py
-├── services/               # Business logic services
-│   ├── embedding_service.py      # Embedding generation
-│   ├── rag_service.py            # RAG query processing
-│   ├── unified_indexing_service.py # Multi-destination indexing
-│   └── __init__.py
-├── tools/                  # MCP tool implementations
-│   ├── github_tools.py    # GitHub-related MCP tools
-│   ├── kg_tools.py        # Knowledge graph tools
-│   ├── rag_tools.py       # RAG query tools
-│   ├── web_tools.py       # Web crawling tools
-│   └── __init__.py
-├── utils/                  # Utility functions
-│   ├── file_id_generator.py      # File ID management
-│   ├── grammar_initialization.py # Tree-sitter setup
-│   ├── validation.py             # Input validation
-│   └── __init__.py
-├── device_manager.py      # GPU/CPU detection
-├── embedding_cache.py     # Redis caching
-├── embedding_config.py    # Embedding configuration
-├── event_loop_fix.py      # Windows async fixes
-└── sparse_vector_types.py # Vector type definitions
+├── core/                 # Application core
+│   ├── app.py           # FastMCP server setup and tool registration
+│   └── context.py       # Singleton context management
+├── tools/               # MCP tools (exposed to AI agents)
+│   ├── web_tools.py     # Web crawling tools
+│   ├── github_tools.py  # GitHub repository indexing
+│   ├── rag_tools.py     # Vector search and RAG queries
+│   └── kg_tools.py      # Knowledge graph and hallucination detection
+├── services/            # Business logic layer
+│   ├── rag_service.py   # RAG search with reranking
+│   ├── embedding_service.py # Embedding generation and caching
+│   └── unified_indexing_service.py # Multi-destination indexing
+├── clients/             # External API integrations
+│   ├── qdrant_client.py # Vector database client
+│   └── llm_api_client.py # LLM and embedding API client
+├── k_graph/             # Knowledge graph system (modularized)
+│   ├── core/            # Core interfaces and models
+│   ├── parsing/         # Tree-sitter multi-language parsers
+│   ├── analysis/        # Hallucination detection and validation
+│   └── services/        # Repository parsing services
+├── features/            # Feature modules
+│   └── github/          # GitHub processing pipeline
+│       ├── processors/  # Language-specific processors
+│       ├── discovery/   # File discovery and filtering
+│       └── repository/  # Git operations and metadata
+├── utils/               # Utility functions
+└── __main__.py         # Main entry point (`uv run -m src`)
 ```
 
-## Testing Structure (`tests/`)
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: Full system testing with databases
-- **Performance Tests**: Benchmarking and load testing
-- **Fixtures**: Test data and mock configurations
+## Testing (`tests/`)
+```
+tests/
+├── conftest.py          # Shared pytest fixtures
+├── integration/         # Full workflow tests
+├── tools/              # MCP tool tests
+├── rag/                # RAG service tests
+├── knowledge_graphs/   # Tree-sitter parser tests
+├── clients/            # Database client tests
+├── performance/        # Performance benchmarks
+└── fixtures/           # Test data and mocks
+```
+
+## Scripts (`scripts/`)
+```
+scripts/
+├── clean_qdrant.py              # Database cleanup utility
+├── define_qdrant_dimensions.py  # Fix dimension mismatches
+├── query_knowledge_graph.py     # Neo4j query interface
+└── build_grammars.py           # Tree-sitter grammar compilation
+```
+
+## Configuration Directories
+```
+.serena/                 # Serena memory files and project configuration
+PRPs/                    # Project Requirement Papers (development docs)
+SPEC_PRP/               # Specification PRPs
+.claude/                # Claude Code integration commands
+```
 
 ## Key Entry Points
-- `src/__main__.py`: Primary entry point (`uv run -m src`)
-- `run_server.py`: Alternative entry point for standalone execution
-- `setup.bat`: Windows Docker services setup
-- `start.bat`: Complete Windows server startup script
+1. **`src/__main__.py`** - Primary entry via `uv run -m src`
+2. **`run_server.py`** - Alternative entry via `uv run python run_server.py`
+3. **`src/core/app.py`** - FastMCP application factory and tool registration
+
+## Tool Organization Pattern
+Each tool category has dedicated files:
+- **Web tools**: Single page crawling, smart URL detection
+- **GitHub tools**: Repository cloning, indexing, multi-language processing
+- **RAG tools**: Vector search, source filtering, code example search
+- **Knowledge graph tools**: Code parsing, hallucination detection, graph queries
+
+## Configuration Flow
+```
+.env → Environment Variables → Context Singletons → Service Instances → MCP Tools
+```

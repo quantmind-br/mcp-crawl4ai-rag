@@ -1,53 +1,69 @@
 # Code Style and Conventions
 
+## Code Formatting & Linting
+- **Ruff** - Primary linting and formatting tool (>=0.12.7)
+  - Auto-fixing: `uv run ruff check --fix .`
+  - Formatting: `uv run ruff format .`
+  - Configuration in pyproject.toml
+
 ## Python Style Guidelines
-- **Python Version**: 3.12+ required
-- **Type Hints**: Used throughout the codebase
-- **Docstrings**: Present for classes and functions
-- **Import Style**: Relative imports within package, absolute for external
-- **Async/Await**: Extensive use of asyncio patterns
+- **Function signatures**: Type hints for all parameters and return values
+- **Async/await**: Consistent async patterns throughout codebase
+- **Docstrings**: Google-style docstrings for all public functions/classes
+- **Imports**: Organized with `# ruff: noqa: E402` when needed for test files
 
-## Code Formatting
-- **Linter**: Ruff (configured in dev dependencies)
-- **Line Length**: Not explicitly configured (Ruff default: 88 chars)
-- **Import Sorting**: Handled by Ruff
-- **Code Formatting**: Ruff handles both linting and formatting
+## Naming Conventions
+- **Functions/variables**: snake_case (e.g., `perform_rag_query`, `match_count`)
+- **Classes**: PascalCase (e.g., `RagService`, `ContextSingleton`) 
+- **Constants**: UPPER_SNAKE_CASE (e.g., `USE_HYBRID_SEARCH`, `QDRANT_HOST`)
+- **Private members**: Leading underscore (e.g., `_internal_method`)
 
-## File Organization
-- **Module Structure**: Clear separation of concerns
-  - `clients/`: External service integrations
-  - `core/`: Application foundation
-  - `services/`: Business logic
-  - `tools/`: MCP tool implementations
-  - `utils/`: Helper functions
-- **Naming Conventions**:
-  - Files: `snake_case.py`
-  - Classes: `PascalCase`
-  - Functions: `snake_case`
-  - Constants: `UPPER_SNAKE_CASE`
-  - Private members: `_leading_underscore`
-
-## Async Patterns
-- **Singleton Pattern**: Used for shared resources (ContextSingleton, RerankingModelSingleton)
-- **Context Managers**: For resource management and cleanup
-- **Lifespan Management**: Proper startup/shutdown handling
-- **Error Handling**: Comprehensive exception handling with logging
-
-## Documentation Style
-- **Docstrings**: Triple quotes with clear descriptions
-- **Comments**: Inline comments for complex logic
-- **Type Annotations**: Full type hinting including return types
-- **Module Docstrings**: File-level documentation explaining purpose
-
-## Project-Specific Patterns
-- **MCP Tools**: Standardized async function signatures
-- **Service Layer**: Clear separation between tools and business logic
-- **Client Abstractions**: Consistent interfaces for external services
-- **Configuration Management**: Environment-based configuration
-- **Logging**: Structured logging throughout application
+## Type Annotations
+- **Required**: All function parameters and return types
+- **Optional types**: `Optional[str] = None` pattern
+- **Context typing**: `ctx: Context` for MCP tools
+- **JSON returns**: Functions returning JSON use `-> str` with `json.dumps()`
 
 ## Error Handling
-- **Exception Classes**: Custom exceptions where appropriate
-- **Graceful Degradation**: Fallback mechanisms for API failures
-- **Logging**: Comprehensive error logging and debugging information
-- **Resource Cleanup**: Proper cleanup in finally blocks and context managers
+- **Try-catch blocks**: Comprehensive error handling in MCP tools
+- **JSON error responses**: Consistent error format with `{"success": False, "error": str(e)}`
+- **Logging**: Use `logger` from `logging` module for debug info
+
+## Documentation Standards
+- **Docstring format**:
+  ```python
+  async def function_name(param: type) -> return_type:
+      \"\"\"
+      Brief description.
+
+      Detailed explanation of functionality and purpose.
+
+      Args:
+          param: Description of parameter
+
+      Returns:
+          Description of return value
+      \"\"\"
+  ```
+
+## File Organization
+- **MCP Tools**: One tool per function in `src/tools/`
+- **Services**: Business logic in `src/services/`
+- **Clients**: External API wrappers in `src/clients/`
+- **Tests**: Mirror source structure in `tests/`
+
+## Import Organization
+- **Standard library** first
+- **Third-party packages** second  
+- **Local imports** last
+- **Relative imports**: Use `from ..services import` pattern
+
+## Configuration Patterns
+- **Environment variables**: All config via .env files
+- **Singleton patterns**: Context, reranking models, knowledge graph
+- **Default values**: Provide sensible defaults for optional parameters
+
+## Unicode Guidelines (CRITICAL for Windows)
+- **NEVER use Unicode characters**: ✅ ❌ 🚀 🔧 etc.
+- **ASCII alternatives only**: "SUCCESS", "FAILED", "ERROR"
+- **Console compatibility**: All output must work in Windows cmd (cp1252)

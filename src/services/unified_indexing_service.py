@@ -26,9 +26,9 @@ try:
         IndexingDestination,
     )
     from ..services.rag_service import add_documents_to_vector_db, update_source_info
-    from ..features.github import GitHubService
+    from ..features.github.repository.git_operations import GitRepository
     from ..clients.qdrant_client import get_qdrant_client
-    from ..knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
+    from ..k_graph.services.repository_parser import DirectNeo4jExtractor
 
     # Embedding service imported when needed
     from ..event_loop_fix import setup_event_loop
@@ -43,9 +43,9 @@ except ImportError:
             IndexingDestination,
         )
         from services.rag_service import add_documents_to_vector_db, update_source_info
-        from features.github import GitHubService
+        from features.github.repository.git_operations import GitRepository
         from clients.qdrant_client import get_qdrant_client
-        from knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
+        from src.k_graph.services.repository_parser import DirectNeo4jExtractor
         from event_loop_fix import setup_event_loop
     except ImportError:
         # Final fallback - add project root to path
@@ -67,12 +67,172 @@ except ImportError:
             add_documents_to_vector_db,
             update_source_info,
         )
-        from src.features.github import GitHubService
+        from src.features.github.repository.git_operations import GitRepository
         from src.clients.qdrant_client import get_qdrant_client
-        from knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
+        from src.k_graph.services.repository_parser import DirectNeo4jExtractor
         from src.event_loop_fix import setup_event_loop
 
 logger = logging.getLogger(__name__)
+
+
+# Inline model definitions for unified indexing
+from enum import Enum
+from dataclasses import dataclass, field
+
+
+class IndexingDestination(Enum):
+    """Destination for indexed data."""
+
+    QDRANT = "qdrant"
+    NEO4J = "neo4j"
+    BOTH = "both"
+
+
+@dataclass
+class UnifiedIndexingRequest:
+    """Request for unified repository indexing."""
+
+    repo_url: str
+    destination: IndexingDestination
+    file_types: List[str] = field(default_factory=lambda: [".md"])
+    max_files: int = 50
+    chunk_size: int = 5000
+    max_size_mb: int = 500
+
+    @property
+    def should_process_rag(self) -> bool:
+        """Check if RAG processing is requested."""
+        return self.destination in [
+            IndexingDestination.QDRANT,
+            IndexingDestination.BOTH,
+        ]
+
+    @property
+    def should_process_kg(self) -> bool:
+        """Check if Knowledge Graph processing is requested."""
+        return self.destination in [IndexingDestination.NEO4J, IndexingDestination.BOTH]
+
+
+@dataclass
+class FileProcessingResult:
+    """Result of processing a single file."""
+
+    file_id: str
+    relative_path: str
+    file_path: str = ""
+    language: str = "unknown"
+    file_type: str = ""
+    processed_for_rag: bool = False
+    processed_for_kg: bool = False
+    rag_chunks: int = 0
+    kg_entities: int = 0
+    processing_time_seconds: float = 0.0
+    processing_summary: str = ""
+    errors: List[str] = field(default_factory=list)
+
+    @property
+    def is_successful(self) -> bool:
+        """Check if processing was successful."""
+        return len(self.errors) == 0 and (
+            self.processed_for_rag or self.processed_for_kg
+        )
+
+
+@dataclass
+class UnifiedIndexingResponse:
+    """Response from unified repository indexing."""
+
+    success: bool
+    repo_url: str
+    repo_name: str
+    destination: str
+    files_processed: int
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    processing_time_seconds: float = 0.0
+    qdrant_documents: int = 0
+    neo4j_nodes: int = 0
+    cross_system_links_created: int = 0
+    file_results: List[FileProcessingResult] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
+
+    def add_file_result(self, result: FileProcessingResult) -> None:
+        """Add a file processing result."""
+        self.file_results.append(result)
+        self.files_processed = len(self.file_results)
+
+        # Update totals
+        if result.processed_for_rag:
+            self.qdrant_documents += result.rag_chunks
+        if result.processed_for_kg:
+            self.neo4j_nodes += result.kg_entities
+
+    def finalize(self) -> None:
+        """Finalize the response with calculated values."""
+        self.end_time = datetime.now()
+        if self.start_time:
+            self.processing_time_seconds = (
+                self.end_time - self.start_time
+            ).total_seconds()
+
+        # Determine success
+        successful_files = len([r for r in self.file_results if r.is_successful])
+        self.success = successful_files > 0 and len(self.errors) == 0
+
+    @property
+    def success_rate(self) -> float:
+        """Calculate success rate percentage."""
+        if not self.file_results:
+            return 0.0
+        successful_files = len([r for r in self.file_results if r.is_successful])
+        return (successful_files / len(self.file_results)) * 100.0
+
+    @property
+    def performance_summary(self) -> dict:
+        """Get performance metrics."""
+        if self.processing_time_seconds == 0:
+            return {
+                "files_per_second": 0.0,
+                "avg_processing_time_per_file": 0.0,
+                "total_chunks_created": sum(r.rag_chunks for r in self.file_results),
+                "total_entities_extracted": sum(
+                    r.kg_entities for r in self.file_results
+                ),
+            }
+
+        return {
+            "files_per_second": self.files_processed / self.processing_time_seconds,
+            "avg_processing_time_per_file": self.processing_time_seconds
+            / max(self.files_processed, 1),
+            "total_chunks_created": sum(r.rag_chunks for r in self.file_results),
+            "total_entities_extracted": sum(r.kg_entities for r in self.file_results),
+        }
+
+    @property
+    def error_summary(self) -> dict:
+        """Get error summary."""
+        file_errors = []
+        system_errors = []
+
+        for error in self.errors:
+            if any(keyword in error.lower() for keyword in ["file", "path", "read"]):
+                file_errors.append(error)
+            else:
+                system_errors.append(error)
+
+        # Add file-level errors
+        for result in self.file_results:
+            file_errors.extend(result.errors)
+
+        return {
+            "has_errors": len(self.errors) > 0
+            or any(r.errors for r in self.file_results),
+            "error_count": len(self.errors)
+            + sum(len(r.errors) for r in self.file_results),
+            "system_errors": len(system_errors),
+            "file_errors": len(file_errors),
+            "failed_files": len([r for r in self.file_results if not r.is_successful]),
+        }
 
 
 class ResourceManager:
@@ -179,20 +339,21 @@ class UnifiedIndexingService:
             qdrant_client: Optional Qdrant client, will create if not provided
             neo4j_parser: Optional Neo4j repository parser, will create if not provided
         """
-        self.qdrant_client = qdrant_client or get_qdrant_client()
-        if neo4j_parser:
-            self.neo4j_parser = neo4j_parser
-        else:
-            # Initialize with environment variables if available
-            import os
+        import os
 
-            neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-            neo4j_user = os.getenv("NEO4J_USER", "neo4j")
-            neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
-            self.neo4j_parser = DirectNeo4jExtractor(
-                neo4j_uri, neo4j_user, neo4j_password
-            )
-        self.github_processor = GitHubService()
+        self.qdrant_client = qdrant_client or get_qdrant_client()
+        # Only store Neo4j parser if provided, don't create one unless needed
+        self.neo4j_parser = neo4j_parser
+        self._neo4j_config = (
+            None
+            if neo4j_parser
+            else {
+                "uri": os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+                "user": os.getenv("NEO4J_USER", "neo4j"),
+                "password": os.getenv("NEO4J_PASSWORD", "password"),
+            }
+        )
+        self.github_repository = GitRepository()
         self.executor = ThreadPoolExecutor(max_workers=4)
 
     async def process_repository_unified(
@@ -223,9 +384,17 @@ class UnifiedIndexingService:
         async with ResourceManager() as resource_manager:
             try:
                 # Step 0: Initialize Neo4j parser if needed for this request
-                if request.should_process_kg and self.neo4j_parser:
-                    await self.neo4j_parser.initialize()
-                    logger.debug("Neo4j parser initialized successfully")
+                if request.should_process_kg:
+                    if not self.neo4j_parser and self._neo4j_config:
+                        # Create Neo4j parser only when needed
+                        self.neo4j_parser = DirectNeo4jExtractor(
+                            self._neo4j_config["uri"],
+                            self._neo4j_config["user"],
+                            self._neo4j_config["password"],
+                        )
+                    if self.neo4j_parser:
+                        await self.neo4j_parser.initialize()
+                        logger.debug("Neo4j parser initialized successfully")
 
                 # Step 1: Clone repository to temporary directory
                 temp_dir = await self._clone_repository(
@@ -257,8 +426,37 @@ class UnifiedIndexingService:
                         response.add_file_result(file_result)
 
                 # Step 5: Process collected Neo4j analyses if any
+                neo4j_result = None
                 if hasattr(self, "_neo4j_analyses") and self._neo4j_analyses:
-                    await self._batch_process_neo4j_analyses()
+                    neo4j_result = await self._batch_process_neo4j_analyses()
+
+                    # Update response with Neo4j processing results
+                    if neo4j_result:
+                        entities_created = neo4j_result.get("entities_created", 0)
+                        # Update the response totals with actual Neo4j results
+                        response.neo4j_nodes = entities_created
+
+                        # Update individual file results with correct kg_entities
+                        files_processed_neo4j = neo4j_result.get("files_processed", 0)
+                        if files_processed_neo4j > 0:
+                            # Distribute entities across processed files
+                            avg_entities_per_file = (
+                                entities_created // files_processed_neo4j
+                            )
+                            remainder = entities_created % files_processed_neo4j
+
+                            # Update kg_entities for files that were processed for Neo4j
+                            neo4j_file_count = 0
+                            for file_result in response.file_results:
+                                if (
+                                    file_result.processed_for_kg
+                                    and neo4j_file_count < files_processed_neo4j
+                                ):
+                                    file_result.kg_entities = avg_entities_per_file
+                                    if remainder > 0:
+                                        file_result.kg_entities += 1
+                                        remainder -= 1
+                                    neo4j_file_count += 1
 
                 # Step 6: Finalize response
                 response.finalize()
@@ -298,20 +496,12 @@ class UnifiedIndexingService:
         resource_manager.register_temp_directory(temp_dir)
 
         try:
-            # Clone repository using GitHub processor
-            clone_result = await asyncio.to_thread(
-                self.github_processor.clone_repository_temp,
-                repo_url,
-                max_size_mb,
-                temp_dir.name,
+            # Clone repository using GitRepository
+            cloned_temp_dir = await asyncio.to_thread(
+                self.github_repository.clone_repository, repo_url, max_size_mb
             )
 
-            if not clone_result["success"]:
-                raise ValueError(
-                    f"Repository cloning failed: {clone_result.get('error', 'Unknown error')}"
-                )
-
-            cloned_path = Path(clone_result["temp_directory"])
+            cloned_path = Path(cloned_temp_dir)
             logger.info(f"Successfully cloned repository to {cloned_path}")
 
             return cloned_path

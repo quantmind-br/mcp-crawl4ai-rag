@@ -18,7 +18,7 @@ def get_grammars_directory() -> Path:
     """Get the path to the Tree-sitter grammars directory."""
     # Get project root (assuming we're in src/utils/)
     project_root = Path(__file__).parent.parent.parent
-    return project_root / "knowledge_graphs" / "grammars"
+    return project_root / "src" / "k_graph" / "parsing" / "grammars"
 
 
 def check_essential_grammars() -> Dict[str, bool]:
@@ -100,7 +100,8 @@ def run_grammar_builder() -> bool:
     try:
         # Import and use the build_grammars_if_needed function directly
         project_root = Path(__file__).parent.parent.parent
-        sys.path.insert(0, str(project_root / "knowledge_graphs"))
+        scripts_path = project_root / "scripts"
+        sys.path.insert(0, str(scripts_path))
 
         from build_grammars import build_grammars_if_needed
 
@@ -114,8 +115,9 @@ def run_grammar_builder() -> bool:
         return False
     finally:
         # Clean up sys.path
-        if str(project_root / "knowledge_graphs") in sys.path:
-            sys.path.remove(str(project_root / "knowledge_graphs"))
+        scripts_path_str = str(project_root / "scripts")
+        if scripts_path_str in sys.path:
+            sys.path.remove(scripts_path_str)
 
 
 def initialize_grammars_if_needed() -> bool:
@@ -164,7 +166,7 @@ def initialize_grammars_if_needed() -> bool:
             logger.warning(
                 "Failed to build Tree-sitter grammars automatically. "
                 "Some knowledge graph features may be limited. "
-                "Try running manually: python knowledge_graphs/build_grammars.py"
+                "Try running manually: python scripts/build_grammars.py"
             )
             return False
 

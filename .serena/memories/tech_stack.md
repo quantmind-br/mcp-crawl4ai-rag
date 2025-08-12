@@ -1,45 +1,46 @@
 # Technology Stack
 
-## Core Technologies
-- **Python 3.12+**: Primary programming language
-- **MCP 1.7.1**: Model Context Protocol for AI agent integration
-- **FastMCP**: Async MCP server framework
-- **Crawl4AI 0.6.2**: Advanced web crawling engine
-- **Qdrant Client 1.12.0+**: Vector database client
-- **Neo4j 5.28.1+**: Graph database for knowledge representation
+## Core Framework & Protocol
+- **MCP (Model Context Protocol)** v1.7.1 - AI agent integration framework
+- **FastMCP** - Async MCP server implementation 
+- **Python 3.12+** - Primary programming language
 
-## AI/ML Stack
-- **OpenAI 1.71.0**: LLM and embeddings API client
-- **FastEmbed 0.4.0+**: Fast embedding generation
-- **Sentence Transformers 5.0.0+**: Local embedding models
-- **PyTorch 2.5.1**: Deep learning framework with CUDA support
-- **Tree-sitter**: Multi-language parsing for code analysis
+## Web Crawling & Processing
+- **Crawl4AI** v0.6.2 - Advanced web crawling engine
+- **AsyncWebCrawler** - Asynchronous crawling with context management
 
-## Data & Storage
-- **Qdrant**: Vector database for embeddings and semantic search
-- **Neo4j**: Knowledge graph database for code relationships
-- **Redis 5.0.0+**: Caching layer for embeddings and API responses
+## Databases & Storage
+- **Qdrant** >=1.12.0 - Vector database for semantic search
+- **Neo4j** >=5.28.1 - Graph database for code structure analysis  
+- **Redis** >=5.0.0 - Caching layer for embeddings and API responses
+
+## AI & Machine Learning
+- **OpenAI** v1.71.0 - LLM and embedding API client
+- **Sentence Transformers** >=5.0.0 - Text embeddings and cross-encoder reranking
+- **FastEmbed** >=0.4.0 - Efficient embedding computations
+- **PyTorch** (CUDA 12.1) - GPU acceleration for ML models
+
+## Multi-Language Code Analysis
+- **Tree-sitter** >=0.23.0 - Multi-language parsing framework
+- Language parsers: Python, JavaScript/TypeScript, Java, Go, Rust, C/C++, C#, PHP, Ruby, Kotlin
+
+## Testing & Quality
+- **pytest** >=8.4.1 - Testing framework with async support
+- **pytest-asyncio** >=1.1.0 - Async test support
+- **ruff** >=0.12.7 - Linting and code formatting
+
+## Package Management & Environment
+- **uv** - Fast Python package manager (preferred over pip/poetry)
+- **Docker & Docker Compose** - Service containerization
+- **dotenv** - Environment variable management
+
+## API Providers (Multi-provider support)
+- **OpenAI** - Default for chat and embeddings
+- **Azure OpenAI** - Enterprise alternative  
+- **DeepInfra** - Cost-effective provider
+- **Fallback configuration** - High availability setup
 
 ## Development Tools
-- **uv**: Fast Python package manager (preferred over pip)
-- **pytest 8.4.1+**: Testing framework with async support
-- **Ruff 0.12.7+**: Fast Python linter and formatter
-- **Docker**: Containerization for databases (Qdrant, Neo4j, Redis)
-
-## Multi-Language Parsing
-Tree-sitter parsers for:
-- Python, JavaScript, TypeScript
-- Java, Go, Rust, C/C++, C#
-- PHP, Ruby, Kotlin
-
-## API Providers (Flexible)
-- **OpenAI**: Default provider for chat and embeddings
-- **DeepInfra**: Cost-effective alternative
-- **Azure OpenAI**: Enterprise integration
-- **Custom Providers**: Any OpenAI-compatible API
-
-## Infrastructure
-- **Docker Compose**: Service orchestration
-- **Windows Support**: Optimized for Windows development
-- **Event Loop Fixes**: Windows-specific async handling
-- **GPU Acceleration**: CUDA support for reranking models
+- **Windows** - Primary development platform
+- **Git** - Version control
+- **setup.bat** - Windows service initialization script

@@ -7,20 +7,13 @@ including repository parsing, AI hallucination detection, and graph querying.
 
 import json
 import os
-import sys
-from pathlib import Path
 from typing import Dict, Any
 from ..utils.validation import validate_github_url
 from mcp.server.fastmcp import Context
 
-# Add knowledge_graphs folder to path for importing knowledge graph modules
-project_root = Path(__file__).resolve().parent.parent.parent
-knowledge_graphs_path = project_root / "knowledge_graphs"
-if str(knowledge_graphs_path) not in sys.path:
-    sys.path.append(str(knowledge_graphs_path))
-
-from ai_script_analyzer import AIScriptAnalyzer  # noqa: E402
-from hallucination_reporter import HallucinationReporter  # noqa: E402
+# Import k_graph components
+from ..k_graph.analysis.script_analyzer import AIScriptAnalyzer
+from ..k_graph.analysis.reporter import HallucinationReporter
 
 import logging  # noqa: E402
 

@@ -1,9 +1,0 @@
-# Tree-sitter Grammars Directory
-#
-# This directory contains auto-generated tree-sitter grammar files for multi-language parsing.
-# The grammars are downloaded and built automatically by knowledge_graphs/build_grammars.py
-#
-# Supported languages: Python, JavaScript, TypeScript, Java, Go, Rust, C
-#
-# To rebuild grammars, run:
-#   uv run python knowledge_graphs/build_grammars.py

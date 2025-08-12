@@ -271,10 +271,8 @@ class KnowledgeGraphSingleton:
             if knowledge_graphs_path not in sys.path:
                 sys.path.insert(0, knowledge_graphs_path)
 
-            from knowledge_graphs.knowledge_graph_validator import (
-                KnowledgeGraphValidator,
-            )
-            from knowledge_graphs.parse_repo_into_neo4j import DirectNeo4jExtractor
+            from ..k_graph.analysis.validator import KnowledgeGraphValidator
+            from ..k_graph.services.repository_parser import DirectNeo4jExtractor
 
             # Get Neo4j connection parameters
             neo4j_uri = os.getenv("NEO4J_URI")

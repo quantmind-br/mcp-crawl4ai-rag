@@ -541,8 +541,8 @@ async def index_github_repository(
     """
     try:
         # Import unified processing components
-        from ..services.unified_indexing_service import UnifiedIndexingService
-        from ..models.unified_indexing_models import (
+        from ..services.unified_indexing_service import (
+            UnifiedIndexingService,
             UnifiedIndexingRequest,
             IndexingDestination,
         )

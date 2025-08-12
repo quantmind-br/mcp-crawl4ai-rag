@@ -1,30 +1,28 @@
 # Project Overview
 
 ## Purpose
-Crawl4AI RAG MCP Server is an advanced web crawling and Retrieval-Augmented Generation (RAG) system designed for AI agents and coding assistants. It integrates:
+This is a Model Context Protocol (MCP) server that integrates Crawl4AI web crawling, Qdrant vector database, and Neo4j knowledge graph to provide AI agents and coding assistants with advanced capabilities:
 
-- **Crawl4AI**: Intelligent web crawling with sitemap detection, recursive crawling, and GitHub repository processing
-- **Qdrant**: Vector database for semantic search and embedding storage
-- **Neo4j**: Knowledge graph for code structure analysis and AI hallucination detection
-- **MCP (Model Context Protocol)**: Standardized interface for AI agent integration
+- **Web crawling and indexing** - Intelligent web crawling with auto-detection for sitemaps
+- **GitHub repository indexing** - Clone and index GitHub repositories with multi-language parsing
+- **Vector search and RAG** - Semantic search with contextual embeddings and reranking  
+- **AI hallucination detection** - Validate AI-generated code against knowledge graphs
+- **Multi-language code analysis** - Tree-sitter parsers for Python, JavaScript, Java, Go, Rust, C/C++
 
 ## Key Features
-1. **Web Crawling**: Smart URL detection, sitemap processing, recursive crawling
-2. **GitHub Integration**: Repository cloning, documentation indexing, code structure analysis
-3. **RAG Capabilities**: Hybrid search (semantic + keyword), contextual embeddings, reranking
-4. **AI Hallucination Detection**: Code validation using knowledge graphs and AST analysis
-5. **Multi-Language Support**: Tree-sitter parsers for Python, JavaScript, Java, Go, Rust, C/C++, TypeScript, etc.
-6. **Advanced RAG Strategies**: Contextual embeddings, hybrid search, agentic RAG, GPU acceleration
+- **MCP Tool Architecture** - FastMCP-based server with async tools organized by functionality
+- **Dual Database Strategy** - Qdrant for vectors, Neo4j for code structure graphs
+- **Advanced RAG Strategies** - Hybrid search, contextual embeddings, agentic RAG, reranking
+- **Multi-Provider API Support** - OpenAI, Azure, DeepInfra with fallback configuration
+- **Docker-based Services** - Containerized Qdrant, Neo4j, and Redis services
+- **GPU Acceleration** - Auto-detection for reranking models with CUDA/MPS support
 
-## Architecture
-- **MCP Server**: FastMCP-based async server with SSE/stdio transport
-- **Vector Database**: Qdrant for semantic search and storage
-- **Knowledge Graph**: Neo4j for code relationships and validation
-- **Multi-Provider Support**: OpenAI, Azure OpenAI, DeepInfra with fallback configurations
-- **Device Management**: Automatic GPU/CPU detection and optimization
+## Architecture Components
+- **MCP Server**: `src/core/app.py` - FastMCP application with async context management
+- **Tools**: `src/tools/` - MCP tools (web_tools.py, github_tools.py, rag_tools.py, kg_tools.py)
+- **Services**: `src/services/` - Core business logic (RAG, embedding, unified indexing)
+- **Clients**: `src/clients/` - Database and API integrations
+- **Knowledge Graphs**: `src/k_graph/` - Multi-language code analysis with Tree-sitter
 
 ## Target Users
-- AI coding assistants requiring documentation and code knowledge
-- Developers building AI agents with web crawling capabilities
-- Teams needing intelligent code analysis and hallucination detection
-- Projects requiring advanced RAG capabilities for technical content
+AI agents, coding assistants, and developers needing advanced RAG capabilities with web crawling and code analysis features.

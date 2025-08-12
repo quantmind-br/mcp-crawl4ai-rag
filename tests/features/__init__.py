@@ -1,1 +1,0 @@
-# Features tests package

@@ -89,45 +89,54 @@ def get_optimal_device(preference: str = "auto", gpu_index: int = 0) -> DeviceIn
         )
 
     # Try GPU (CUDA or MPS) if requested or auto
-    if preference in ["auto", "cuda"] and torch.cuda.is_available():
+    if preference in ["auto", "cuda"]:
         try:
-            # CRITICAL: Test actual GPU operations, not just availability
-            device = torch.device(f"cuda:{gpu_index}")
-
-            # Verify GPU works with actual tensor operations
-            test_tensor = torch.randn(10, 10, device=device)
-            _ = test_tensor @ test_tensor.T  # Matrix multiplication test
-
-            # Try to fetch device name; guard against mock environments
-            try:
-                device_name = torch.cuda.get_device_name(device)
-            except Exception:
-                device_name = str(device)
-
-            logging.info(f"GPU device verified: {device} ({device_name})")
-
-            # Get model kwargs for GPU device
-            model_kwargs = get_model_kwargs_for_device(device, precision)
-
-            # Try to fetch total memory; guard against mock environments
-            try:
-                total_memory_gb = torch.cuda.get_device_properties(
-                    device
-                ).total_memory / (1024**3)
-            except Exception:
-                total_memory_gb = None
-
-            return DeviceInfo(
-                device=str(device),
-                device_type="cuda",
-                name=device_name,
-                memory_total=total_memory_gb,
-                is_available=True,
-                model_kwargs=model_kwargs,
-            )
-
+            cuda_available = torch.cuda.is_available()
         except Exception as e:
-            logging.warning(f"GPU test failed: {e}. Falling back to CPU.")
+            logging.warning(
+                f"Error checking CUDA availability: {e}. Falling back to CPU."
+            )
+            cuda_available = False
+
+        if cuda_available:
+            try:
+                # CRITICAL: Test actual GPU operations, not just availability
+                device = torch.device(f"cuda:{gpu_index}")
+
+                # Verify GPU works with actual tensor operations
+                test_tensor = torch.randn(10, 10, device=device)
+                _ = test_tensor @ test_tensor.T  # Matrix multiplication test
+
+                # Try to fetch device name; guard against mock environments
+                try:
+                    device_name = torch.cuda.get_device_name(device)
+                except Exception:
+                    device_name = str(device)
+
+                logging.info(f"GPU device verified: {device} ({device_name})")
+
+                # Get model kwargs for GPU device
+                model_kwargs = get_model_kwargs_for_device(device, precision)
+
+                # Try to fetch total memory; guard against mock environments
+                try:
+                    total_memory_gb = torch.cuda.get_device_properties(
+                        device
+                    ).total_memory / (1024**3)
+                except Exception:
+                    total_memory_gb = None
+
+                return DeviceInfo(
+                    device=str(device),
+                    device_type="cuda",
+                    name=device_name,
+                    memory_total=total_memory_gb,
+                    is_available=True,
+                    model_kwargs=model_kwargs,
+                )
+
+            except Exception as e:
+                logging.warning(f"GPU test failed: {e}. Falling back to CPU.")
 
     # Try MPS (Apple Silicon) if requested or auto
     if preference in ["auto", "mps"]:
