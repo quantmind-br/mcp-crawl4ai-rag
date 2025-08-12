@@ -14,10 +14,13 @@ from mcp.server.fastmcp import Context
 
 # MCP decorator will be applied when module is imported
 # This allows for flexible registration patterns
-from ..features.github_processor import (
-    GitHubRepoManager,
-    GitHubMetadataExtractor,
+# Updated imports for modular architecture
+from ..features.github import (
+    GitRepository as GitHubRepoManager,  # Alias for compatibility
+    MetadataExtractor as GitHubMetadataExtractor,  # Alias for compatibility
     MultiFileDiscovery,
+)
+from ..features.github.processors import (
     PythonProcessor,
     TypeScriptProcessor,
     ConfigProcessor,
@@ -129,7 +132,11 @@ async def smart_crawl_github(
         repo_path = repo_manager.clone_repository(repo_url, max_size_mb)
 
         # Extract repository metadata
-        repo_metadata = metadata_extractor.extract_repo_metadata(repo_url, repo_path)
+        repo_metadata_obj = metadata_extractor.extract_repo_metadata(
+            repo_url, repo_path
+        )
+        # Convert to dictionary for compatibility with existing code
+        repo_metadata = metadata_extractor.create_metadata_dict(repo_metadata_obj)
 
         # Discover files of specified types
         discovered_files = file_discovery.discover_files(
@@ -191,8 +198,8 @@ async def smart_crawl_github(
                 file_type_stats[file_ext]["items"] += len(extracted_items)
 
                 for item in extracted_items:
-                    # Create document for chunking
-                    content = item["content"]
+                    # Create document for chunking (item is now ProcessedContent object)
+                    content = item.content
                     file_url = f"{repo_url}/blob/main/{relative_path}"
 
                     # Accumulate content for repository summary
@@ -203,11 +210,11 @@ async def smart_crawl_github(
                     # Create metadata
                     metadata = {
                         "file_path": relative_path,
-                        "type": item["type"],
-                        "name": item["name"],
-                        "signature": item.get("signature"),
-                        "line_number": item.get("line_number"),
-                        "language": item["language"],
+                        "type": item.content_type,
+                        "name": item.name,
+                        "signature": item.signature,
+                        "line_number": item.line_number,
+                        "language": item.language,
                         "repo_url": repo_url,
                         "source_type": "github_repository",
                         "url": file_url,
@@ -394,8 +401,6 @@ async def smart_crawl_github(
             repo_manager.cleanup()
 
 
-
-
 async def index_github_repository(
     ctx: Context,
     repo_url: str,
@@ -407,12 +412,12 @@ async def index_github_repository(
 ) -> str:
     """
     🚀 UNIFIED GITHUB REPOSITORY INDEXING TOOL 🚀
-    
-    **PRIMARY PURPOSE**: 
-    Intelligent dual-system repository processing that simultaneously indexes GitHub repositories 
-    for both semantic search (Qdrant vector database) and code understanding (Neo4j knowledge graph), 
+
+    **PRIMARY PURPOSE**:
+    Intelligent dual-system repository processing that simultaneously indexes GitHub repositories
+    for both semantic search (Qdrant vector database) and code understanding (Neo4j knowledge graph),
     enabling comprehensive code analysis, similarity search, and relationship discovery.
-    
+
     **CORE CAPABILITIES**:
     ✅ **Dual-System Processing**: Simultaneous RAG (Retrieval Augmented Generation) and Knowledge Graph indexing
     ✅ **Multi-Language Support**: Python, JavaScript, TypeScript, Go, Java, C/C++, Rust, Markdown, JSON, YAML
@@ -420,28 +425,28 @@ async def index_github_repository(
     ✅ **Cross-System Linking**: Consistent file_id metadata enables correlation between vector search and graph queries
     ✅ **Selective Processing**: Choose Qdrant-only, Neo4j-only, or both systems based on use case
     ✅ **Production Ready**: Robust error handling, progress tracking, and comprehensive statistics
-    
+
     **WHEN TO USE THIS TOOL**:
     🎯 **Code Analysis**: Understanding repository structure, functions, classes, and dependencies
-    🎯 **Semantic Search**: Finding relevant code snippets, documentation, and similar patterns  
+    🎯 **Semantic Search**: Finding relevant code snippets, documentation, and similar patterns
     🎯 **AI Development**: Building context for code generation, debugging, and explanation tools
     🎯 **Repository Discovery**: Exploring unknown codebases and understanding architectural patterns
     🎯 **Cross-Reference Analysis**: Linking documentation with implementation across large projects
-    
+
     **OUTPUT SYSTEMS EXPLAINED**:
-    
+
     📊 **QDRANT (Vector Database)**:
     - **Purpose**: Semantic similarity search and RAG applications
     - **Data Stored**: Text chunks (code + docs) converted to high-dimensional vectors
     - **Use Cases**: "Find similar functions", "Search relevant documentation", "Code completion context"
     - **Query Methods**: Vector similarity, hybrid search, metadata filtering
-    
-    🕸️ **NEO4J (Knowledge Graph)**:  
+
+    🕸️ **NEO4J (Knowledge Graph)**:
     - **Purpose**: Code structure analysis and relationship discovery
     - **Data Stored**: Classes, functions, methods, imports, file relationships as graph nodes/edges
     - **Use Cases**: "Find all callers of function X", "Show class hierarchy", "Detect circular dependencies"
     - **Query Methods**: Cypher graph queries, pattern matching, relationship traversal
-    
+
     **SUPPORTED FILE TYPES & LANGUAGES**:
     🐍 **Python** (.py): Classes, functions, methods, imports, docstrings
     🟨 **JavaScript/TypeScript** (.js, .ts, .tsx): Functions, classes, exports, imports, JSDoc
@@ -451,36 +456,36 @@ async def index_github_repository(
     ⚡ **C/C++** (.c, .cpp, .h, .hpp): Functions, classes, headers, includes
     📝 **Documentation** (.md, .rst, .txt): Content chunks for context and search
     📋 **Configuration** (.json, .yaml, .yml, .toml): Structured data for project context
-    
+
     **INTELLIGENT PROCESSING FEATURES**:
     🧠 **Content-Aware Chunking**: Splits large files intelligently at sentence boundaries
     🔄 **Batch Processing**: Optimized concurrent processing with resource management
-    📈 **Progress Tracking**: Real-time processing statistics and error reporting  
+    📈 **Progress Tracking**: Real-time processing statistics and error reporting
     🛡️ **Error Resilience**: Individual file failures don't stop overall processing
     🔗 **Cross-System Consistency**: Same file_id used across both Qdrant and Neo4j for data correlation
-    
+
     **PERFORMANCE CHARACTERISTICS**:
     ⚡ **Speed**: 50-70% faster than separate indexing tools
     💾 **Memory Efficient**: Streaming processing prevents memory exhaustion
     🔄 **Concurrent**: Parallel file processing with intelligent batching
     📊 **Scalable**: Handles repositories from small projects to enterprise codebases
-    
+
     **PARAMETER GUIDANCE**:
-    
+
     Args:
         ctx: The MCP server provided context (automatically provided)
         repo_url: GitHub repository URL (e.g., 'https://github.com/user/repo')
                   ⚠️  Must be publicly accessible or have proper authentication
         destination: Target indexing system(s):
                     • "qdrant" = Vector search only (fast semantic search, AI applications)
-                    • "neo4j" = Knowledge graph only (code structure analysis, dependencies) 
+                    • "neo4j" = Knowledge graph only (code structure analysis, dependencies)
                     • "both" = Dual system (comprehensive analysis, recommended default)
         file_types: File extensions to process (default: ['.md'] for documentation)
                    📝 Popular combinations:
                    • ['.md', '.py'] = Python project with docs
                    • ['.js', '.ts', '.tsx'] = React/Node.js project
                    • ['.go'] = Go project
-                   • ['.java'] = Java project  
+                   • ['.java'] = Java project
                    • ['.md', '.py', '.js', '.json'] = Multi-language project
         max_files: Maximum files to process (default: 50)
                   🎯 Recommended: 20-100 for exploration, 500+ for full indexing
@@ -498,48 +503,48 @@ async def index_github_repository(
         • 🔍 File-level details (individual processing results, errors)
         • 🏷️  Detected languages and file types
         • 🔗 Cross-system linking information
-        
+
     **EXAMPLE USAGE PATTERNS**:
-    
+
     🔍 **Quick Documentation Search**:
     ```
     index_github_repository("https://github.com/user/docs-repo", destination="qdrant", file_types=[".md"])
     ```
-    
+
     🏗️ **Full Code Analysis**:
     ```
-    index_github_repository("https://github.com/user/code-repo", destination="both", 
+    index_github_repository("https://github.com/user/code-repo", destination="both",
                            file_types=[".py", ".js", ".md"], max_files=200)
     ```
-    
-    🕸️ **Dependency Analysis Only**:  
+
+    🕸️ **Dependency Analysis Only**:
     ```
-    index_github_repository("https://github.com/user/app", destination="neo4j", 
+    index_github_repository("https://github.com/user/app", destination="neo4j",
                            file_types=[".py", ".js"], max_files=100)
     ```
-    
+
     **ERROR HANDLING & TROUBLESHOOTING**:
     🚨 **Common Issues**:
     • Repository too large: Increase max_size_mb or reduce file scope
     • Rate limiting: Wait and retry, or use smaller max_files batches
     • Memory issues: Reduce chunk_size and max_files
     • Network timeouts: Retry with stable connection
-    
+
     **INTEGRATION RECOMMENDATIONS**:
     🔄 **After Indexing**: Use perform_rag_query and query_knowledge_graph tools for analysis
     🔍 **Query Patterns**: Combine vector similarity search with graph relationship queries
     📈 **Monitoring**: Check processing statistics to optimize parameters for your use case
-    
+
     This tool represents a significant advancement in automated code understanding,
-    combining the power of modern vector search with traditional graph analysis 
+    combining the power of modern vector search with traditional graph analysis
     for comprehensive repository intelligence.
     """
     try:
         # Import unified processing components
         from ..services.unified_indexing_service import UnifiedIndexingService
         from ..models.unified_indexing_models import (
-            UnifiedIndexingRequest, 
-            IndexingDestination
+            UnifiedIndexingRequest,
+            IndexingDestination,
         )
         from ..utils.validation import validate_github_url
 
@@ -551,7 +556,7 @@ async def index_github_repository(
                     "success": False,
                     "repo_url": repo_url,
                     "error": f"Invalid GitHub URL: {error_msg}",
-                    "tool": "index_github_repository"
+                    "tool": "index_github_repository",
                 },
                 indent=2,
             )
@@ -564,16 +569,16 @@ async def index_github_repository(
         destination_mapping = {
             "qdrant": IndexingDestination.QDRANT,
             "neo4j": IndexingDestination.NEO4J,
-            "both": IndexingDestination.BOTH
+            "both": IndexingDestination.BOTH,
         }
-        
+
         if destination.lower() not in destination_mapping:
             return json.dumps(
                 {
                     "success": False,
                     "repo_url": repo_url,
                     "error": f"Invalid destination '{destination}'. Must be 'qdrant', 'neo4j', or 'both'",
-                    "tool": "index_github_repository"
+                    "tool": "index_github_repository",
                 },
                 indent=2,
             )
@@ -585,18 +590,20 @@ async def index_github_repository(
             file_types=file_types,
             max_files=max_files,
             chunk_size=chunk_size,
-            max_size_mb=max_size_mb
+            max_size_mb=max_size_mb,
         )
 
         # Initialize unified indexing service with context clients
-        qdrant_client = getattr(ctx.request_context.lifespan_context, 'qdrant_client', None)
-        
+        qdrant_client = getattr(
+            ctx.request_context.lifespan_context, "qdrant_client", None
+        )
+
         service = UnifiedIndexingService(qdrant_client=qdrant_client)
-        
+
         try:
             # Process repository using unified service
             response = await service.process_repository_unified(request)
-            
+
             # Convert response to JSON format
             result = {
                 "success": response.success,
@@ -606,57 +613,71 @@ async def index_github_repository(
                 "destination": response.destination,
                 "processing_summary": {
                     "files_processed": response.files_processed,
-                    "files_successful": len([r for r in response.file_results if r.is_successful]),
+                    "files_successful": len(
+                        [r for r in response.file_results if r.is_successful]
+                    ),
                     "success_rate_percent": round(response.success_rate, 1),
-                    "processing_time_seconds": round(response.processing_time_seconds, 2)
+                    "processing_time_seconds": round(
+                        response.processing_time_seconds, 2
+                    ),
                 },
                 "storage_summary": {
                     "qdrant_documents": response.qdrant_documents,
                     "neo4j_nodes": response.neo4j_nodes,
-                    "cross_system_links": response.cross_system_links_created
+                    "cross_system_links": response.cross_system_links_created,
                 },
                 "performance_metrics": response.performance_summary,
-                "file_types_processed": list(set(r.file_type for r in response.file_results)),
-                "languages_detected": list(set(r.language for r in response.file_results)),
+                "file_types_processed": list(
+                    set(r.file_type for r in response.file_results)
+                ),
+                "languages_detected": list(
+                    set(r.language for r in response.file_results)
+                ),
                 "error_summary": response.error_summary,
                 "request_parameters": {
                     "destination": destination,
                     "file_types": file_types,
                     "max_files": max_files,
                     "chunk_size": chunk_size,
-                    "max_size_mb": max_size_mb
-                }
+                    "max_size_mb": max_size_mb,
+                },
             }
-            
+
             # Add file-level details if requested (first 10 files for brevity)
             if response.file_results:
                 result["file_details"] = []
                 for file_result in response.file_results[:10]:
-                    result["file_details"].append({
-                        "file_id": file_result.file_id,
-                        "relative_path": file_result.relative_path,
-                        "language": file_result.language,
-                        "file_type": file_result.file_type,
-                        "processed_for_rag": file_result.processed_for_rag,
-                        "processed_for_kg": file_result.processed_for_kg,
-                        "rag_chunks": file_result.rag_chunks,
-                        "kg_entities": file_result.kg_entities,
-                        "processing_time_seconds": round(file_result.processing_time_seconds, 3),
-                        "summary": file_result.processing_summary,
-                        "errors": file_result.errors
-                    })
-                
+                    result["file_details"].append(
+                        {
+                            "file_id": file_result.file_id,
+                            "relative_path": file_result.relative_path,
+                            "language": file_result.language,
+                            "file_type": file_result.file_type,
+                            "processed_for_rag": file_result.processed_for_rag,
+                            "processed_for_kg": file_result.processed_for_kg,
+                            "rag_chunks": file_result.rag_chunks,
+                            "kg_entities": file_result.kg_entities,
+                            "processing_time_seconds": round(
+                                file_result.processing_time_seconds, 3
+                            ),
+                            "summary": file_result.processing_summary,
+                            "errors": file_result.errors,
+                        }
+                    )
+
                 if len(response.file_results) > 10:
-                    result["file_details"].append({
-                        "note": f"Showing first 10 of {len(response.file_results)} files processed"
-                    })
+                    result["file_details"].append(
+                        {
+                            "note": f"Showing first 10 of {len(response.file_results)} files processed"
+                        }
+                    )
 
             return json.dumps(result, indent=2)
-            
+
         finally:
             # Clean up service resources
             await service.cleanup()
-            
+
     except ImportError as e:
         return json.dumps(
             {
@@ -664,7 +685,7 @@ async def index_github_repository(
                 "repo_url": repo_url,
                 "error": f"Unified indexing service not available: {str(e)}",
                 "tool": "index_github_repository",
-                "suggestion": "Ensure unified indexing dependencies are installed"
+                "suggestion": "Ensure unified indexing dependencies are installed",
             },
             indent=2,
         )
@@ -674,7 +695,7 @@ async def index_github_repository(
                 "success": False,
                 "repo_url": repo_url,
                 "error": str(e),
-                "tool": "index_github_repository"
+                "tool": "index_github_repository",
             },
             indent=2,
         )

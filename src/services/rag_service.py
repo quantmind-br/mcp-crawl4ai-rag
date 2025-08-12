@@ -409,7 +409,12 @@ def add_documents_to_vector_db(
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_documents_to_qdrant(
-            urls, chunk_numbers, contents, enhanced_metadatas, url_to_full_document, batch_size
+            urls,
+            chunk_numbers,
+            contents,
+            enhanced_metadatas,
+            url_to_full_document,
+            batch_size,
         )
     )
 
@@ -572,13 +577,20 @@ def add_code_examples_to_vector_db(
         enhanced_metadata = metadata.copy()
         if file_ids and i < len(file_ids) and file_ids[i]:
             enhanced_metadata["file_id"] = file_ids[i]
-            logger.debug(f"Added file_id '{file_ids[i]}' to metadata for code example {i}")
+            logger.debug(
+                f"Added file_id '{file_ids[i]}' to metadata for code example {i}"
+            )
         enhanced_metadatas.append(enhanced_metadata)
 
     # Get point batches from Qdrant client (this handles URL deletion)
     point_batches = list(
         client.add_code_examples_to_qdrant(
-            urls, chunk_numbers, code_examples, summaries, enhanced_metadatas, batch_size
+            urls,
+            chunk_numbers,
+            code_examples,
+            summaries,
+            enhanced_metadatas,
+            batch_size,
         )
     )
 

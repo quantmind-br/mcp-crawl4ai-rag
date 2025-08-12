@@ -17,11 +17,13 @@ from unittest.mock import Mock, patch, mock_open
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from features.github_processor import (
-    GitHubRepoManager,
+from features.github.repository.git_operations import GitRepository
+from features.github.repository.metadata_extractor import MetadataExtractor
+from features.github.discovery import (
     MarkdownDiscovery,
-    GitHubMetadataExtractor,
     MultiFileDiscovery,
+)
+from features.github.processors import (
     PythonProcessor,
     TypeScriptProcessor,
     ConfigProcessor,
@@ -30,20 +32,20 @@ from features.github_processor import (
 from utils.validation import validate_github_url, normalize_github_url
 
 
-class TestGitHubRepoManager:
+class TestGitRepository:
     """Test cases for GitHubRepoManager class."""
 
     def test_init(self):
         """Test initialization of GitHubRepoManager."""
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
         assert manager.temp_dirs == []
         assert manager.logger is not None
 
     def test_is_valid_github_url(self):
         """Test GitHub URL validation."""
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
 
         # Valid URLs
         assert manager._is_valid_github_url("https://github.com/user/repo") is True
@@ -74,10 +76,10 @@ class TestGitHubRepoManager:
             == "https://github.com/user/repo.git"
         )
 
-    @patch("features.github_processor.tempfile.mkdtemp")
-    @patch("features.github_processor.subprocess.run")
-    @patch("features.github_processor.os.walk")
-    @patch("features.github_processor.os.path.getsize")
+    @patch("features.github.repository.git_operations.tempfile.mkdtemp")
+    @patch("features.github.repository.git_operations.subprocess.run")
+    @patch("features.github.repository.git_operations.os.walk")
+    @patch("features.github.repository.git_operations.os.path.getsize")
     def test_clone_repository_success(
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
@@ -89,7 +91,7 @@ class TestGitHubRepoManager:
         mock_walk.return_value = [("/tmp/test_clone", [], ["file1.md", "file2.txt"])]
         mock_getsize.side_effect = [1024, 2048]  # File sizes
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
 
         # Test
         result = manager.clone_repository("https://github.com/user/repo")
@@ -111,14 +113,14 @@ class TestGitHubRepoManager:
             timeout=300,
         )
 
-    @patch("features.github_processor.tempfile.mkdtemp")
-    @patch("features.github_processor.subprocess.run")
+    @patch("features.github.repository.git_operations.tempfile.mkdtemp")
+    @patch("features.github.repository.git_operations.subprocess.run")
     def test_clone_repository_invalid_url(self, mock_subprocess, mock_mkdtemp):
         """Test cloning with invalid URL."""
 
         mock_mkdtemp.return_value = "/tmp/test_clone"
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
 
         with pytest.raises(ValueError, match="Invalid GitHub repository URL"):
             manager.clone_repository("https://gitlab.com/user/repo")
@@ -136,10 +138,10 @@ class TestGitHubRepoManager:
         with pytest.raises(RuntimeError, match="Git clone failed"):
             manager.clone_repository("https://github.com/user/nonexistent")
 
-    @patch("features.github_processor.tempfile.mkdtemp")
-    @patch("features.github_processor.subprocess.run")
-    @patch("features.github_processor.os.walk")
-    @patch("features.github_processor.os.path.getsize")
+    @patch("features.github.repository.git_operations.tempfile.mkdtemp")
+    @patch("features.github.repository.git_operations.subprocess.run")
+    @patch("features.github.repository.git_operations.os.walk")
+    @patch("features.github.repository.git_operations.os.path.getsize")
     def test_clone_repository_too_large(
         self, mock_getsize, mock_walk, mock_subprocess, mock_mkdtemp
     ):
@@ -151,7 +153,7 @@ class TestGitHubRepoManager:
         mock_walk.return_value = [("/tmp/test_clone", [], ["large_file.bin"])]
         mock_getsize.return_value = 600 * 1024 * 1024  # 600MB file
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
 
         with pytest.raises(RuntimeError, match="Repository too large"):
             manager.clone_repository(
@@ -165,7 +167,7 @@ class TestGitHubRepoManager:
 
         mock_exists.return_value = True
 
-        manager = GitHubRepoManager()
+        manager = GitRepository()
         manager.temp_dirs = ["/tmp/dir1", "/tmp/dir2"]
 
         manager.cleanup()
@@ -255,8 +257,8 @@ class TestMarkdownDiscovery:
         # README files should have higher priority
         assert readme_priority[0] > regular_priority[0]
 
-    @patch("features.github_processor.os.walk")
-    @patch("features.github_processor.os.stat")
+    @patch("features.github.discovery.markdown_discovery.os.walk")
+    @patch("features.github.discovery.markdown_discovery.os.stat")
     @patch("builtins.open", new_callable=mock_open)
     def test_discover_markdown_files(self, mock_file, mock_stat, mock_walk):
         """Test markdown file discovery."""
@@ -284,19 +286,19 @@ class TestMarkdownDiscovery:
         assert all("relative_path" in f for f in result)
 
 
-class TestGitHubMetadataExtractor:
+class TestMetadataExtractor:
     """Test cases for GitHubMetadataExtractor class."""
 
     def test_init(self):
         """Test initialization of GitHubMetadataExtractor."""
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
         assert extractor.logger is not None
 
     def test_parse_repo_info(self):
         """Test repository information parsing."""
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
 
         # Test various URL formats
         owner, repo = extractor._parse_repo_info("https://github.com/user/repo")
@@ -312,7 +314,7 @@ class TestGitHubMetadataExtractor:
             extractor._parse_repo_info("https://github.com/user")
 
     @patch("builtins.open", new_callable=mock_open)
-    @patch("features.github_processor.os.path.exists")
+    @patch("features.github.repository.metadata_extractor.os.path.exists")
     def test_extract_package_info_nodejs(self, mock_exists, mock_file):
         """Test package.json extraction."""
 
@@ -326,7 +328,7 @@ class TestGitHubMetadataExtractor:
         }
         mock_file.return_value.read.return_value = str(package_json).replace("'", '"')
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
 
         with patch("json.load", return_value=package_json):
             result = extractor._extract_package_info("/repo")
@@ -338,7 +340,7 @@ class TestGitHubMetadataExtractor:
         assert result["license"] == "MIT"
 
     @patch("builtins.open", new_callable=mock_open)
-    @patch("features.github_processor.os.path.exists")
+    @patch("features.github.repository.metadata_extractor.os.path.exists")
     def test_extract_package_info_python(self, mock_exists, mock_file):
         """Test pyproject.toml extraction."""
 
@@ -353,7 +355,7 @@ class TestGitHubMetadataExtractor:
 
         mock_file.return_value.read.return_value = toml_content
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
         result = extractor._extract_package_info("/repo")
 
         assert result["language"] == "python"
@@ -384,7 +386,7 @@ class TestGitHubMetadataExtractor:
 
         assert result["readme_title"] == "Test Project"
 
-    @patch("features.github_processor.subprocess.run")
+    @patch("features.github.repository.metadata_extractor.subprocess.run")
     def test_extract_git_info(self, mock_subprocess):
         """Test Git information extraction."""
 
@@ -393,7 +395,7 @@ class TestGitHubMetadataExtractor:
             returncode=0, stdout="abc123|Initial commit|2024-01-15 10:30:00 +0000"
         )
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
         result = extractor._extract_git_info("/repo")
 
         assert result["latest_commit_hash"] == "abc123"
@@ -403,7 +405,7 @@ class TestGitHubMetadataExtractor:
     def test_extract_repo_metadata_integration(self):
         """Test complete repository metadata extraction."""
 
-        extractor = GitHubMetadataExtractor()
+        extractor = MetadataExtractor()
 
         with (
             patch.object(extractor, "_parse_repo_info", return_value=("user", "repo")),

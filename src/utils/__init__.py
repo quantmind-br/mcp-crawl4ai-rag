@@ -2,10 +2,11 @@
 Utility modules for the Crawl4AI MCP server.
 """
 
-from src.features.github_processor import (
-    GitHubRepoManager,
+# Updated imports for modular architecture
+from src.features.github import (
+    GitRepository as GitHubRepoManager,
     MarkdownDiscovery,
-    GitHubMetadataExtractor,
+    MetadataExtractor as GitHubMetadataExtractor,
 )
 from .validation import validate_github_url
 from .grammar_initialization import initialize_grammars_if_needed

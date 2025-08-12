@@ -67,15 +67,23 @@ def extract_source_summary(source_id: str, content: str, max_length: int = 500) 
 
     for line in lines:
         line = line.strip()
-        if line and total_length + len(line) < max_length:
-            summary_lines.append(line)
-            total_length += len(line) + 1  # +1 for newline
-        else:
-            break
+        if line:
+            if total_length + len(line) <= max_length - 3:  # Reserve space for "..."
+                summary_lines.append(line)
+                total_length += len(line) + 1  # +1 for newline
+            else:
+                # If this line is too long, truncate it and add it
+                if not summary_lines:  # Only if we haven't added anything yet
+                    truncated_line = line[: max_length - 3]
+                    summary_lines.append(truncated_line)
+                    total_length = len(truncated_line)
+                break
 
     summary = " ".join(summary_lines)
-    if total_length >= max_length:
-        summary = summary[: max_length - 3] + "..."
+    if len(content.strip()) > max_length or total_length >= max_length - 3:
+        if len(summary) > max_length - 3:
+            summary = summary[: max_length - 3]
+        summary += "..."
 
     return summary or f"Content from {source_id}"
 

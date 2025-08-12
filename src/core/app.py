@@ -28,28 +28,29 @@ logger = logging.getLogger(__name__)
 
 class ContextSingleton:
     """Singleton for managing the application context to avoid multiple initializations."""
-    
+
     _instance: Optional["ContextSingleton"] = None
     _context: Optional[Crawl4AIContext] = None
     _initializing: bool = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     async def get_context(self, server: FastMCP) -> Crawl4AIContext:
         """Get the application context, initializing if necessary."""
         if self._context is not None:
             return self._context
-            
+
         if self._initializing:
             # Wait for initialization to complete
             import asyncio
+
             while self._initializing:
                 await asyncio.sleep(0.01)
             return self._context
-        
+
         # Initialize the context
         self._initializing = True
         try:
@@ -57,7 +58,7 @@ class ContextSingleton:
             return self._context
         finally:
             self._initializing = False
-    
+
     async def _initialize_context(self, server: FastMCP) -> Crawl4AIContext:
         """Initialize the application context once."""
         logger.info("Starting application initialization...")
@@ -133,7 +134,10 @@ class ContextSingleton:
 
         # Initialize knowledge graph components (if available)
         knowledge_graph_singleton = KnowledgeGraphSingleton()
-        knowledge_validator, repo_extractor = await knowledge_graph_singleton.get_components_async()
+        (
+            knowledge_validator,
+            repo_extractor,
+        ) = await knowledge_graph_singleton.get_components_async()
 
         if knowledge_validator or repo_extractor:
             logger.info("Knowledge graph components initialized successfully")
@@ -150,16 +154,16 @@ class ContextSingleton:
 
         logger.info("Application initialization completed successfully")
         return context
-    
+
     async def cleanup(self):
         """Cleanup the singleton context."""
         if self._context:
             try:
                 await self._context.crawler.__aexit__(None, None, None)
-                
+
                 knowledge_graph_singleton = KnowledgeGraphSingleton()
                 await knowledge_graph_singleton.close_components()
-                
+
             except Exception as e:
                 logger.error(f"Error during context cleanup: {e}")
             finally:
@@ -203,8 +207,12 @@ class RerankingModelSingleton:
             )
 
             # Extract device from model_kwargs to avoid duplication
-            model_kwargs = device_info.model_kwargs.copy() if isinstance(device_info.model_kwargs, dict) else {}
-            
+            model_kwargs = (
+                device_info.model_kwargs.copy()
+                if isinstance(device_info.model_kwargs, dict)
+                else {}
+            )
+
             self._model = CrossEncoder(
                 model_name,
                 trust_remote_code=False,
@@ -364,17 +372,17 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
         Crawl4AIContext: The context containing all initialized application components
     """
     context_singleton = ContextSingleton()
-    
+
     try:
         # Get context from singleton (initializes once, reuses afterwards)
         context = await context_singleton.get_context(server)
         logger.info("Application context ready (using singleton pattern)")
         yield context
-        
+
     except Exception as e:
         logger.error(f"Error in application lifespan: {e}")
         raise
-        
+
     finally:
         # Note: We don't cleanup here since the singleton manages lifecycle
         # The cleanup happens when the singleton is explicitly cleaned up
@@ -385,12 +393,12 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
 async def cleanup_application() -> None:
     """
     Cleanup application resources managed by singletons.
-    
+
     This function should be called when the application is shutting down
     to properly cleanup all singleton resources.
     """
     logger.info("Starting application cleanup...")
-    
+
     try:
         context_singleton = ContextSingleton()
         await context_singleton.cleanup()
@@ -460,7 +468,7 @@ def register_tools(app: FastMCP) -> None:
 
         # Register GitHub tools manually with the app instance
         app.tool()(github_tools.smart_crawl_github)
-        
+
         # Register unified repository indexing tool with enhanced description
         app.tool(
             name="index_github_repository",
@@ -492,9 +500,11 @@ def register_tools(app: FastMCP) -> None:
             
             Returns comprehensive JSON with processing statistics, storage summary,
             performance metrics, and detailed file-level results.
-            """
+            """,
         )(github_tools.index_github_repository)
-        logger.info("GitHub tools imported and registered (including unified index_github_repository)")
+        logger.info(
+            "GitHub tools imported and registered (including unified index_github_repository)"
+        )
     except ImportError as e:
         logger.error(f"Failed to import GitHub tools: {e}")
 
