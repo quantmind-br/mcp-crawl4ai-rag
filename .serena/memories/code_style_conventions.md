@@ -1,69 +1,67 @@
 # Code Style and Conventions
 
-## Code Formatting & Linting
-- **Ruff** - Primary linting and formatting tool (>=0.12.7)
-  - Auto-fixing: `uv run ruff check --fix .`
-  - Formatting: `uv run ruff format .`
-  - Configuration in pyproject.toml
+## Language Standards
+- **Python 3.12+**: Use modern Python features and async/await patterns
+- **Type Hints**: Required for all function signatures and class attributes
+- **Docstrings**: Google-style docstrings for all public functions and classes
 
-## Python Style Guidelines
-- **Function signatures**: Type hints for all parameters and return values
-- **Async/await**: Consistent async patterns throughout codebase
-- **Docstrings**: Google-style docstrings for all public functions/classes
-- **Imports**: Organized with `# ruff: noqa: E402` when needed for test files
+## Code Organization
+### Import Order
+1. Standard library imports
+2. Third-party imports (crawl4ai, qdrant, openai, etc.)
+3. Local application imports
 
-## Naming Conventions
-- **Functions/variables**: snake_case (e.g., `perform_rag_query`, `match_count`)
-- **Classes**: PascalCase (e.g., `RagService`, `ContextSingleton`) 
-- **Constants**: UPPER_SNAKE_CASE (e.g., `USE_HYBRID_SEARCH`, `QDRANT_HOST`)
-- **Private members**: Leading underscore (e.g., `_internal_method`)
+### Naming Conventions
+- **Functions/Variables**: snake_case
+- **Classes**: PascalCase
+- **Constants**: UPPER_SNAKE_CASE
+- **Private methods**: _leading_underscore
+- **MCP Tools**: descriptive names with underscores (e.g., `crawl_single_page`)
 
-## Type Annotations
-- **Required**: All function parameters and return types
-- **Optional types**: `Optional[str] = None` pattern
-- **Context typing**: `ctx: Context` for MCP tools
-- **JSON returns**: Functions returning JSON use `-> str` with `json.dumps()`
+## Async Patterns
+- Use async/await for all I/O operations
+- Context managers for resource management
+- Singleton pattern for shared resources (crawlers, databases)
 
 ## Error Handling
-- **Try-catch blocks**: Comprehensive error handling in MCP tools
-- **JSON error responses**: Consistent error format with `{"success": False, "error": str(e)}`
-- **Logging**: Use `logger` from `logging` module for debug info
+- Use specific exception types
+- Comprehensive logging with structured messages
+- Graceful fallback for API failures
 
-## Documentation Standards
-- **Docstring format**:
-  ```python
-  async def function_name(param: type) -> return_type:
-      \"\"\"
-      Brief description.
+## Documentation Style
+### Function Docstrings
+```python
+def example_function(param: str) -> bool:
+    \"\"\"
+    Brief description of the function.
 
-      Detailed explanation of functionality and purpose.
+    Detailed explanation if needed, including behavior,
+    side effects, and usage examples.
 
-      Args:
-          param: Description of parameter
+    Args:
+        param: Description of the parameter
 
-      Returns:
-          Description of return value
-      \"\"\"
-  ```
+    Returns:
+        Description of return value
 
-## File Organization
-- **MCP Tools**: One tool per function in `src/tools/`
-- **Services**: Business logic in `src/services/`
-- **Clients**: External API wrappers in `src/clients/`
-- **Tests**: Mirror source structure in `tests/`
+    Raises:
+        SpecificException: When this exception occurs
+    \"\"\"
+```
 
-## Import Organization
-- **Standard library** first
-- **Third-party packages** second  
-- **Local imports** last
-- **Relative imports**: Use `from ..services import` pattern
+### Class Docstrings
+```python
+class ExampleClass:
+    \"\"\"
+    Brief description of the class purpose.
+    
+    Detailed explanation of the class responsibilities,
+    usage patterns, and important implementation details.
+    \"\"\"
+```
 
-## Configuration Patterns
-- **Environment variables**: All config via .env files
-- **Singleton patterns**: Context, reranking models, knowledge graph
-- **Default values**: Provide sensible defaults for optional parameters
-
-## Unicode Guidelines (CRITICAL for Windows)
-- **NEVER use Unicode characters**: ✅ ❌ 🚀 🔧 etc.
-- **ASCII alternatives only**: "SUCCESS", "FAILED", "ERROR"
-- **Console compatibility**: All output must work in Windows cmd (cp1252)
+## File Organization Patterns
+- One main class per file
+- Related utility functions in the same module
+- Clear separation between interfaces, implementations, and utilities
+- Factory patterns for object creation (e.g., parser_factory.py)

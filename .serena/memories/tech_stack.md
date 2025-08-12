@@ -1,46 +1,36 @@
 # Technology Stack
 
-## Core Framework & Protocol
-- **MCP (Model Context Protocol)** v1.7.1 - AI agent integration framework
-- **FastMCP** - Async MCP server implementation 
-- **Python 3.12+** - Primary programming language
+## Core Framework
+- **Python 3.12+**: Main language with modern async/await patterns
+- **FastMCP**: MCP server framework for tool registration
+- **uv**: Package manager for dependency management
 
-## Web Crawling & Processing
-- **Crawl4AI** v0.6.2 - Advanced web crawling engine
-- **AsyncWebCrawler** - Asynchronous crawling with context management
+## External Dependencies
+### Web Crawling
+- **Crawl4AI 0.6.2**: Web crawling and content extraction
+- **requests**: HTTP operations
 
-## Databases & Storage
-- **Qdrant** >=1.12.0 - Vector database for semantic search
-- **Neo4j** >=5.28.1 - Graph database for code structure analysis  
-- **Redis** >=5.0.0 - Caching layer for embeddings and API responses
+### Vector Database & Search
+- **Qdrant**: Vector database for semantic search
+- **OpenAI**: LLM API and embeddings
+- **sentence-transformers**: Text embeddings and reranking
+- **fastembed**: Embedding optimization
 
-## AI & Machine Learning
-- **OpenAI** v1.71.0 - LLM and embedding API client
-- **Sentence Transformers** >=5.0.0 - Text embeddings and cross-encoder reranking
-- **FastEmbed** >=0.4.0 - Efficient embedding computations
-- **PyTorch** (CUDA 12.1) - GPU acceleration for ML models
+### Knowledge Graph
+- **Neo4j**: Graph database for code structure analysis
+- **tree-sitter**: Multi-language code parsing (10+ languages)
 
-## Multi-Language Code Analysis
-- **Tree-sitter** >=0.23.0 - Multi-language parsing framework
-- Language parsers: Python, JavaScript/TypeScript, Java, Go, Rust, C/C++, C#, PHP, Ruby, Kotlin
-
-## Testing & Quality
-- **pytest** >=8.4.1 - Testing framework with async support
-- **pytest-asyncio** >=1.1.0 - Async test support
-- **ruff** >=0.12.7 - Linting and code formatting
-
-## Package Management & Environment
-- **uv** - Fast Python package manager (preferred over pip/poetry)
-- **Docker & Docker Compose** - Service containerization
-- **dotenv** - Environment variable management
-
-## API Providers (Multi-provider support)
-- **OpenAI** - Default for chat and embeddings
-- **Azure OpenAI** - Enterprise alternative  
-- **DeepInfra** - Cost-effective provider
-- **Fallback configuration** - High availability setup
+### Infrastructure
+- **Docker**: Required for Qdrant, Neo4j, and Redis services
+- **Redis**: Caching layer for embeddings
+- **PyTorch**: GPU acceleration for reranking models
 
 ## Development Tools
-- **Windows** - Primary development platform
-- **Git** - Version control
-- **setup.bat** - Windows service initialization script
+- **pytest**: Testing framework with hierarchical test organization
+- **ruff**: Code linting and formatting
+- **pytest-asyncio**: Async testing support
+
+## Key Integrations
+- **MCP Protocol**: Tool registration and client communication
+- **OpenAI API**: Chat models and embeddings with fallback support
+- **Multi-provider support**: Azure OpenAI, DeepInfra for cost optimization

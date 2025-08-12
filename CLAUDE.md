@@ -18,7 +18,7 @@ This is an MCP (Model Context Protocol) server that integrates Crawl4AI, Qdrant 
   - `kg_tools.py` - Knowledge graph and hallucination detection
 - **Services**: Core business logic (`src/services/`)
 - **Clients**: Database and API integrations (`src/clients/`)
-- **Knowledge Graphs**: Tree-sitter parsers for multi-language code analysis (`knowledge_graphs/`)
+- **Knowledge Graphs**: Tree-sitter parsers for multi-language code analysis (`src/k_graph/`)
 
 ## Common Development Commands
 
@@ -42,16 +42,22 @@ docker-compose up -d  # Linux/Mac
 # Run all tests
 uv run pytest
 
-# Run specific test suites
-uv run pytest tests/integration/
-uv run pytest tests/rag/
-uv run pytest tests/knowledge_graphs/
+# Run by category (new hierarchical structure)
+uv run pytest tests/unit/                    # Unit tests by module
+uv run pytest tests/specialized/             # Domain-specific tests  
+uv run pytest tests/infrastructure/          # Infrastructure tests
+uv run pytest tests/integration/             # End-to-end tests
+
+# Run specific modules
+uv run pytest tests/unit/tools/              # MCP tools tests
+uv run pytest tests/specialized/embedding/   # Embedding system tests
+uv run pytest tests/specialized/knowledge_graphs/ # Knowledge graph tests
 
 # Run with coverage
 uv run pytest --cov=src --cov-report=html
 
 # Run specific test file
-uv run pytest tests/test_web_tools.py -v
+uv run pytest tests/unit/tools/test_web_tools.py -v
 ```
 
 ### Code Quality
@@ -155,16 +161,26 @@ docker-compose logs   # View logs
 
 ### Test Organization
 
-Tests are organized by functionality matching the source structure:
+Tests are organized in a hierarchical structure for better maintainability:
 
 ```
 tests/
-├── integration/          # Full workflow tests
-├── clients/              # Database client tests
-├── tools/                # MCP tool tests
-├── knowledge_graphs/     # Tree-sitter parser tests
-├── rag/                  # RAG service tests
-└── conftest.py          # Shared pytest fixtures
+├── unit/                          # Unit tests by module
+│   ├── clients/                   # Database and API clients
+│   ├── core/                      # Core application functionality
+│   ├── services/                  # Business logic services
+│   ├── tools/                     # MCP tools
+│   └── utils/                     # Utility functions
+├── specialized/                   # Domain-specific functionality
+│   ├── embedding/                 # Embedding system tests
+│   ├── knowledge_graphs/          # Knowledge graph tests
+│   └── device_management/         # GPU/CPU device management
+├── infrastructure/                # Infrastructure components
+│   ├── storage/                   # Qdrant, Redis storage tests
+│   └── validation/                # Data validation tests
+├── integration/                   # End-to-end workflow tests
+├── fixtures/                      # Test data and samples
+└── conftest.py                   # Shared pytest fixtures
 ```
 
 ### Key Test Commands
@@ -173,14 +189,15 @@ tests/
 # Full test suite
 uv run pytest
 
-# Integration tests (requires Docker services)
-uv run pytest tests/integration/
+# By test category
+uv run pytest tests/unit/                    # All unit tests
+uv run pytest tests/specialized/             # Domain-specific tests
+uv run pytest tests/infrastructure/          # Infrastructure tests
+uv run pytest tests/integration/             # Integration tests (requires Docker)
 
-# Unit tests only
-uv run pytest tests/clients/ tests/tools/
-
-# Performance benchmarks
-uv run pytest tests/performance/
+# Specific functionality
+uv run pytest tests/unit/tools/              # MCP tools only
+uv run pytest tests/specialized/embedding/   # Embedding system only
 ```
 
 ### Test Fixtures
@@ -190,34 +207,53 @@ Key fixtures in `tests/conftest.py`:
 - `mock_qdrant` - Mocked Qdrant client
 - `sample_github_repo` - Test repository data
 
-## Tree-sitter Multi-Language Parsing
+## Knowledge Graph Architecture (src/k_graph/)
+
+### Modular Structure
+
+The knowledge graph system has been modularized into organized components:
+
+```
+src/k_graph/
+├── core/                          # Core interfaces and models
+│   ├── interfaces.py              # Language parser interfaces
+│   └── models.py                  # Data models for parsing
+├── parsing/                       # Multi-language parsing engine
+│   ├── tree_sitter_parser.py     # Tree-sitter integration
+│   ├── simple_fallback_parser.py # Fallback for unsupported languages
+│   ├── parser_factory.py         # Parser selection logic
+│   └── query_patterns/           # Language-specific AST queries
+│       ├── python_queries.py     # Python AST patterns
+│       ├── javascript_queries.py # JavaScript/TypeScript patterns
+│       ├── java_queries.py       # Java AST patterns
+│       └── ...                   # Other language patterns
+├── analysis/                      # Code analysis and validation
+│   ├── hallucination_detector.py # AI code validation
+│   ├── validator.py              # Knowledge graph validation
+│   ├── script_analyzer.py        # Script analysis engine
+│   └── reporter.py               # Analysis reporting
+└── services/                      # High-level services
+    └── repository_parser.py      # Repository processing orchestrator
+```
 
 ### Language Support
 
-The knowledge graph system supports parsing multiple programming languages via Tree-sitter grammars in `knowledge_graphs/grammars/`:
-
-- **Python** - Class/function extraction, imports
-- **JavaScript/TypeScript** - Module analysis, function definitions  
-- **Java** - Class hierarchies, method signatures
-- **Go** - Package structure, function definitions
-- **Rust** - Module system, trait implementations
-- **C/C++** - Header analysis, function declarations
-
-### Parser Architecture
-
-Key files for language parsing:
-- `knowledge_graphs/language_parser.py` - Tree-sitter integration
-- `knowledge_graphs/query_patterns/` - Language-specific queries
-- `knowledge_graphs/parse_repo_into_neo4j.py` - Repository analysis
+Multi-language parsing with Tree-sitter grammars:
+- **Python** - Class/function extraction, imports, docstrings
+- **JavaScript/TypeScript** - Module analysis, function definitions, exports
+- **Java** - Class hierarchies, method signatures, annotations
+- **Go** - Package structure, function definitions, interfaces
+- **Rust** - Module system, trait implementations, cargo metadata
+- **C/C++** - Header analysis, function declarations, includes
 
 ### Usage Examples
 
 ```bash
 # Parse repository for hallucination detection
-uv run python knowledge_graphs/parse_repo_into_neo4j.py https://github.com/user/repo
+uv run python scripts/query_knowledge_graph.py
 
-# Check AI-generated Python code
-uv run python knowledge_graphs/ai_hallucination_detector.py script.py
+# Check AI-generated Python code (from MCP tools)
+# Use kg_tools.check_ai_script_hallucinations MCP tool
 ```
 
 ## Key Dependencies
@@ -246,14 +282,33 @@ uv sync
 # Never edit pyproject.toml directly - always use uv commands
 ```
 
+## Unified Indexing Service
+
+The core service (`src/services/unified_indexing_service.py`) orchestrates repository processing:
+
+### Key Features
+- **Dual-destination indexing**: Simultaneous Qdrant (RAG) and Neo4j (KG) processing
+- **Cross-system file linking**: Consistent file_id linking between systems
+- **Modular processor architecture**: GitHub, web, and custom content processors
+- **Resource management**: Automatic cleanup and memory management
+- **Comprehensive reporting**: Detailed processing statistics and error handling
+
+### Processing Pipeline
+1. **Repository cloning** with size and file type validation
+2. **File discovery** using configurable patterns and filters
+3. **Parallel processing** for RAG embeddings and KG parsing
+4. **Cross-system linking** via unified file_id generation
+5. **Storage optimization** with batch operations and caching
+
 ## Important Notes
 
 - **Entry Points**: Use `uv run -m src` or `uv run python run_server.py`
 - **Docker Required**: Qdrant and Neo4j services must be running
 - **Environment Variables**: Copy `.env.example` to `.env` with API keys
-- **Multi-Language Support**: Tree-sitter grammars are auto-initialized
-- **Testing**: Run `uv run pytest` for full test suite
-- **GPU Support**: Auto-detected for reranking models
+- **Multi-Language Support**: Tree-sitter grammars are auto-initialized in `src/utils/grammar_initialization.py`
+- **Testing**: Run `uv run pytest` - see hierarchical structure in `tests/README.md`
+- **GPU Support**: Auto-detected for reranking models via `src/device_manager.py`
+- **Knowledge Graph**: Modularized in `src/k_graph/` with comprehensive language support
 
 ## Unicode Character Guidelines
 

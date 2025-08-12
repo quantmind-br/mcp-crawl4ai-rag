@@ -1,17 +1,17 @@
-# Essential Commands for Development
+# Suggested Commands for Development
 
 ## Server Management
 ```bash
-# Start MCP server (primary entry point)
+# Start MCP server (primary method)
 uv run -m src
 
 # Alternative entry point
 uv run python run_server.py
 
-# Start Docker services first (Windows)
+# Start with Docker services (Windows)
 setup.bat
 
-# Start Docker services (Linux/Mac)  
+# Start services (Linux/Mac)
 docker-compose up -d
 ```
 
@@ -20,35 +20,34 @@ docker-compose up -d
 # Run all tests
 uv run pytest
 
-# Run specific test suites
-uv run pytest tests/integration/     # Full workflow tests
-uv run pytest tests/tools/           # MCP tool tests  
-uv run pytest tests/rag/             # RAG service tests
-uv run pytest tests/knowledge_graphs/ # Tree-sitter parser tests
+# Run by test category
+uv run pytest tests/unit/                    # Unit tests by module
+uv run pytest tests/specialized/             # Domain-specific tests
+uv run pytest tests/infrastructure/          # Infrastructure tests
+uv run pytest tests/integration/             # End-to-end tests
+
+# Run specific test modules
+uv run pytest tests/unit/tools/              # MCP tools tests
+uv run pytest tests/specialized/embedding/   # Embedding system tests
+uv run pytest tests/specialized/knowledge_graphs/ # Knowledge graph tests
 
 # Run with coverage
 uv run pytest --cov=src --cov-report=html
 
 # Run specific test file
-uv run pytest tests/test_web_tools.py -v
-
-# Integration tests (requires Docker services running)
-uv run pytest tests/integration_test.py
+uv run pytest tests/unit/tools/test_web_tools.py -v
 ```
 
-## Code Quality & Formatting
+## Code Quality Commands
 ```bash
-# Check linting (must pass before commits)
+# Check linting issues
 uv run ruff check .
 
-# Auto-fix linting issues
+# Fix linting issues automatically
 uv run ruff check --fix .
 
-# Format code (standardized style)
+# Format code
 uv run ruff format .
-
-# Combined quality check
-uv run ruff check --fix . && uv run ruff format .
 ```
 
 ## Database Management
@@ -71,68 +70,35 @@ docker-compose restart
 docker-compose down --volumes
 ```
 
-## Package Management (uv only)
+## Development Utilities
 ```bash
-# Install dependencies
-uv sync
+# Package management (use uv for all operations)
+uv add package-name                    # Add dependency
+uv add --dev pytest-package           # Add dev dependency
+uv sync                               # Sync after pyproject.toml changes
 
-# Add new dependency
-uv add package-name
-
-# Add dev dependency
-uv add --dev pytest-package
-
-# NEVER edit pyproject.toml directly - always use uv commands
-```
-
-## Knowledge Graph & Analysis
-```bash
-# Parse repository for hallucination detection
+# Knowledge graph utilities
 uv run python scripts/query_knowledge_graph.py
-
-# Check AI-generated Python code
-uv run python knowledge_graphs/ai_hallucination_detector.py script.py
-```
-
-## Environment Setup
-```bash
-# Copy environment template (first time setup)
-cp .env.example .env
-
-# Edit .env with your API keys and configuration
-# Required: CHAT_API_KEY, EMBEDDINGS_API_KEY
 ```
 
 ## Windows-Specific Commands
 ```bash
-# Service initialization
-setup.bat
+# File operations
+dir                    # List directory contents
+type filename.txt      # Display file contents
+findstr "pattern" *.py # Search for pattern in files
+cd /d path             # Change directory with drive change
 
-# Start server  
-start.bat
-
-# Use 'dir' instead of 'ls'
-dir
-
-# Use 'type' instead of 'cat'
-type filename.txt
+# Process management
+tasklist               # List running processes
+netstat -an           # Show network connections
 ```
 
-## Git Workflow
+## Environment Setup
 ```bash
-# Standard git commands work normally
-git status
-git add .
-git commit -m "message"
-git push
-```
+# Copy environment template
+copy .env.example .env
 
-## Performance & Debugging
-```bash
-# Performance benchmarks
-uv run pytest tests/performance/
-
-# Debug specific components
-uv run python debug_analysis_test.py
-uv run python debug_neo4j_test.py
+# Edit environment file (Windows)
+notepad .env
 ```
