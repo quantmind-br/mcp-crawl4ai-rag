@@ -181,10 +181,10 @@ More text after code block."""
                             # Mock storage functions
                             with patch(
                                 "src.tools.github_tools.add_documents_to_vector_db"
-                            ) as mock_add_docs:
+                            ):
                                 with patch(
                                     "src.tools.github_tools.update_source_info"
-                                ) as mock_update_source:
+                                ):
                                     result = await smart_crawl_github(
                                         mock_context,
                                         "https://github.com/user/repo",

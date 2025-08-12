@@ -116,7 +116,7 @@ pip install test-package
 
     def test_file_size_limits_maintained(self):
         """Test that file size limits are properly maintained."""
-        discovery = MultiFileDiscovery()
+        MultiFileDiscovery()
 
         # Check that size limits exist for all supported file types
         expected_limits = {

@@ -507,7 +507,7 @@ class DirectNeo4jExtractor:
                 if "tx" in locals():
                     try:
                         await tx.rollback()
-                    except:
+                    except Exception:
                         pass
                 logger.error(f"Failed to clear repository data for {repo_name}: {e}")
                 raise

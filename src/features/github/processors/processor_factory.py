@@ -119,7 +119,7 @@ class ProcessorRegistry:
 
         # Sort by processor priority (higher priority first)
         language = get_language_for_extension(file_ext)
-        priority = PROCESSOR_PRIORITY.get(language, 0)
+        PROCESSOR_PRIORITY.get(language, 0)
 
         # Choose highest priority processor
         best_processor = max(

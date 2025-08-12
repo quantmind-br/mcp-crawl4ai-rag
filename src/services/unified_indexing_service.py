@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
+from dataclasses import dataclass, field
 
 # Import utilities and models
 try:
@@ -76,8 +78,6 @@ logger = logging.getLogger(__name__)
 
 
 # Inline model definitions for unified indexing
-from enum import Enum
-from dataclasses import dataclass, field
 
 
 class IndexingDestination(Enum):

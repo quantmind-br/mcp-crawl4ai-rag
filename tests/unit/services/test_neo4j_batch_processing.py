@@ -189,7 +189,7 @@ class TestNeo4jBatchProcessing:
         )
 
         # Call the method
-        result = await unified_indexing_service._batch_process_neo4j_analyses()
+        await unified_indexing_service._batch_process_neo4j_analyses()
 
         # Verify verification queries were executed
         assert mock_session.run.call_count >= 2  # At least repo and nodes count queries

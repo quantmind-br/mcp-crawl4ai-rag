@@ -362,7 +362,7 @@ class TestSingletonPattern:
 
     def test_get_qdrant_client_recreate_on_failure(self):
         """Test that get_qdrant_client creates new instance when previous one fails."""
-        with patch("src.clients.qdrant_client.QdrantClient") as mock_client_class:
+        with patch("src.clients.qdrant_client.QdrantClient"):
             with patch(
                 "src.clients.qdrant_client.QdrantClientWrapper._ensure_collections_exist"
             ) as mock_ensure:

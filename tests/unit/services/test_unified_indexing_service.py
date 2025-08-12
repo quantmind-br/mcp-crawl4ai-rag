@@ -790,7 +790,7 @@ class TestConvenienceFunctions:
             mock_service_class.return_value = mock_service_instance
 
             # Call with custom parameters
-            response = await process_repository_unified(
+            await process_repository_unified(
                 repo_url="https://github.com/test/repo",
                 destination=IndexingDestination.QDRANT,
                 file_types=[".py", ".js"],

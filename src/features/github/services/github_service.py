@@ -91,7 +91,6 @@ class GitHubService:
                 )
 
             repo_path = clone_result.temp_directory
-            metadata = clone_result.metadata
 
             # Step 2: Discover files
             discovery_result = await self._discover_files(
