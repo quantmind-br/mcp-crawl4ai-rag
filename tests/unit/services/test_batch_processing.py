@@ -329,12 +329,15 @@ class TestOptimizedIndexingPipeline:
         result1 = results[0]
         # Use os.path.normpath to handle different path separators on Windows/Unix
         import os
+
         expected_relative_path = "src/main.py"
         # Normalize both the expected and actual file_id for comparison
-        expected_file_id = f"repo:{expected_relative_path}".replace('\\', '/')
-        actual_file_id = result1.file_id.replace('\\', '/')
+        expected_file_id = f"repo:{expected_relative_path}".replace("\\", "/")
+        actual_file_id = result1.file_id.replace("\\", "/")
         assert actual_file_id == expected_file_id
-        assert os.path.normpath(result1.relative_path) == os.path.normpath(expected_relative_path)
+        assert os.path.normpath(result1.relative_path) == os.path.normpath(
+            expected_relative_path
+        )
         assert result1.language == "python"
         assert result1.processed_for_rag is True
         assert result1.processed_for_kg is True
@@ -375,11 +378,11 @@ class TestOptimizedIndexingPipeline:
 
         # Test embedding generation (will use fallback embeddings due to invalid API key)
         result = await pipeline.stage_generate_embeddings(file_contents)
-        
+
         # Should return a list of embeddings (even if they're zero vectors from fallback)
         assert isinstance(result, list)
         assert len(result) == len(file_contents)
-        
+
         # Each embedding should be a list of floats
         for embedding in result:
             assert isinstance(embedding, list)

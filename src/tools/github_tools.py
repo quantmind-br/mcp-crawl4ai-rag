@@ -411,6 +411,9 @@ async def index_github_repository(
     max_files: int = 50,
     chunk_size: int = 5000,
     max_size_mb: int = 500,
+    enable_intelligent_routing: bool = True,
+    force_rag_patterns: List[str] = None,
+    force_kg_patterns: List[str] = None,
 ) -> str:
     """
     🚀 UNIFIED GITHUB REPOSITORY INDEXING TOOL 🚀
@@ -495,6 +498,12 @@ async def index_github_repository(
                    📏 Smaller chunks = more precise search, larger chunks = better context
         max_size_mb: Repository size limit in MB (default: 500)
                     🛡️  Prevents processing of massive repositories that could consume resources
+        enable_intelligent_routing: Enable intelligent file classification routing (default: True)
+                                   🧠 Routes files optimally: docs/config to Qdrant, code to Neo4j
+        force_rag_patterns: List of regex patterns to force files into RAG processing (default: None)
+                           📝 Example: [".*README.*", ".*docs/.*"] forces these patterns to Qdrant
+        force_kg_patterns: List of regex patterns to force files into KG processing (default: None)
+                          🔍 Example: [".*test.*", ".*spec.*"] forces these patterns to Neo4j
 
     Returns:
         📋 **Comprehensive JSON Response** containing:
@@ -548,6 +557,7 @@ async def index_github_repository(
             UnifiedIndexingRequest,
             IndexingDestination,
         )
+        from ..models.classification_models import IntelligentRoutingConfig
         from ..utils.validation import validate_github_url
 
         # Validate GitHub URL
@@ -567,6 +577,12 @@ async def index_github_repository(
         if file_types is None:
             file_types = [".md"]
 
+        # Set default routing patterns
+        if force_rag_patterns is None:
+            force_rag_patterns = []
+        if force_kg_patterns is None:
+            force_kg_patterns = []
+
         # Validate and convert destination parameter
         destination_mapping = {
             "qdrant": IndexingDestination.QDRANT,
@@ -585,6 +601,13 @@ async def index_github_repository(
                 indent=2,
             )
 
+        # Create intelligent routing configuration
+        routing_config = IntelligentRoutingConfig(
+            enable_intelligent_routing=enable_intelligent_routing,
+            force_rag_patterns=force_rag_patterns,
+            force_kg_patterns=force_kg_patterns,
+        )
+
         # Create unified indexing request
         request = UnifiedIndexingRequest(
             repo_url=repo_url,
@@ -593,6 +616,7 @@ async def index_github_repository(
             max_files=max_files,
             chunk_size=chunk_size,
             max_size_mb=max_size_mb,
+            routing_config=routing_config,
         )
 
         # Initialize unified indexing service with context clients
@@ -642,6 +666,11 @@ async def index_github_repository(
                     "max_files": max_files,
                     "chunk_size": chunk_size,
                     "max_size_mb": max_size_mb,
+                    "intelligent_routing": {
+                        "enabled": enable_intelligent_routing,
+                        "force_rag_patterns": force_rag_patterns,
+                        "force_kg_patterns": force_kg_patterns,
+                    },
                 },
             }
 

@@ -75,7 +75,7 @@ class TestCrawl4AIContext:
             "qdrant_client",
             "embedding_cache",
             "io_executor",
-            "cpu_executor", 
+            "cpu_executor",
             "performance_config",
             "reranker",
             "knowledge_validator",

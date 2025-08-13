@@ -18,6 +18,11 @@ from src.services.unified_indexing_service import (
     IndexingDestination,
     FileProcessingResult,
 )
+from src.models.classification_models import (
+    IntelligentRoutingConfig,
+    ClassificationResult,
+)
+from src.services.file_classifier import FileClassifier
 
 
 class TestResourceManager:
@@ -146,6 +151,41 @@ class TestUnifiedIndexingModels:
         assert request.should_process_rag is True
         assert request.should_process_kg is True
 
+    def test_unified_indexing_request_with_routing_config(self):
+        """Test UnifiedIndexingRequest with intelligent routing configuration."""
+        routing_config = IntelligentRoutingConfig(
+            enable_intelligent_routing=True,
+            force_rag_patterns=[".*README.*", ".*docs/.*"],
+            force_kg_patterns=[".*test.*", ".*spec.*"],
+            classification_confidence_threshold=0.9,
+        )
+
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=routing_config,
+        )
+
+        assert request.routing_config == routing_config
+        assert request.routing_config.enable_intelligent_routing is True
+        assert request.routing_config.force_rag_patterns == [".*README.*", ".*docs/.*"]
+        assert request.routing_config.force_kg_patterns == [".*test.*", ".*spec.*"]
+        assert request.routing_config.classification_confidence_threshold == 0.9
+
+    def test_unified_indexing_request_default_routing_config(self):
+        """Test UnifiedIndexingRequest with default routing configuration."""
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+        )
+
+        # Should have default routing config
+        assert request.routing_config is not None
+        assert isinstance(request.routing_config, IntelligentRoutingConfig)
+        assert request.routing_config.enable_intelligent_routing is True
+        assert request.routing_config.force_rag_patterns == []
+        assert request.routing_config.force_kg_patterns == []
+
     def test_unified_indexing_request_rag_only(self):
         """Test UnifiedIndexingRequest for RAG only."""
         request = UnifiedIndexingRequest(
@@ -192,6 +232,36 @@ class TestUnifiedIndexingModels:
         assert result.kg_entities == 10
         assert result.processing_time_seconds == 2.5
         assert result.is_successful is True
+
+    def test_file_processing_result_with_classification(self):
+        """Test FileProcessingResult with classification metadata."""
+        classification_result = ClassificationResult(
+            destination=IndexingDestination.NEO4J,
+            confidence=0.95,
+            reasoning="Code file detected",
+            applied_overrides=[],
+            classification_time_ms=1.2,
+        )
+
+        result = FileProcessingResult(
+            file_id="test_file_id",
+            relative_path="test/file.py",
+            file_path="/full/path/to/test/file.py",
+            language="python",
+            file_type=".py",
+            processed_for_kg=True,
+            kg_entities=10,
+            processing_time_seconds=2.5,
+            classification_result=classification_result,
+            routing_decision="Routed to KG based on .py extension",
+            classification_time_ms=1.2,
+        )
+
+        assert result.classification_result == classification_result
+        assert result.classification_result.destination == IndexingDestination.NEO4J
+        assert result.classification_result.confidence == 0.95
+        assert result.routing_decision == "Routed to KG based on .py extension"
+        assert result.classification_time_ms == 1.2
 
     def test_file_processing_result_with_errors(self):
         """Test FileProcessingResult with errors."""
@@ -729,6 +799,368 @@ let myVar = 10;
         """Test service cleanup."""
         # Should not raise any exceptions
         await unified_indexing_service.cleanup()
+
+
+class TestUnifiedIndexingServiceIntelligentRouting:
+    """Test cases for intelligent routing functionality in UnifiedIndexingService."""
+
+    @pytest.fixture
+    def mock_qdrant_client(self):
+        """Create a mock Qdrant client."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_file_classifier(self):
+        """Create a mock FileClassifier."""
+        classifier = Mock(spec=FileClassifier)
+        classifier.classify_file = Mock()
+        classifier.get_statistics = Mock(return_value={"total_classifications": 0})
+        return classifier
+
+    @pytest.fixture
+    def unified_indexing_service_with_classifier(
+        self, mock_qdrant_client, mock_file_classifier
+    ):
+        """Create a UnifiedIndexingService instance with mocked FileClassifier."""
+        service = UnifiedIndexingService(qdrant_client=mock_qdrant_client)
+        service.file_classifier = mock_file_classifier
+        return service
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_with_intelligent_routing_kg_only(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test _process_single_file with intelligent routing for KG-only files."""
+        # Setup classification result for KG-only processing
+        classification_result = ClassificationResult(
+            destination=IndexingDestination.NEO4J,
+            confidence=1.0,
+            reasoning="Code file: .py",
+            classification_time_ms=1.0,
+        )
+
+        unified_indexing_service_with_classifier.file_classifier.classify_file.return_value = classification_result
+
+        # Create request with intelligent routing enabled
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(enable_intelligent_routing=True),
+        )
+
+        # Mock file path and content
+        file_path = Path("/test/repo/main.py")
+        test_content = "def hello_world():\n    print('Hello, World!')"
+
+        # Mock file reading
+        with patch("builtins.open", mock_open(read_data=test_content)):
+            with (
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_kg"
+                ) as mock_kg,
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_rag"
+                ) as mock_rag,
+            ):
+                # Mock KG processing to return 5 entities
+                mock_kg.return_value = 5
+
+                result = (
+                    await unified_indexing_service_with_classifier._process_single_file(
+                        file_path, request, Path("/test/repo")
+                    )
+                )
+
+                # Verify classification was called
+                unified_indexing_service_with_classifier.file_classifier.classify_file.assert_called_once_with(
+                    str(file_path), request.routing_config
+                )
+
+                # Verify only KG processing was called (not RAG)
+                mock_kg.assert_called_once()
+                mock_rag.assert_not_called()
+
+                # Verify result
+                assert result.processed_for_kg is True
+                assert result.processed_for_rag is False
+                assert result.kg_entities == 5
+                assert result.rag_chunks == 0
+                assert result.classification_result == classification_result
+                assert result.routing_decision == "Intelligent routing: KG only"
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_with_intelligent_routing_rag_only(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test _process_single_file with intelligent routing for RAG-only files."""
+        # Setup classification result for RAG-only processing
+        classification_result = ClassificationResult(
+            destination=IndexingDestination.QDRANT,
+            confidence=1.0,
+            reasoning="Documentation file: .md",
+            classification_time_ms=1.0,
+        )
+
+        unified_indexing_service_with_classifier.file_classifier.classify_file.return_value = classification_result
+
+        # Create request with intelligent routing enabled
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(enable_intelligent_routing=True),
+        )
+
+        # Mock file path and content
+        file_path = Path("/test/repo/README.md")
+        test_content = "# Hello World\n\nThis is a test document."
+
+        # Mock file reading
+        with patch("builtins.open", mock_open(read_data=test_content)):
+            with (
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_kg"
+                ) as mock_kg,
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_rag"
+                ) as mock_rag,
+            ):
+                # Mock RAG processing to return 3 chunks
+                mock_rag.return_value = 3
+
+                result = (
+                    await unified_indexing_service_with_classifier._process_single_file(
+                        file_path, request, Path("/test/repo")
+                    )
+                )
+
+                # Verify classification was called
+                unified_indexing_service_with_classifier.file_classifier.classify_file.assert_called_once_with(
+                    str(file_path), request.routing_config
+                )
+
+                # Verify only RAG processing was called (not KG)
+                mock_rag.assert_called_once()
+                mock_kg.assert_not_called()
+
+                # Verify result
+                assert result.processed_for_rag is True
+                assert result.processed_for_kg is False
+                assert result.rag_chunks == 3
+                assert result.kg_entities == 0
+                assert result.classification_result == classification_result
+                assert result.routing_decision == "Intelligent routing: RAG only"
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_with_force_override_patterns(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test _process_single_file with force override patterns."""
+        # Setup classification result with override applied
+        classification_result = ClassificationResult(
+            destination=IndexingDestination.QDRANT,
+            confidence=1.0,
+            reasoning="Force RAG override: .*README.*",
+            applied_overrides=["force_rag: .*README.*"],
+            classification_time_ms=1.5,
+        )
+
+        unified_indexing_service_with_classifier.file_classifier.classify_file.return_value = classification_result
+
+        # Create request with force patterns
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(
+                enable_intelligent_routing=True,
+                force_rag_patterns=[".*README.*"],
+            ),
+        )
+
+        # Mock a Python file that would normally go to KG but is forced to RAG
+        file_path = Path("/test/repo/README.py")
+        test_content = "# README Python script\nprint('Hello')"
+
+        # Mock file reading
+        with patch("builtins.open", mock_open(read_data=test_content)):
+            with patch.object(
+                unified_indexing_service_with_classifier, "_process_for_rag"
+            ) as mock_rag:
+                mock_rag.return_value = 2
+
+                result = (
+                    await unified_indexing_service_with_classifier._process_single_file(
+                        file_path, request, Path("/test/repo")
+                    )
+                )
+
+                # Verify override was applied
+                assert result.processed_for_rag is True
+                assert result.processed_for_kg is False
+                assert result.classification_result.applied_overrides == [
+                    "force_rag: .*README.*"
+                ]
+                assert result.routing_decision == "Intelligent routing: RAG only"
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_disabled_intelligent_routing(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test _process_single_file with intelligent routing disabled."""
+        # Create request with intelligent routing disabled
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(enable_intelligent_routing=False),
+        )
+
+        # Mock file path and content
+        file_path = Path("/test/repo/main.py")
+        test_content = "def hello_world():\n    print('Hello, World!')"
+
+        # Mock file reading
+        with patch("builtins.open", mock_open(read_data=test_content)):
+            with (
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_kg"
+                ) as mock_kg,
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_rag"
+                ) as mock_rag,
+            ):
+                mock_kg.return_value = 5
+                mock_rag.return_value = 3
+
+                result = (
+                    await unified_indexing_service_with_classifier._process_single_file(
+                        file_path, request, Path("/test/repo")
+                    )
+                )
+
+                # Verify file classifier was not called when disabled
+                unified_indexing_service_with_classifier.file_classifier.classify_file.assert_not_called()
+
+                # Verify both processing methods were called (fallback to legacy behavior)
+                mock_kg.assert_called_once()
+                mock_rag.assert_called_once()
+
+                # Verify result
+                assert result.processed_for_rag is True
+                assert result.processed_for_kg is True
+                assert result.rag_chunks == 3
+                assert result.kg_entities == 5
+                assert result.classification_result is None
+                assert result.routing_decision == "Legacy routing: both destinations"
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_classification_exception(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test _process_single_file when classification raises an exception."""
+        # Make classifier raise an exception
+        unified_indexing_service_with_classifier.file_classifier.classify_file.side_effect = Exception(
+            "Classification failed"
+        )
+
+        # Create request with intelligent routing enabled
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(enable_intelligent_routing=True),
+        )
+
+        file_path = Path("/test/repo/main.py")
+        test_content = "def hello_world():\n    print('Hello, World!')"
+
+        # Mock file reading
+        with patch("builtins.open", mock_open(read_data=test_content)):
+            with (
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_kg"
+                ) as mock_kg,
+                patch.object(
+                    unified_indexing_service_with_classifier, "_process_for_rag"
+                ) as mock_rag,
+            ):
+                mock_kg.return_value = 5
+                mock_rag.return_value = 3
+
+                result = (
+                    await unified_indexing_service_with_classifier._process_single_file(
+                        file_path, request, Path("/test/repo")
+                    )
+                )
+
+                # Should fall back to processing both when classification fails
+                mock_kg.assert_called_once()
+                mock_rag.assert_called_once()
+
+                # Verify fallback behavior
+                assert result.processed_for_rag is True
+                assert result.processed_for_kg is True
+                assert (
+                    result.routing_decision
+                    == "Classification failed, using legacy routing"
+                )
+                assert len(result.errors) == 1
+                assert "Classification failed" in result.errors[0]
+
+    def test_file_classifier_initialization(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test that FileClassifier is properly initialized in the service."""
+        # FileClassifier should be available
+        assert hasattr(unified_indexing_service_with_classifier, "file_classifier")
+        assert unified_indexing_service_with_classifier.file_classifier is not None
+
+    @pytest.mark.asyncio
+    async def test_process_repository_with_intelligent_routing_stats(
+        self, unified_indexing_service_with_classifier
+    ):
+        """Test that intelligent routing statistics are tracked properly."""
+        # Mock classification statistics
+        unified_indexing_service_with_classifier.file_classifier.get_statistics.return_value = {
+            "total_classifications": 10,
+            "kg_classifications": 6,
+            "rag_classifications": 4,
+            "override_applications": 2,
+        }
+
+        # Create a simple request
+        request = UnifiedIndexingRequest(
+            repo_url="https://github.com/test/repo",
+            destination=IndexingDestination.BOTH,
+            routing_config=IntelligentRoutingConfig(enable_intelligent_routing=True),
+        )
+
+        # Mock the major processing steps
+        with (
+            patch.object(
+                unified_indexing_service_with_classifier, "_clone_repository"
+            ) as mock_clone,
+            patch.object(
+                unified_indexing_service_with_classifier, "_discover_repository_files"
+            ) as mock_discover,
+        ):
+            mock_clone.return_value = Mock()
+            mock_discover.return_value = []  # No files to process
+
+            response = await unified_indexing_service_with_classifier.process_repository_unified(
+                request
+            )
+
+            # Verify classifier statistics were retrieved
+            unified_indexing_service_with_classifier.file_classifier.get_statistics.assert_called()
+
+            # Statistics should be available in the service for potential logging/monitoring
+            assert response is not None
+
+
+# Helper function to create mock file content
+def mock_open(read_data=""):
+    """Create a mock file open context manager."""
+    from unittest.mock import mock_open as base_mock_open
+
+    return base_mock_open(read_data=read_data)
 
 
 class TestConvenienceFunctions:

@@ -367,9 +367,7 @@ More text after code block."""
                             mock_repo_info.owner = "user"
                             mock_repo_info.repo_name = "mdx-repo"
                             mock_repo_info.description = "MDX documentation repository"
-                            mock_metadata_extractor.extract_repo_metadata.return_value = (
-                                mock_repo_info
-                            )
+                            mock_metadata_extractor.extract_repo_metadata.return_value = mock_repo_info
                             mock_metadata_extractor.create_metadata_dict.return_value = {
                                 "owner": "user",
                                 "repo_name": "mdx-repo",
@@ -382,13 +380,15 @@ More text after code block."""
                             # Mock MDX processor
                             mock_mdx_processor = Mock()
                             mock_processed_content = Mock()
-                            mock_processed_content.content = "# Guide\n\nThis is processed MDX content"
+                            mock_processed_content.content = (
+                                "# Guide\n\nThis is processed MDX content"
+                            )
                             mock_processed_content.content_type = "mdx"
                             mock_processed_content.name = "guide.mdx"
                             mock_processed_content.signature = None
                             mock_processed_content.line_number = 1
                             mock_processed_content.language = "mdx"
-                            
+
                             # Mock JSX component
                             mock_jsx_component = Mock()
                             mock_jsx_component.content = "JSX Component: Alert"
@@ -397,10 +397,10 @@ More text after code block."""
                             mock_jsx_component.signature = "<Alert type='info'>"
                             mock_jsx_component.line_number = 5
                             mock_jsx_component.language = "jsx"
-                            
+
                             mock_mdx_processor.process_file.return_value = [
                                 mock_processed_content,
-                                mock_jsx_component
+                                mock_jsx_component,
                             ]
                             mock_mdx_processor_class.return_value = mock_mdx_processor
 
@@ -409,9 +409,7 @@ More text after code block."""
                                 "src.tools.github_tools.extract_source_summary",
                                 return_value="MDX documentation summary",
                             ):
-                                with patch(
-                                    "src.tools.github_tools.update_source_info"
-                                ):
+                                with patch("src.tools.github_tools.update_source_info"):
                                     with patch(
                                         "src.tools.github_tools.add_documents_to_vector_db"
                                     ):
@@ -425,9 +423,15 @@ More text after code block."""
                                         result_data = json.loads(result)
 
                                         assert result_data["success"] is True
-                                        assert result_data["repo_url"] == "https://github.com/user/mdx-repo"
+                                        assert (
+                                            result_data["repo_url"]
+                                            == "https://github.com/user/mdx-repo"
+                                        )
                                         assert result_data["files_discovered"] == 1
-                                        assert ".mdx" in result_data["file_types_requested"]
+                                        assert (
+                                            ".mdx"
+                                            in result_data["file_types_requested"]
+                                        )
 
     @pytest.mark.asyncio
     async def test_index_github_repository_mdx_files(self, mock_context):
@@ -455,7 +459,7 @@ More text after code block."""
                 mock_response.cross_system_links_created = 8
                 mock_response.performance_summary = {
                     "processing_speed": "1.8 files/sec",
-                    "jsx_components_extracted": 15
+                    "jsx_components_extracted": 15,
                 }
                 mock_response.error_summary = {}
                 mock_response.file_results = [
@@ -486,7 +490,7 @@ More text after code block."""
                         processing_summary="MDX processed with 5 JSX components",
                         errors=[],
                         is_successful=True,
-                    )
+                    ),
                 ]
 
                 mock_service.process_repository_unified.return_value = mock_response
@@ -507,7 +511,7 @@ More text after code block."""
                 assert result_data["storage_summary"]["neo4j_nodes"] == 12
                 assert result_data["languages_detected"] == ["mdx"]
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_smart_crawl_github_mixed_file_types_with_mdx(self, mock_context):
         """Test smart crawl with mixed file types including MDX."""
         with patch(
@@ -548,7 +552,7 @@ More text after code block."""
                                 "filename": "guide.mdx",
                                 "size_bytes": 2048,
                                 "is_readme": False,
-                            }
+                            },
                         ]
                         mock_file_discovery_class.return_value = mock_file_discovery
 
@@ -557,7 +561,9 @@ More text after code block."""
                         mock_repo_info = Mock()
                         mock_repo_info.owner = "user"
                         mock_repo_info.repo_name = "mixed-repo"
-                        mock_repo_info.description = "Repository with mixed documentation"
+                        mock_repo_info.description = (
+                            "Repository with mixed documentation"
+                        )
                         mock_metadata_extractor.extract_repo_metadata.return_value = (
                             mock_repo_info
                         )
@@ -586,10 +592,12 @@ More text after code block."""
                                 mock_md_content.language = "markdown"
                                 mock_md_content.signature = None
                                 mock_md_content.line_number = 1
-                                mock_md_processor.process_file.return_value = [mock_md_content]
+                                mock_md_processor.process_file.return_value = [
+                                    mock_md_content
+                                ]
                                 mock_md_processor_class.return_value = mock_md_processor
 
-                                # Mock MDX processor  
+                                # Mock MDX processor
                                 mock_mdx_processor = Mock()
                                 mock_mdx_content = Mock()
                                 mock_mdx_content.content = "# Guide\n\nMDX content"
@@ -598,8 +606,12 @@ More text after code block."""
                                 mock_mdx_content.language = "mdx"
                                 mock_mdx_content.signature = None
                                 mock_mdx_content.line_number = 1
-                                mock_mdx_processor.process_file.return_value = [mock_mdx_content]
-                                mock_mdx_processor_class.return_value = mock_mdx_processor
+                                mock_mdx_processor.process_file.return_value = [
+                                    mock_mdx_content
+                                ]
+                                mock_mdx_processor_class.return_value = (
+                                    mock_mdx_processor
+                                )
 
                                 # Mock storage functions
                                 with patch(
@@ -614,7 +626,7 @@ More text after code block."""
                                         ):
                                             result = await smart_crawl_github(
                                                 mock_context,
-                                                "https://github.com/user/mixed-repo", 
+                                                "https://github.com/user/mixed-repo",
                                                 max_files=10,
                                                 file_types_to_index=[".md", ".mdx"],
                                             )
@@ -623,5 +635,418 @@ More text after code block."""
 
                                             assert result_data["success"] is True
                                             assert result_data["files_discovered"] == 2
-                                            assert ".md" in result_data["file_types_requested"]
-                                            assert ".mdx" in result_data["file_types_requested"]
+                                            assert (
+                                                ".md"
+                                                in result_data["file_types_requested"]
+                                            )
+                                            assert (
+                                                ".mdx"
+                                                in result_data["file_types_requested"]
+                                            )
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_with_intelligent_routing_default(
+        self, mock_context
+    ):
+        """Test index repository with default intelligent routing parameters."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/repo"
+                mock_response.repo_name = "repo"
+                mock_response.destination = "both"
+                mock_response.files_processed = 3
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = 5.0
+                mock_response.qdrant_documents = 10
+                mock_response.neo4j_nodes = 8
+                mock_response.cross_system_links_created = 5
+                mock_response.performance_summary = {
+                    "processing_speed": "0.6 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/repo",
+                    destination="both",
+                    # Using default intelligent routing parameters
+                )
+                result_data = json.loads(result)
+
+                # Verify the request was called with a proper routing config
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert hasattr(call_args, "routing_config")
+                assert call_args.routing_config.enable_intelligent_routing is True
+                assert call_args.routing_config.force_rag_patterns == []
+                assert call_args.routing_config.force_kg_patterns == []
+
+                # Verify response includes intelligent routing parameters
+                assert result_data["success"] is True
+                assert "intelligent_routing" in result_data["request_parameters"]
+                assert (
+                    result_data["request_parameters"]["intelligent_routing"]["enabled"]
+                    is True
+                )
+                assert (
+                    result_data["request_parameters"]["intelligent_routing"][
+                        "force_rag_patterns"
+                    ]
+                    == []
+                )
+                assert (
+                    result_data["request_parameters"]["intelligent_routing"][
+                        "force_kg_patterns"
+                    ]
+                    == []
+                )
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_with_custom_intelligent_routing(
+        self, mock_context
+    ):
+        """Test index repository with custom intelligent routing parameters."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/repo"
+                mock_response.repo_name = "repo"
+                mock_response.destination = "both"
+                mock_response.files_processed = 5
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = 8.0
+                mock_response.qdrant_documents = 15
+                mock_response.neo4j_nodes = 12
+                mock_response.cross_system_links_created = 8
+                mock_response.performance_summary = {
+                    "processing_speed": "0.625 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                # Test with custom intelligent routing parameters
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/repo",
+                    destination="both",
+                    enable_intelligent_routing=True,
+                    force_rag_patterns=[".*README.*", ".*docs/.*"],
+                    force_kg_patterns=[".*test.*", ".*spec.*"],
+                )
+                result_data = json.loads(result)
+
+                # Verify the request was called with custom routing config
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert call_args.routing_config.enable_intelligent_routing is True
+                assert call_args.routing_config.force_rag_patterns == [
+                    ".*README.*",
+                    ".*docs/.*",
+                ]
+                assert call_args.routing_config.force_kg_patterns == [
+                    ".*test.*",
+                    ".*spec.*",
+                ]
+
+                # Verify response includes custom intelligent routing parameters
+                assert result_data["success"] is True
+                routing_params = result_data["request_parameters"][
+                    "intelligent_routing"
+                ]
+                assert routing_params["enabled"] is True
+                assert routing_params["force_rag_patterns"] == [
+                    ".*README.*",
+                    ".*docs/.*",
+                ]
+                assert routing_params["force_kg_patterns"] == [".*test.*", ".*spec.*"]
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_with_disabled_intelligent_routing(
+        self, mock_context
+    ):
+        """Test index repository with intelligent routing disabled."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/repo"
+                mock_response.repo_name = "repo"
+                mock_response.destination = "both"
+                mock_response.files_processed = 4
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = (
+                    12.0  # Slower without intelligent routing
+                )
+                mock_response.qdrant_documents = 20
+                mock_response.neo4j_nodes = (
+                    20  # Both destinations processed for all files
+                )
+                mock_response.cross_system_links_created = 20
+                mock_response.performance_summary = {
+                    "processing_speed": "0.33 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/repo",
+                    destination="both",
+                    enable_intelligent_routing=False,
+                    force_rag_patterns=[
+                        ".*README.*"
+                    ],  # Should be ignored when disabled
+                    force_kg_patterns=[".*test.*"],  # Should be ignored when disabled
+                )
+                result_data = json.loads(result)
+
+                # Verify the request was called with disabled routing
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert call_args.routing_config.enable_intelligent_routing is False
+                # Patterns should still be passed even if disabled (for potential future use)
+                assert call_args.routing_config.force_rag_patterns == [".*README.*"]
+                assert call_args.routing_config.force_kg_patterns == [".*test.*"]
+
+                # Verify response reflects disabled state
+                assert result_data["success"] is True
+                routing_params = result_data["request_parameters"][
+                    "intelligent_routing"
+                ]
+                assert routing_params["enabled"] is False
+                assert routing_params["force_rag_patterns"] == [".*README.*"]
+                assert routing_params["force_kg_patterns"] == [".*test.*"]
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_intelligent_routing_with_kg_only_destination(
+        self, mock_context
+    ):
+        """Test intelligent routing parameters with KG-only destination."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response for KG-only processing
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/code-repo"
+                mock_response.repo_name = "code-repo"
+                mock_response.destination = "neo4j"
+                mock_response.files_processed = 8
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = 6.0
+                mock_response.qdrant_documents = 0  # No RAG processing
+                mock_response.neo4j_nodes = 35  # Only KG processing
+                mock_response.cross_system_links_created = 0
+                mock_response.performance_summary = {
+                    "processing_speed": "1.33 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/code-repo",
+                    destination="neo4j",  # KG only
+                    enable_intelligent_routing=True,
+                    force_kg_patterns=[
+                        ".*\\.py$",
+                        ".*\\.js$",
+                    ],  # Force specific files to KG
+                )
+                result_data = json.loads(result)
+
+                # Verify the request was properly configured
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert call_args.destination.value == "neo4j"
+                assert call_args.routing_config.enable_intelligent_routing is True
+                assert call_args.routing_config.force_kg_patterns == [
+                    ".*\\.py$",
+                    ".*\\.js$",
+                ]
+
+                # Verify response shows KG-only results
+                assert result_data["success"] is True
+                assert result_data["destination"] == "neo4j"
+                assert result_data["storage_summary"]["qdrant_documents"] == 0
+                assert result_data["storage_summary"]["neo4j_nodes"] == 35
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_intelligent_routing_with_complex_patterns(
+        self, mock_context
+    ):
+        """Test intelligent routing with complex regex patterns."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/complex-repo"
+                mock_response.repo_name = "complex-repo"
+                mock_response.destination = "both"
+                mock_response.files_processed = 12
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = 15.0
+                mock_response.qdrant_documents = 25
+                mock_response.neo4j_nodes = 18
+                mock_response.cross_system_links_created = 8
+                mock_response.performance_summary = {
+                    "processing_speed": "0.8 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                # Test with complex regex patterns
+                complex_rag_patterns = [
+                    ".*/(README|CHANGELOG|CONTRIBUTING)\\.(md|rst|txt)$",
+                    ".*/docs/.*\\.(md|mdx)$",
+                    ".*\\.config\\.(json|yaml|yml)$",
+                ]
+                complex_kg_patterns = [
+                    ".*/(src|lib)/.*\\.(py|js|ts|tsx)$",
+                    ".*test.*\\.(py|js|ts)$",
+                    ".*/(spec|__tests__)/.*$",
+                ]
+
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/complex-repo",
+                    destination="both",
+                    enable_intelligent_routing=True,
+                    force_rag_patterns=complex_rag_patterns,
+                    force_kg_patterns=complex_kg_patterns,
+                )
+                result_data = json.loads(result)
+
+                # Verify complex patterns were passed correctly
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert (
+                    call_args.routing_config.force_rag_patterns == complex_rag_patterns
+                )
+                assert call_args.routing_config.force_kg_patterns == complex_kg_patterns
+
+                # Verify response includes complex patterns
+                assert result_data["success"] is True
+                routing_params = result_data["request_parameters"][
+                    "intelligent_routing"
+                ]
+                assert routing_params["force_rag_patterns"] == complex_rag_patterns
+                assert routing_params["force_kg_patterns"] == complex_kg_patterns
+
+    @pytest.mark.asyncio
+    async def test_index_github_repository_intelligent_routing_backward_compatibility(
+        self, mock_context
+    ):
+        """Test that intelligent routing maintains backward compatibility."""
+        with patch(
+            "src.tools.github_tools.validate_github_url", return_value=(True, None)
+        ):
+            with patch(
+                "src.services.unified_indexing_service.UnifiedIndexingService"
+            ) as mock_service_class:
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock response
+                mock_response = Mock()
+                mock_response.success = True
+                mock_response.repo_url = "https://github.com/user/legacy-repo"
+                mock_response.repo_name = "legacy-repo"
+                mock_response.destination = "both"
+                mock_response.files_processed = 6
+                mock_response.success_rate = 100.0
+                mock_response.processing_time_seconds = 10.0
+                mock_response.qdrant_documents = 15
+                mock_response.neo4j_nodes = 12
+                mock_response.cross_system_links_created = 10
+                mock_response.performance_summary = {
+                    "processing_speed": "0.6 files/sec"
+                }
+                mock_response.error_summary = {}
+                mock_response.file_results = []
+
+                mock_service.process_repository_unified.return_value = mock_response
+
+                # Test calling function without new parameters (backward compatibility)
+                result = await index_github_repository(
+                    mock_context,
+                    "https://github.com/user/legacy-repo",
+                    destination="both",
+                    file_types=[".py", ".md"],
+                    max_files=20,
+                    chunk_size=2000,
+                    max_size_mb=300,
+                    # NOT providing intelligent routing parameters - should use defaults
+                )
+                result_data = json.loads(result)
+
+                # Verify defaults were applied
+                call_args = mock_service.process_repository_unified.call_args[0][0]
+                assert (
+                    call_args.routing_config.enable_intelligent_routing is True
+                )  # Default
+                assert call_args.routing_config.force_rag_patterns == []  # Default
+                assert call_args.routing_config.force_kg_patterns == []  # Default
+
+                # Verify response includes default intelligent routing
+                assert result_data["success"] is True
+                routing_params = result_data["request_parameters"][
+                    "intelligent_routing"
+                ]
+                assert routing_params["enabled"] is True
+                assert routing_params["force_rag_patterns"] == []
+                assert routing_params["force_kg_patterns"] == []
+
+                # Verify all original parameters still work
+                assert result_data["request_parameters"]["destination"] == "both"
+                assert result_data["request_parameters"]["file_types"] == [".py", ".md"]
+                assert result_data["request_parameters"]["max_files"] == 20
+                assert result_data["request_parameters"]["chunk_size"] == 2000
+                assert result_data["request_parameters"]["max_size_mb"] == 300

@@ -15,8 +15,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
-from enum import Enum
-from dataclasses import dataclass, field
 
 # Import utilities and models
 try:
@@ -28,6 +26,7 @@ try:
         IndexingDestination,
     )
     from ..services.rag_service import add_documents_to_vector_db, update_source_info
+    from ..services.file_classifier import FileClassifier
     from ..features.github.repository.git_operations import GitRepository
     from ..clients.qdrant_client import get_qdrant_client
     from ..k_graph.services.repository_parser import DirectNeo4jExtractor
@@ -45,6 +44,7 @@ except ImportError:
             IndexingDestination,
         )
         from services.rag_service import add_documents_to_vector_db, update_source_info
+        from services.file_classifier import FileClassifier
         from features.github.repository.git_operations import GitRepository
         from clients.qdrant_client import get_qdrant_client
         from src.k_graph.services.repository_parser import DirectNeo4jExtractor
@@ -80,159 +80,7 @@ logger = logging.getLogger(__name__)
 # Inline model definitions for unified indexing
 
 
-class IndexingDestination(Enum):
-    """Destination for indexed data."""
-
-    QDRANT = "qdrant"
-    NEO4J = "neo4j"
-    BOTH = "both"
-
-
-@dataclass
-class UnifiedIndexingRequest:
-    """Request for unified repository indexing."""
-
-    repo_url: str
-    destination: IndexingDestination
-    file_types: List[str] = field(default_factory=lambda: [".md"])
-    max_files: int = 50
-    chunk_size: int = 5000
-    max_size_mb: int = 500
-
-    @property
-    def should_process_rag(self) -> bool:
-        """Check if RAG processing is requested."""
-        return self.destination in [
-            IndexingDestination.QDRANT,
-            IndexingDestination.BOTH,
-        ]
-
-    @property
-    def should_process_kg(self) -> bool:
-        """Check if Knowledge Graph processing is requested."""
-        return self.destination in [IndexingDestination.NEO4J, IndexingDestination.BOTH]
-
-
-@dataclass
-class FileProcessingResult:
-    """Result of processing a single file."""
-
-    file_id: str
-    relative_path: str
-    file_path: str = ""
-    language: str = "unknown"
-    file_type: str = ""
-    processed_for_rag: bool = False
-    processed_for_kg: bool = False
-    rag_chunks: int = 0
-    kg_entities: int = 0
-    processing_time_seconds: float = 0.0
-    processing_summary: str = ""
-    errors: List[str] = field(default_factory=list)
-
-    @property
-    def is_successful(self) -> bool:
-        """Check if processing was successful."""
-        return len(self.errors) == 0 and (
-            self.processed_for_rag or self.processed_for_kg
-        )
-
-
-@dataclass
-class UnifiedIndexingResponse:
-    """Response from unified repository indexing."""
-
-    success: bool
-    repo_url: str
-    repo_name: str
-    destination: str
-    files_processed: int
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    processing_time_seconds: float = 0.0
-    qdrant_documents: int = 0
-    neo4j_nodes: int = 0
-    cross_system_links_created: int = 0
-    file_results: List[FileProcessingResult] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-
-    def add_file_result(self, result: FileProcessingResult) -> None:
-        """Add a file processing result."""
-        self.file_results.append(result)
-        self.files_processed = len(self.file_results)
-
-        # Update totals
-        if result.processed_for_rag:
-            self.qdrant_documents += result.rag_chunks
-        if result.processed_for_kg:
-            self.neo4j_nodes += result.kg_entities
-
-    def finalize(self) -> None:
-        """Finalize the response with calculated values."""
-        self.end_time = datetime.now()
-        if self.start_time:
-            self.processing_time_seconds = (
-                self.end_time - self.start_time
-            ).total_seconds()
-
-        # Determine success
-        successful_files = len([r for r in self.file_results if r.is_successful])
-        self.success = successful_files > 0 and len(self.errors) == 0
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate percentage."""
-        if not self.file_results:
-            return 0.0
-        successful_files = len([r for r in self.file_results if r.is_successful])
-        return (successful_files / len(self.file_results)) * 100.0
-
-    @property
-    def performance_summary(self) -> dict:
-        """Get performance metrics."""
-        if self.processing_time_seconds == 0:
-            return {
-                "files_per_second": 0.0,
-                "avg_processing_time_per_file": 0.0,
-                "total_chunks_created": sum(r.rag_chunks for r in self.file_results),
-                "total_entities_extracted": sum(
-                    r.kg_entities for r in self.file_results
-                ),
-            }
-
-        return {
-            "files_per_second": self.files_processed / self.processing_time_seconds,
-            "avg_processing_time_per_file": self.processing_time_seconds
-            / max(self.files_processed, 1),
-            "total_chunks_created": sum(r.rag_chunks for r in self.file_results),
-            "total_entities_extracted": sum(r.kg_entities for r in self.file_results),
-        }
-
-    @property
-    def error_summary(self) -> dict:
-        """Get error summary."""
-        file_errors = []
-        system_errors = []
-
-        for error in self.errors:
-            if any(keyword in error.lower() for keyword in ["file", "path", "read"]):
-                file_errors.append(error)
-            else:
-                system_errors.append(error)
-
-        # Add file-level errors
-        for result in self.file_results:
-            file_errors.extend(result.errors)
-
-        return {
-            "has_errors": len(self.errors) > 0
-            or any(r.errors for r in self.file_results),
-            "error_count": len(self.errors)
-            + sum(len(r.errors) for r in self.file_results),
-            "system_errors": len(system_errors),
-            "file_errors": len(file_errors),
-            "failed_files": len([r for r in self.file_results if not r.is_successful]),
-        }
+# All models (IndexingDestination, UnifiedIndexingRequest, UnifiedIndexingResponse, FileProcessingResult) are now imported from models
 
 
 class ResourceManager:
@@ -355,6 +203,10 @@ class UnifiedIndexingService:
             }
         )
         self.github_repository = GitRepository()
+
+        # NEW: Initialize file classifier for intelligent routing
+        self.file_classifier = FileClassifier()
+        logger.debug("FileClassifier initialized for intelligent routing")
 
         # Performance optimization components
         self.context = context
@@ -700,8 +552,37 @@ class UnifiedIndexingService:
                 lambda: open(file_path, "r", encoding="utf-8", errors="ignore").read()
             )
 
-            # Process for RAG if requested
-            if request.should_process_rag:
+            # NEW: Intelligent classification integration
+            if request.routing_config.enable_intelligent_routing:
+                # Use intelligent classification to determine processing
+                classification = self.file_classifier.classify_file(
+                    str(file_path), request.routing_config
+                )
+                should_process_rag = classification.should_process_rag
+                should_process_kg = classification.should_process_kg
+
+                # Store classification metadata
+                result.classification_result = classification
+                result.routing_decision = (
+                    f"{classification.destination.value}: {classification.reasoning}"
+                )
+                result.classification_time_ms = classification.classification_time_ms
+
+                logger.debug(
+                    f"Intelligent routing for {relative_path}: {classification.destination.value} (confidence: {classification.confidence:.2f})"
+                )
+            else:
+                # PATTERN: Backward compatibility fallback - use static request settings
+                should_process_rag = request.should_process_rag
+                should_process_kg = request.should_process_kg
+                result.routing_decision = f"Static routing: {'RAG' if should_process_rag else ''}{'+' if should_process_rag and should_process_kg else ''}{'KG' if should_process_kg else ''}"
+
+                logger.debug(
+                    f"Static routing for {relative_path}: destination={request.destination.value}"
+                )
+
+            # Process for RAG if determined by routing logic
+            if should_process_rag:
                 rag_success = await self._process_file_for_rag(
                     file_path, content, file_id, request
                 )
@@ -711,8 +592,8 @@ class UnifiedIndexingService:
                         self._chunk_content(content, request.chunk_size)
                     )
 
-            # Process for Neo4j if requested
-            if request.should_process_kg:
+            # Process for Neo4j if determined by routing logic
+            if should_process_kg:
                 kg_success = await self._process_file_for_neo4j(
                     file_path, content, file_id, request
                 )

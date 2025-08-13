@@ -30,6 +30,7 @@ sys.path.insert(0, str(project_root))
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     env_path = project_root / ".env"
     if env_path.exists():
         load_dotenv(env_path)
@@ -37,7 +38,9 @@ try:
     else:
         logging.getLogger(__name__).warning(f"No .env file found at {env_path}")
 except ImportError:
-    logging.getLogger(__name__).warning("python-dotenv not available, relying on system environment")
+    logging.getLogger(__name__).warning(
+        "python-dotenv not available, relying on system environment"
+    )
 
 try:
     from src.clients.qdrant_client import get_qdrant_client
@@ -67,7 +70,9 @@ class DatabaseCleaner:
         self.neo4j_extractor = None
         self.redis_client = None
 
-    async def initialize_clients(self, qdrant_only=False, neo4j_only=False, redis_only=False):
+    async def initialize_clients(
+        self, qdrant_only=False, neo4j_only=False, redis_only=False
+    ):
         """Initialize database clients."""
         try:
             # Initialize Qdrant client if needed
@@ -80,7 +85,7 @@ class DatabaseCleaner:
                 neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
                 neo4j_user = os.getenv("NEO4J_USER", "neo4j")
                 neo4j_password = os.getenv("NEO4J_PASSWORD", "password123")
-                
+
                 if not neo4j_password:
                     raise ValueError(
                         "Neo4j password not found in environment variables. "
@@ -100,7 +105,7 @@ class DatabaseCleaner:
                 redis_db = int(os.getenv("REDIS_DB", "0"))
                 redis_password = os.getenv("REDIS_PASSWORD")
                 redis_username = os.getenv("REDIS_USERNAME")
-                
+
                 # Create Redis connection parameters
                 redis_params = {
                     "host": redis_host,
@@ -110,12 +115,12 @@ class DatabaseCleaner:
                     "socket_timeout": 5,
                     "socket_connect_timeout": 5,
                 }
-                
+
                 if redis_password:
                     redis_params["password"] = redis_password
                 if redis_username:
                     redis_params["username"] = redis_username
-                
+
                 self.redis_client = redis.Redis(**redis_params)
                 # Test connection
                 self.redis_client.ping()
@@ -252,14 +257,14 @@ class DatabaseCleaner:
 
                 # Delete all relationships first
                 logger.info("DELETING: Deleting all relationships...")
-                rel_result = await session.run(
-                    "MATCH ()-[r]-() DELETE r"
-                )
+                rel_result = await session.run("MATCH ()-[r]-() DELETE r")
                 # Neo4j DELETE doesn't return count, so we need to count separately
-                count_result = await session.run("MATCH ()-[r]-() RETURN count(r) as count")
+                count_result = await session.run(
+                    "MATCH ()-[r]-() RETURN count(r) as count"
+                )
                 count_record = await count_result.single()
                 initial_rel_count = count_record["count"] if count_record else 0
-                
+
                 # Actually delete relationships
                 await session.run("MATCH ()-[r]-() DELETE r")
                 stats["relationships_deleted"] = initial_rel_count
@@ -273,7 +278,7 @@ class DatabaseCleaner:
                 count_result = await session.run("MATCH (n) RETURN count(n) as count")
                 count_record = await count_result.single()
                 initial_node_count = count_record["count"] if count_record else 0
-                
+
                 # Actually delete nodes
                 await session.run("MATCH (n) DELETE n")
                 stats["nodes_deleted"] = initial_node_count
@@ -293,7 +298,9 @@ class DatabaseCleaner:
                             try:
                                 await session.run(f"DROP CONSTRAINT {constraint_name}")
                                 stats["constraints_deleted"] += 1
-                                logger.info(f"SUCCESS: Dropped constraint: {constraint_name}")
+                                logger.info(
+                                    f"SUCCESS: Dropped constraint: {constraint_name}"
+                                )
                             except Exception as e:
                                 logger.warning(
                                     f"WARNING: Failed to drop constraint {constraint_name}: {e}"
@@ -347,11 +354,11 @@ class DatabaseCleaner:
                 # Count keys for dry run
                 key_count = self.redis_client.dbsize()
                 stats["keys_deleted"] = key_count
-                
+
                 # Get memory usage
                 info = self.redis_client.info("memory")
                 stats["memory_freed"] = info.get("used_memory", 0)
-                
+
                 logger.info(
                     f"DRY RUN: [DRY RUN] Would delete {stats['keys_deleted']} keys and free {stats['memory_freed']} bytes"
                 )
@@ -363,13 +370,15 @@ class DatabaseCleaner:
             initial_memory = initial_memory_info.get("used_memory", 0)
 
             # Clear all keys in the current database
-            logger.info(f"DELETING: Clearing database {self.redis_client.connection_pool.connection_kwargs['db']}...")
+            logger.info(
+                f"DELETING: Clearing database {self.redis_client.connection_pool.connection_kwargs['db']}..."
+            )
             self.redis_client.flushdb()
-            
+
             # Get final stats
             final_memory_info = self.redis_client.info("memory")
             final_memory = final_memory_info.get("used_memory", 0)
-            
+
             stats["keys_deleted"] = initial_key_count
             stats["memory_freed"] = initial_memory - final_memory
             stats["databases_cleared"] = 1
@@ -425,21 +434,25 @@ class DatabaseCleaner:
 
                 # Count by node labels - use simple approach without APOC
                 try:
-                    labels_result = await session.run("CALL db.labels() YIELD label RETURN label")
+                    labels_result = await session.run(
+                        "CALL db.labels() YIELD label RETURN label"
+                    )
                     labels = []
                     async for record in labels_result:
                         labels.append(record["label"])
-                    
+
                     # Count each label type separately
                     for label in labels:
                         try:
-                            count_result = await session.run(f"MATCH (n:{label}) RETURN count(n) as count")
+                            count_result = await session.run(
+                                f"MATCH (n:{label}) RETURN count(n) as count"
+                            )
                             count_record = await count_result.single()
                             if count_record:
                                 stats["neo4j"][f"{label}_nodes"] = count_record["count"]
                         except Exception as e:
                             logger.warning(f"Failed to count {label} nodes: {e}")
-                            
+
                 except Exception as e:
                     # If db.labels() is not available, skip detailed counting
                     logger.warning(f"Could not get node labels: {e}")
@@ -451,11 +464,21 @@ class DatabaseCleaner:
                     redis_info = self.redis_client.info()
                     stats["redis"]["keys"] = self.redis_client.dbsize()
                     stats["redis"]["used_memory"] = redis_info.get("used_memory", 0)
-                    stats["redis"]["used_memory_human"] = redis_info.get("used_memory_human", "0B")
-                    stats["redis"]["connected_clients"] = redis_info.get("connected_clients", 0)
-                    stats["redis"]["uptime_seconds"] = redis_info.get("uptime_in_seconds", 0)
-                    stats["redis"]["redis_version"] = redis_info.get("redis_version", "unknown")
-                    stats["redis"]["database"] = self.redis_client.connection_pool.connection_kwargs.get('db', 0)
+                    stats["redis"]["used_memory_human"] = redis_info.get(
+                        "used_memory_human", "0B"
+                    )
+                    stats["redis"]["connected_clients"] = redis_info.get(
+                        "connected_clients", 0
+                    )
+                    stats["redis"]["uptime_seconds"] = redis_info.get(
+                        "uptime_in_seconds", 0
+                    )
+                    stats["redis"]["redis_version"] = redis_info.get(
+                        "redis_version", "unknown"
+                    )
+                    stats["redis"]["database"] = (
+                        self.redis_client.connection_pool.connection_kwargs.get("db", 0)
+                    )
                 except Exception as e:
                     logger.warning(f"Could not get Redis stats: {e}")
                     stats["redis"]["error"] = str(e)
@@ -484,25 +507,33 @@ class DatabaseCleaner:
                 try:
                     # Use a more robust input method for Windows compatibility
                     import msvcrt
-                    
-                    print("\nWARNING: This will DELETE ALL DATA in both databases. Continue? (y/n): ", end="", flush=True)
-                    
+
+                    print(
+                        "\nWARNING: This will DELETE ALL DATA in both databases. Continue? (y/n): ",
+                        end="",
+                        flush=True,
+                    )
+
                     while True:
                         if msvcrt.kbhit():
-                            char = msvcrt.getch().decode('utf-8').lower()
+                            char = msvcrt.getch().decode("utf-8").lower()
                             print(char)  # Echo the character
-                            
-                            if char == 'y':
+
+                            if char == "y":
                                 print("SUCCESS: Proceeding with cleanup...")
                                 break
-                            elif char == 'n':
+                            elif char == "n":
                                 print("ERROR: Operation cancelled by user")
                                 return results
                             else:
-                                print("Please enter 'y' for yes or 'n' for no: ", end="", flush=True)
-                        
+                                print(
+                                    "Please enter 'y' for yes or 'n' for no: ",
+                                    end="",
+                                    flush=True,
+                                )
+
                         await asyncio.sleep(0.1)
-                        
+
                 except ImportError:
                     # Fallback for non-Windows or if msvcrt not available
                     try:
@@ -514,7 +545,9 @@ class DatabaseCleaner:
                             return results
                     except EOFError:
                         # Handle cases where input is not available (automated scripts)
-                        logger.warning("WARNING: No input available, proceeding with cleanup (use --dry-run to test first)")
+                        logger.warning(
+                            "WARNING: No input available, proceeding with cleanup (use --dry-run to test first)"
+                        )
 
             # Clean Qdrant
             if self.qdrant_client:
