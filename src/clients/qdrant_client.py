@@ -410,7 +410,7 @@ class QdrantClientWrapper:
         contents: List[str],
         metadatas: List[Dict[str, Any]],
         url_to_full_document: Dict[str, str],
-        batch_size: int = 100,
+        batch_size: int = 500,
     ) -> None:
         """
         Add documents to Qdrant crawled_pages collection.
@@ -620,7 +620,7 @@ class QdrantClientWrapper:
         code_examples: List[str],
         summaries: List[str],
         metadatas: List[Dict[str, Any]],
-        batch_size: int = 100,
+        batch_size: int = 500,
     ):
         """
         Add code examples to Qdrant with same interface as Supabase version.

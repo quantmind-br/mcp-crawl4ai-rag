@@ -74,13 +74,33 @@ def is_playwright_imported() -> bool:
     return ("playwright" in sys.modules) or ("crawl4ai" in sys.modules)
 
 
+def will_playwright_be_imported() -> bool:
+    """
+    Detect if Playwright will be imported by checking for Crawl4AI availability.
+
+    This is used during early event loop configuration to predict Playwright usage
+    without actually importing heavy modules.
+
+    Returns:
+        bool: True if Playwright will be imported (Crawl4AI is available), False otherwise
+    """
+    try:
+        # Try to find crawl4ai without importing it
+        import importlib.util
+
+        spec = importlib.util.find_spec("crawl4ai")
+        return spec is not None
+    except Exception:
+        return False
+
+
 def should_use_selector_loop() -> bool:
     """
     Determine if SelectorEventLoop should be used.
 
     Uses SelectorEventLoop on Windows when available to avoid
     ConnectionResetError during HTTP client cleanup, but falls back
-    to ProactorEventLoop when Playwright is detected.
+    to ProactorEventLoop when Playwright is detected or will be imported.
 
     Returns:
         bool: True if SelectorEventLoop should be used, False otherwise
@@ -93,9 +113,9 @@ def should_use_selector_loop() -> bool:
         if not has_selector_event_loop_policy():
             return False
 
-        # Don't use SelectorEventLoop if Playwright is imported
+        # Don't use SelectorEventLoop if Playwright is imported or will be imported
         # since it requires ProactorEventLoop for subprocess support
-        if is_playwright_imported():
+        if is_playwright_imported() or will_playwright_be_imported():
             return False
 
         return True
@@ -198,8 +218,12 @@ def setup_event_loop() -> Optional[str]:
                 logging.debug(f"Applied Windows event loop fix - using {new_policy}")
                 return new_policy
 
-            elif playwright_detected or not has_selector_event_loop_policy():
-                # Playwright detected - ensure ProactorEventLoop is used
+            elif (
+                playwright_detected
+                or will_playwright_be_imported()
+                or not has_selector_event_loop_policy()
+            ):
+                # Playwright detected or will be imported - ensure ProactorEventLoop is used
                 if hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
                     asyncio.set_event_loop_policy(
                         asyncio.WindowsProactorEventLoopPolicy()
@@ -207,22 +231,29 @@ def setup_event_loop() -> Optional[str]:
                     # Return the intended policy name for determinism in tests
                     new_policy = "WindowsProactorEventLoopPolicy"
 
-                    logger.info(
-                        f"Playwright detected on Windows: Using ProactorEventLoop for subprocess support. "
-                        f"Changed from {original_policy} to {new_policy}. "
-                        f"ConnectionResetError may still occur but functionality is preserved."
-                    )
-                    logging.debug(
-                        f"Playwright detected - using {new_policy} for subprocess support. "
-                        f"ConnectionResetError may still occur."
-                    )
+                    if playwright_detected:
+                        logger.info(
+                            f"Playwright detected on Windows: Using ProactorEventLoop for optimal performance. "
+                            f"Changed from {original_policy} to {new_policy}."
+                        )
+                        logging.debug(
+                            f"Playwright detected - using {new_policy} for optimal performance."
+                        )
+                    elif will_playwright_be_imported():
+                        logger.info(
+                            f"Crawl4AI/Playwright will be imported: Using ProactorEventLoop for optimal performance. "
+                            f"Changed from {original_policy} to {new_policy}."
+                        )
+                        logging.debug(
+                            f"Crawl4AI/Playwright will be imported - using {new_policy} for optimal performance."
+                        )
                     return new_policy
                 else:
                     logger.warning(
-                        "Playwright detected but WindowsProactorEventLoopPolicy not available"
+                        "Playwright detected/needed but WindowsProactorEventLoopPolicy not available"
                     )
                     logging.debug(
-                        "Playwright detected but ProactorEventLoop not available"
+                        "Playwright detected/needed but ProactorEventLoop not available"
                     )
             else:
                 # Windows but SelectorEventLoop not suitable and no Playwright

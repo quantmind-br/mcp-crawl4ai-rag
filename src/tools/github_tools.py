@@ -25,6 +25,7 @@ from ..features.github.processors import (
     TypeScriptProcessor,
     ConfigProcessor,
     MarkdownProcessor,
+    MDXProcessor,
 )
 from ..utils.validation import validate_github_url
 
@@ -101,7 +102,7 @@ async def smart_crawl_github(
         chunk_size: Maximum size of each content chunk in characters (default: 5000)
         max_size_mb: Maximum repository size in MB (default: 500)
         file_types_to_index: File extensions to process (default: ['.md'])
-                           Supported: ['.md', '.py', '.ts', '.tsx', '.json', '.yaml', '.yml', '.toml']
+                           Supported: ['.md', '.mdx', '.py', '.ts', '.tsx', '.json', '.yaml', '.yml', '.toml']
 
     Returns:
         JSON string with crawl summary and storage information
@@ -159,6 +160,7 @@ async def smart_crawl_github(
             ".markdown": MarkdownProcessor,
             ".mdown": MarkdownProcessor,
             ".mkd": MarkdownProcessor,
+            ".mdx": MDXProcessor,
             ".py": PythonProcessor,
             ".ts": TypeScriptProcessor,
             ".tsx": TypeScriptProcessor,

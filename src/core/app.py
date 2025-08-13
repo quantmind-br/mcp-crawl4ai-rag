@@ -98,6 +98,15 @@ class ContextSingleton:
         """Initialize the application context once."""
         logger.info("Starting application initialization...")
 
+        # Apply Windows Unicode compatibility fixes FIRST
+        try:
+            from ..utils.windows_unicode_fix import setup_windows_unicode_compatibility
+
+            setup_windows_unicode_compatibility()
+            logger.debug("Applied Windows Unicode compatibility fixes")
+        except ImportError:
+            logger.debug("Windows Unicode fix module not available")
+
         # Initialize Tree-sitter grammars if needed (for knowledge graph features)
         try:
             from ..utils.grammar_initialization import initialize_grammars_if_needed
@@ -108,13 +117,35 @@ class ContextSingleton:
                 "Grammar initialization module not available, skipping Tree-sitter setup"
             )
 
-        # Create browser configuration
-        browser_config = BrowserConfig(headless=True, verbose=False)
+        # Create browser configuration with Unicode safety
+        try:
+            from ..utils.windows_unicode_fix import create_safe_crawler_config
 
-        # Initialize the crawler
-        crawler = AsyncWebCrawler(config=browser_config)
-        await crawler.__aenter__()
-        logger.info("Web crawler initialized")
+            browser_config = create_safe_crawler_config()
+            logger.debug(
+                "Using safe crawler configuration for Windows Unicode compatibility"
+            )
+        except ImportError:
+            # Fallback to original configuration
+            browser_config = BrowserConfig(headless=True, verbose=False)
+            logger.debug("Using fallback crawler configuration")
+
+        # Initialize the crawler with enhanced error handling
+        try:
+            crawler = AsyncWebCrawler(config=browser_config)
+            await crawler.__aenter__()
+            logger.info("Web crawler initialized")
+        except Exception as e:
+            logger.error(f"Error initializing crawler: {e}")
+            # Try with minimal configuration as fallback
+            try:
+                minimal_config = BrowserConfig(headless=True, verbose=False)
+                crawler = AsyncWebCrawler(config=minimal_config)
+                await crawler.__aenter__()
+                logger.info("Web crawler initialized with minimal configuration")
+            except Exception as e2:
+                logger.error(f"Failed to initialize crawler with minimal config: {e2}")
+                raise
 
         # Initialize Qdrant client
         try:
@@ -510,7 +541,7 @@ def register_tools(app: FastMCP) -> None:
             
             CAPABILITIES:
             • Simultaneous indexing for semantic search (Qdrant) and code analysis (Neo4j)
-            • Multi-language support: Python, JavaScript, Go, Java, Rust, C/C++, and more
+            • Multi-language support: Python, JavaScript/TypeScript, Go, Java, Rust, C/C++, Ruby, PHP, Kotlin, Swift, Scala, C#, Markdown/MDX, and more
             • 50-70% faster processing through unified pipeline architecture
             • Cross-system file_id linking for comprehensive code intelligence
             • Production-ready with robust error handling and detailed statistics
@@ -526,7 +557,8 @@ def register_tools(app: FastMCP) -> None:
             PARAMETERS:
             • repo_url: GitHub repository URL (public or authenticated)
             • destination: "qdrant" | "neo4j" | "both" (default: "both") 
-            • file_types: Array of extensions [".py", ".js", ".md"] (default: [".md"])
+            • file_types: Array of extensions (default: [".md"])
+              📋 SUPPORTED TYPES: [".md", ".mdx", ".py", ".js", ".ts", ".tsx", ".java", ".go", ".rs", ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".kt", ".swift", ".scala", ".json", ".yaml", ".yml", ".toml", ".xml", ".html", ".css", ".scss", ".sql"]
             • max_files: Processing limit (default: 50, recommend: 20-500)
             • chunk_size: RAG chunk size (default: 5000 chars)
             • max_size_mb: Repository size limit (default: 500MB)

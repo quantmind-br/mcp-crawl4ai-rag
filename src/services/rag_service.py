@@ -357,7 +357,7 @@ def add_documents_to_vector_db(
     contents: List[str],
     metadatas: List[Dict[str, Any]],
     url_to_full_document: Dict[str, str],
-    batch_size: int = 100,
+    batch_size: int = 500,
     file_ids: Optional[List[str]] = None,
 ) -> None:
     """

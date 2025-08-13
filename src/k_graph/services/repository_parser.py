@@ -26,6 +26,9 @@ from neo4j import AsyncGraphDatabase
 # Import Tree-sitter components
 from ..parsing.parser_factory import get_global_factory
 
+# Import bulk operations
+from .neo4j_bulk_operations import Neo4jBulkProcessor
+
 # Load environment variables first
 load_dotenv()
 
@@ -411,12 +414,35 @@ class Neo4jCodeAnalyzer:
 class DirectNeo4jExtractor:
     """Creates nodes and relationships directly in Neo4j"""
 
-    def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
+    def __init__(
+        self,
+        neo4j_uri: str,
+        neo4j_user: str,
+        neo4j_password: str,
+        use_bulk_operations: bool = True,
+    ):
         self.neo4j_uri = neo4j_uri
         self.neo4j_user = neo4j_user
         self.neo4j_password = neo4j_password
         self.driver = None
         self.analyzer = Neo4jCodeAnalyzer()
+        self.use_bulk_operations = use_bulk_operations
+
+        # Initialize bulk processor for high-performance operations
+        if use_bulk_operations:
+            try:
+                from ...utils.performance_config import get_performance_config
+
+                config = get_performance_config()
+                batch_size = config.batch_size_neo4j
+            except ImportError:
+                batch_size = 5000  # Default high-performance batch size
+
+            self.bulk_processor = Neo4jBulkProcessor(batch_size=batch_size)
+            logger.info(f"Initialized bulk processor with batch size: {batch_size}")
+        else:
+            self.bulk_processor = None
+            logger.info("Using legacy individual operations mode")
 
     async def initialize(self):
         """Initialize Neo4j connection with deadlock prevention"""
@@ -838,120 +864,251 @@ class DirectNeo4jExtractor:
                     # Don't fail the whole process due to cleanup issues
 
     async def _create_graph(self, repo_name: str, modules_data: List[Dict]):
-        """Create all nodes and relationships in Neo4j"""
+        """Create all nodes and relationships in Neo4j using optimized bulk operations when available"""
 
         async with self.driver.session() as session:
-            # Create Repository node using MERGE to avoid duplicates
-            await session.run(
-                "MERGE (r:Repository {name: $repo_name}) ON CREATE SET r.created_at = datetime()",
-                repo_name=repo_name,
+            # Use bulk operations if available for maximum performance
+            if self.bulk_processor:
+                await self._create_graph_bulk(session, repo_name, modules_data)
+            else:
+                await self._create_graph_legacy(session, repo_name, modules_data)
+
+    async def _create_graph_bulk(
+        self, session, repo_name: str, modules_data: List[Dict]
+    ):
+        """Create graph using optimized bulk operations with UNWIND patterns"""
+        logger.info(f"Using bulk operations to process {len(modules_data)} modules")
+
+        # Prepare data for bulk operations
+        file_data = []
+        class_data = []
+        method_data = []
+        function_data = []
+
+        # Extract and organize data for bulk operations
+        for mod in modules_data:
+            if not isinstance(mod, dict) or not all(
+                key in mod
+                for key in [
+                    "file_path",
+                    "module_name",
+                    "classes",
+                    "functions",
+                    "imports",
+                ]
+            ):
+                continue
+
+            # Prepare file data
+            file_data.append(
+                {
+                    "path": mod["file_path"],
+                    "name": mod["file_path"].split("/")[-1],
+                    "language": mod.get("language", "unknown"),
+                    "file_type": Path(mod["file_path"]).suffix,
+                    "line_count": mod.get("line_count", 0),
+                }
             )
 
-            nodes_created = 0
-            relationships_created = 0
-
-            for i, mod in enumerate(modules_data):
-                # Skip if mod is not a dictionary (safety check)
-                if not isinstance(mod, dict):
-                    logger.warning(
-                        f"Skipping invalid module data at index {i}: {type(mod)}"
+            # Prepare class data
+            for cls in mod.get("classes", []):
+                if isinstance(cls, dict) and "name" in cls and "full_name" in cls:
+                    class_data.append(
+                        {
+                            "full_name": cls["full_name"],
+                            "name": cls["name"],
+                            "file_path": mod["file_path"],
+                            "line_start": cls.get("line_start", 0),
+                            "line_end": cls.get("line_end", 0),
+                            "docstring": cls.get("docstring", ""),
+                        }
                     )
-                    continue
 
-                # Ensure required fields exist
-                if not all(
-                    key in mod
-                    for key in [
-                        "file_path",
-                        "module_name",
-                        "classes",
-                        "functions",
-                        "imports",
-                    ]
-                ):
-                    logger.warning(
-                        f"Skipping module with missing required fields: {mod.get('file_path', 'unknown')}"
+                    # Prepare method data for this class
+                    for method in cls.get("methods", []):
+                        if isinstance(method, dict) and "name" in method:
+                            method_id = f"{cls['full_name']}.{method['name']}"
+                            method_data.append(
+                                {
+                                    "method_id": method_id,
+                                    "name": method["name"],
+                                    "class_full_name": cls["full_name"],
+                                    "class_name": cls["name"],
+                                    "params_list": method.get("params", []),
+                                    "params_detailed": method.get("params", []),
+                                    "return_type": method.get("return_type", "void"),
+                                    "args": method.get("params", []),
+                                    "line_start": method.get("line_start", 0),
+                                    "line_end": method.get("line_end", 0),
+                                    "docstring": method.get("docstring", ""),
+                                }
+                            )
+
+            # Prepare function data
+            for func in mod.get("functions", []):
+                if isinstance(func, dict) and "name" in func and "full_name" in func:
+                    func_id = f"{mod['file_path']}:{func['full_name']}"
+                    function_data.append(
+                        {
+                            "func_id": func_id,
+                            "name": func["name"],
+                            "full_name": func["full_name"],
+                            "file_path": mod["file_path"],
+                            "params_list": func.get("params", []),
+                            "params_detailed": func.get("params", []),
+                            "return_type": func.get("return_type", "void"),
+                            "args": func.get("params", []),
+                            "line_start": func.get("line_start", 0),
+                            "line_end": func.get("line_end", 0),
+                            "docstring": func.get("docstring", ""),
+                        }
                     )
-                    continue
 
-                # 1. Create File node using MERGE to avoid constraint violations
-                await session.run(
-                    """
-                    MERGE (f:File {path: $path})
-                    ON CREATE SET f.name = $name,
-                                  f.module_name = $module_name,
-                                  f.line_count = $line_count,
-                                  f.language = $language,
-                                  f.created_at = datetime()
-                    ON MATCH SET f.module_name = $module_name,
-                                 f.line_count = $line_count,
-                                 f.language = $language
-                """,
-                    name=mod["file_path"].split("/")[-1],
-                    path=mod["file_path"],
-                    module_name=mod["module_name"],
-                    line_count=mod.get("line_count", 0),
-                    language=mod.get("language", "unknown"),
+        # Execute bulk operations in optimal order
+        logger.info("Executing bulk file creation...")
+        await self.bulk_processor.bulk_create_files(session, file_data, repo_name)
+
+        if class_data:
+            logger.info(
+                f"Executing bulk class creation for {len(class_data)} classes..."
+            )
+            await self.bulk_processor.bulk_create_classes(session, class_data)
+
+        if method_data:
+            logger.info(
+                f"Executing bulk method creation for {len(method_data)} methods..."
+            )
+            await self.bulk_processor.bulk_create_methods(session, method_data)
+
+        if function_data:
+            logger.info(
+                f"Executing bulk function creation for {len(function_data)} functions..."
+            )
+            await self.bulk_processor.bulk_create_functions(session, function_data)
+
+        # TODO: Implement import relationships in bulk operations
+        # if import_data:
+        #     await self.bulk_processor.bulk_create_imports(session, import_data)
+
+        logger.info("Bulk graph creation completed successfully")
+
+    async def _create_graph_legacy(
+        self, session, repo_name: str, modules_data: List[Dict]
+    ):
+        """Legacy graph creation method using individual operations"""
+        logger.info(f"Using legacy operations to process {len(modules_data)} modules")
+
+        # Create Repository node using MERGE to avoid duplicates
+        await session.run(
+            "MERGE (r:Repository {name: $repo_name}) ON CREATE SET r.created_at = datetime()",
+            repo_name=repo_name,
+        )
+
+        nodes_created = 0
+        relationships_created = 0
+
+        for i, mod in enumerate(modules_data):
+            # Skip if mod is not a dictionary (safety check)
+            if not isinstance(mod, dict):
+                logger.warning(
+                    f"Skipping invalid module data at index {i}: {type(mod)}"
                 )
-                nodes_created += 1
+                continue
 
-                # 2. Connect File to Repository
-                await session.run(
-                    """
+            # Ensure required fields exist
+            if not all(
+                key in mod
+                for key in [
+                    "file_path",
+                    "module_name",
+                    "classes",
+                    "functions",
+                    "imports",
+                ]
+            ):
+                logger.warning(
+                    f"Skipping module with missing required fields: {mod.get('file_path', 'unknown')}"
+                )
+                continue
+
+            # 1. Create File node using MERGE to avoid constraint violations
+            await session.run(
+                """
+                MERGE (f:File {path: $path})
+                ON CREATE SET f.name = $name,
+                              f.module_name = $module_name,
+                              f.line_count = $line_count,
+                              f.language = $language,
+                              f.created_at = datetime()
+                ON MATCH SET f.module_name = $module_name,
+                             f.line_count = $line_count,
+                             f.language = $language
+            """,
+                name=mod["file_path"].split("/")[-1],
+                path=mod["file_path"],
+                module_name=mod["module_name"],
+                line_count=mod.get("line_count", 0),
+                language=mod.get("language", "unknown"),
+            )
+            nodes_created += 1
+
+            # 2. Connect File to Repository
+            await session.run(
+                """
                     MATCH (r:Repository {name: $repo_name})
                     MATCH (f:File {path: $file_path})
                     MERGE (r)-[:CONTAINS]->(f)
                 """,
-                    repo_name=repo_name,
-                    file_path=mod["file_path"],
-                )
-                relationships_created += 1
+                repo_name=repo_name,
+                file_path=mod["file_path"],
+            )
+            relationships_created += 1
 
-                # 3. Create Class nodes and relationships
-                for cls in mod.get("classes", []):
-                    if (
-                        not isinstance(cls, dict)
-                        or "name" not in cls
-                        or "full_name" not in cls
-                    ):
-                        logger.warning(f"Skipping invalid class data: {cls}")
-                        continue
+            # 3. Create Class nodes and relationships
+            for cls in mod.get("classes", []):
+                if (
+                    not isinstance(cls, dict)
+                    or "name" not in cls
+                    or "full_name" not in cls
+                ):
+                    logger.warning(f"Skipping invalid class data: {cls}")
+                    continue
 
-                    # Create Class node using MERGE to avoid duplicates
-                    await session.run(
-                        """
+                # Create Class node using MERGE to avoid duplicates
+                await session.run(
+                    """
                         MERGE (c:Class {full_name: $full_name})
                         ON CREATE SET c.name = $name, c.created_at = datetime()
                     """,
-                        name=cls["name"],
-                        full_name=cls["full_name"],
-                    )
-                    nodes_created += 1
+                    name=cls["name"],
+                    full_name=cls["full_name"],
+                )
+                nodes_created += 1
 
-                    # Connect File to Class
-                    await session.run(
-                        """
+                # Connect File to Class
+                await session.run(
+                    """
                         MATCH (f:File {path: $file_path})
                         MATCH (c:Class {full_name: $class_full_name})
                         MERGE (f)-[:DEFINES]->(c)
                     """,
-                        file_path=mod["file_path"],
-                        class_full_name=cls["full_name"],
-                    )
-                    relationships_created += 1
+                    file_path=mod["file_path"],
+                    class_full_name=cls["full_name"],
+                )
+                relationships_created += 1
 
-                    # 4. Create Method nodes - use MERGE to avoid duplicates
-                    for method in cls.get("methods", []):
-                        if not isinstance(method, dict) or "name" not in method:
-                            logger.warning(f"Skipping invalid method data: {method}")
-                            continue
+                # 4. Create Method nodes - use MERGE to avoid duplicates
+                for method in cls.get("methods", []):
+                    if not isinstance(method, dict) or "name" not in method:
+                        logger.warning(f"Skipping invalid method data: {method}")
+                        continue
 
-                        method_full_name = f"{cls['full_name']}.{method['name']}"
-                        # Create method with unique ID to avoid conflicts
-                        method_id = f"{cls['full_name']}::{method['name']}"
+                    method_full_name = f"{cls['full_name']}.{method['name']}"
+                    # Create method with unique ID to avoid conflicts
+                    method_id = f"{cls['full_name']}::{method['name']}"
 
-                        await session.run(
-                            """
+                    await session.run(
+                        """
                             MERGE (m:Method {method_id: $method_id})
                             ON CREATE SET m.name = $name, 
                                          m.full_name = $full_name,
@@ -961,133 +1118,131 @@ class DirectNeo4jExtractor:
                                          m.return_type = $return_type,
                                          m.created_at = datetime()
                         """,
-                            name=method["name"],
-                            full_name=method_full_name,
-                            method_id=method_id,
-                            args=method.get("args", []),
-                            params_list=[
-                                f"{p.get('name', '')}:{p.get('type', '')}"
-                                for p in method.get("params", [])
-                                if isinstance(p, dict)
-                            ],  # Simple format
-                            params_detailed=method.get(
-                                "params_detailed", []
-                            ),  # Detailed format
-                            return_type=method.get("return_type", "Any"),
-                        )
-                        nodes_created += 1
+                        name=method["name"],
+                        full_name=method_full_name,
+                        method_id=method_id,
+                        args=method.get("args", []),
+                        params_list=[
+                            f"{p.get('name', '')}:{p.get('type', '')}"
+                            for p in method.get("params", [])
+                            if isinstance(p, dict)
+                        ],  # Simple format
+                        params_detailed=method.get(
+                            "params_detailed", []
+                        ),  # Detailed format
+                        return_type=method.get("return_type", "Any"),
+                    )
+                    nodes_created += 1
 
-                        # Connect Class to Method
-                        await session.run(
-                            """
+                    # Connect Class to Method
+                    await session.run(
+                        """
                             MATCH (c:Class {full_name: $class_full_name})
                             MATCH (m:Method {method_id: $method_id})
                             MERGE (c)-[:HAS_METHOD]->(m)
                         """,
-                            class_full_name=cls["full_name"],
-                            method_id=method_id,
-                        )
-                        relationships_created += 1
+                        class_full_name=cls["full_name"],
+                        method_id=method_id,
+                    )
+                    relationships_created += 1
 
-                    # 5. Create Attribute nodes - use MERGE to avoid duplicates
-                    for attr in cls.get("attributes", []):
-                        if not isinstance(attr, dict) or "name" not in attr:
-                            logger.warning(f"Skipping invalid attribute data: {attr}")
-                            continue
+                # 5. Create Attribute nodes - use MERGE to avoid duplicates
+                for attr in cls.get("attributes", []):
+                    if not isinstance(attr, dict) or "name" not in attr:
+                        logger.warning(f"Skipping invalid attribute data: {attr}")
+                        continue
 
-                        attr_full_name = f"{cls['full_name']}.{attr['name']}"
-                        # Create attribute with unique ID to avoid conflicts
-                        attr_id = f"{cls['full_name']}::{attr['name']}"
-                        await session.run(
-                            """
+                    attr_full_name = f"{cls['full_name']}.{attr['name']}"
+                    # Create attribute with unique ID to avoid conflicts
+                    attr_id = f"{cls['full_name']}::{attr['name']}"
+                    await session.run(
+                        """
                             MERGE (a:Attribute {attr_id: $attr_id})
                             ON CREATE SET a.name = $name,
                                          a.full_name = $full_name,
                                          a.type = $type,
                                          a.created_at = datetime()
                         """,
-                            name=attr["name"],
-                            full_name=attr_full_name,
-                            attr_id=attr_id,
-                            type=attr.get("type", "Any"),
-                        )
-                        nodes_created += 1
+                        name=attr["name"],
+                        full_name=attr_full_name,
+                        attr_id=attr_id,
+                        type=attr.get("type", "Any"),
+                    )
+                    nodes_created += 1
 
-                        # Connect Class to Attribute
-                        await session.run(
-                            """
+                    # Connect Class to Attribute
+                    await session.run(
+                        """
                             MATCH (c:Class {full_name: $class_full_name})
                             MATCH (a:Attribute {attr_id: $attr_id})
                             MERGE (c)-[:HAS_ATTRIBUTE]->(a)
                         """,
-                            class_full_name=cls["full_name"],
-                            attr_id=attr_id,
-                        )
-                        relationships_created += 1
-
-                # 6. Create Function nodes (top-level) - use MERGE to avoid duplicates
-                for func in mod.get("functions", []):
-                    if not isinstance(func, dict) or "name" not in func:
-                        logger.warning(f"Skipping invalid function data: {func}")
-                        continue
-
-                    func_id = f"{mod['file_path']}::{func['name']}"
-                    await session.run(
-                        """
-                        MERGE (f:Function {func_id: $func_id})
-                        ON CREATE SET f.name = $name,
-                                     f.full_name = $full_name,
-                                     f.args = $args,
-                                     f.params_list = $params_list,
-                                     f.params_detailed = $params_detailed,
-                                     f.return_type = $return_type,
-                                     f.created_at = datetime()
-                    """,
-                        name=func["name"],
-                        full_name=func.get("full_name", func["name"]),
-                        func_id=func_id,
-                        args=func.get("args", []),
-                        params_list=func.get(
-                            "params_list", []
-                        ),  # Simple format for backwards compatibility
-                        params_detailed=func.get(
-                            "params_detailed", []
-                        ),  # Detailed format
-                        return_type=func.get("return_type", "Any"),
-                    )
-                    nodes_created += 1
-
-                    # Connect File to Function
-                    await session.run(
-                        """
-                        MATCH (file:File {path: $file_path})
-                        MATCH (func:Function {func_id: $func_id})
-                        MERGE (file)-[:DEFINES]->(func)
-                    """,
-                        file_path=mod["file_path"],
-                        func_id=func_id,
+                        class_full_name=cls["full_name"],
+                        attr_id=attr_id,
                     )
                     relationships_created += 1
 
-                # 7. Create Import relationships
-                imports_list = mod.get("imports", [])
-                if isinstance(imports_list, list):
-                    for import_name in imports_list:
-                        if isinstance(import_name, str):
-                            # Try to find the target file
-                            await session.run(
-                                """
-                                MATCH (source:File {path: $source_path})
-                                OPTIONAL MATCH (target:File) 
-                                WHERE target.module_name = $import_name OR target.module_name STARTS WITH $import_name
-                                WITH source, target
-                                WHERE target IS NOT NULL
-                                MERGE (source)-[:IMPORTS]->(target)
-                            """,
-                                source_path=mod["file_path"],
-                                import_name=import_name,
-                            )
-                            relationships_created += 1
+            # 6. Create Function nodes (top-level) - use MERGE to avoid duplicates
+            for func in mod.get("functions", []):
+                if not isinstance(func, dict) or "name" not in func:
+                    logger.warning(f"Skipping invalid function data: {func}")
+                    continue
+
+                func_id = f"{mod['file_path']}::{func['name']}"
+                await session.run(
+                    """
+                    MERGE (f:Function {func_id: $func_id})
+                    ON CREATE SET f.name = $name,
+                                 f.full_name = $full_name,
+                                 f.args = $args,
+                                 f.params_list = $params_list,
+                                 f.params_detailed = $params_detailed,
+                                 f.return_type = $return_type,
+                                 f.created_at = datetime()
+                """,
+                    name=func["name"],
+                    full_name=func.get("full_name", func["name"]),
+                    func_id=func_id,
+                    args=func.get("args", []),
+                    params_list=func.get(
+                        "params_list", []
+                    ),  # Simple format for backwards compatibility
+                    params_detailed=func.get("params_detailed", []),  # Detailed format
+                    return_type=func.get("return_type", "Any"),
+                )
+                nodes_created += 1
+
+                # Connect File to Function
+                await session.run(
+                    """
+                    MATCH (file:File {path: $file_path})
+                    MATCH (func:Function {func_id: $func_id})
+                    MERGE (file)-[:DEFINES]->(func)
+                """,
+                    file_path=mod["file_path"],
+                    func_id=func_id,
+                )
+                relationships_created += 1
+
+            # 7. Create Import relationships
+            imports_list = mod.get("imports", [])
+            if isinstance(imports_list, list):
+                for import_name in imports_list:
+                    if isinstance(import_name, str):
+                        # Try to find the target file
+                        await session.run(
+                            """
+                            MATCH (source:File {path: $source_path})
+                            OPTIONAL MATCH (target:File) 
+                            WHERE target.module_name = $import_name OR target.module_name STARTS WITH $import_name
+                            WITH source, target
+                            WHERE target IS NOT NULL
+                            MERGE (source)-[:IMPORTS]->(target)
+                        """,
+                            source_path=mod["file_path"],
+                            import_name=import_name,
+                        )
+                        relationships_created += 1
 
                 if (i + 1) % 10 == 0:
                     logger.info(f"Processed {i + 1}/{len(modules_data)} files...")

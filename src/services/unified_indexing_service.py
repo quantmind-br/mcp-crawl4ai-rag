@@ -331,13 +331,14 @@ class UnifiedIndexingService:
     Qdrant (RAG) and Neo4j (Knowledge Graph) with consistent file_id linking.
     """
 
-    def __init__(self, qdrant_client=None, neo4j_parser=None):
+    def __init__(self, qdrant_client=None, neo4j_parser=None, context=None):
         """
         Initialize the unified indexing service.
 
         Args:
             qdrant_client: Optional Qdrant client, will create if not provided
             neo4j_parser: Optional Neo4j repository parser, will create if not provided
+            context: Optional Crawl4AIContext with executors and performance config
         """
         import os
 
@@ -354,7 +355,38 @@ class UnifiedIndexingService:
             }
         )
         self.github_repository = GitRepository()
-        self.executor = ThreadPoolExecutor(max_workers=4)
+
+        # Performance optimization components
+        self.context = context
+        if context and context.io_executor and context.cpu_executor:
+            # Use context executors for optimized performance
+            self.io_executor = context.io_executor
+            self.cpu_executor = context.cpu_executor
+            self.performance_config = context.performance_config
+            logger.info("Using optimized executors from context")
+        else:
+            # Fallback to legacy executor for compatibility
+            self.executor = ThreadPoolExecutor(max_workers=4)
+            self.io_executor = None
+            self.cpu_executor = None
+            self.performance_config = None
+            logger.info("Using legacy ThreadPoolExecutor for compatibility")
+
+        # Initialize optimized pipeline if executors are available
+        self.optimized_pipeline = None
+        if self.io_executor and self.cpu_executor and self.performance_config:
+            try:
+                from .batch_processing.pipeline_stages import OptimizedIndexingPipeline
+
+                self.optimized_pipeline = OptimizedIndexingPipeline(
+                    self.io_executor,
+                    self.cpu_executor,
+                    self.performance_config,
+                )
+                logger.info("Optimized indexing pipeline initialized successfully")
+            except ImportError as e:
+                logger.warning(f"Could not initialize optimized pipeline: {e}")
+                self.optimized_pipeline = None
 
     async def process_repository_unified(
         self, request: UnifiedIndexingRequest
@@ -556,6 +588,9 @@ class UnifiedIndexingService:
         """
         Process files with unified indexing across RAG and/or Neo4j systems.
 
+        Uses optimized multi-stage pipeline when available, falls back to legacy
+        processing for compatibility.
+
         Args:
             files: List of file paths to process
             request: Processing request configuration
@@ -567,36 +602,63 @@ class UnifiedIndexingService:
         """
         logger.info(f"Starting unified processing of {len(files)} files")
 
-        # Process files in batches for better resource management
-        batch_size = 5  # Process 5 files concurrently
+        # Use optimized pipeline if available
+        if self.optimized_pipeline:
+            logger.info("Using optimized multi-stage pipeline for processing")
 
-        for i in range(0, len(files), batch_size):
-            batch_files = files[i : i + batch_size]
+            repo_name = extract_repo_name(request.repo_url)
 
-            # Create tasks for batch processing
-            tasks = []
-            for file_path in batch_files:
-                task = asyncio.create_task(
-                    self._process_single_file(file_path, request, repo_path)
-                )
-                tasks.append(task)
-
-            # Process batch concurrently
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Yield results and update progress
-            for j, result in enumerate(batch_results):
-                if isinstance(result, Exception):
-                    logger.error(f"Error processing file {batch_files[j]}: {result}")
-                    progress.update_progress(failed_increment=1)
-                    yield None
-                else:
-                    progress.update_progress(
-                        operation=f"Processed {result.relative_path}"
-                        if result
-                        else "Processing..."
-                    )
+            # Process files using the optimized pipeline
+            async for batch_results in self.optimized_pipeline.process_files_optimized(
+                files=files,
+                repo_path=repo_path,
+                repo_name=repo_name,
+                should_process_rag=request.should_process_rag,
+                should_process_kg=request.should_process_kg,
+                progress_tracker=progress,
+            ):
+                # Yield each result from the batch
+                for result in batch_results:
                     yield result
+        else:
+            # Fallback to legacy processing method
+            logger.info("Using legacy file processing method")
+
+            # Use performance config batch size if available, otherwise default
+            if self.performance_config:
+                batch_size = self.performance_config.batch_size_file_processing
+            else:
+                batch_size = 5  # Legacy default
+
+            for i in range(0, len(files), batch_size):
+                batch_files = files[i : i + batch_size]
+
+                # Create tasks for batch processing
+                tasks = []
+                for file_path in batch_files:
+                    task = asyncio.create_task(
+                        self._process_single_file(file_path, request, repo_path)
+                    )
+                    tasks.append(task)
+
+                # Process batch concurrently
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Yield results and update progress
+                for j, result in enumerate(batch_results):
+                    if isinstance(result, Exception):
+                        logger.error(
+                            f"Error processing file {batch_files[j]}: {result}"
+                        )
+                        progress.update_progress(failed_increment=1)
+                        yield None
+                    else:
+                        progress.update_progress(
+                            operation=f"Processed {result.relative_path}"
+                            if result
+                            else "Processing..."
+                        )
+                        yield result
 
     async def _process_single_file(
         self, file_path: Path, request: UnifiedIndexingRequest, repo_path: Path
@@ -1110,9 +1172,32 @@ class UnifiedIndexingService:
 
     async def cleanup(self):
         """Clean up service resources."""
-        if hasattr(self, "executor"):
-            self.executor.shutdown(wait=True)
-            logger.info("Unified indexing service cleanup completed")
+        cleanup_errors = []
+
+        # Clean up legacy executor if it exists
+        if hasattr(self, "executor") and self.executor:
+            try:
+                self.executor.shutdown(wait=True)
+                logger.debug("Legacy ThreadPoolExecutor shutdown completed")
+            except Exception as e:
+                cleanup_errors.append(f"Legacy executor cleanup error: {e}")
+                logger.error(f"Error shutting down legacy executor: {e}")
+
+        # Note: Executors from context are managed by the context itself
+        # We don't shut them down here to avoid interfering with other services
+        if self.context:
+            logger.debug("Executors managed by context, skipping direct cleanup")
+        elif self.io_executor or self.cpu_executor:
+            logger.warning(
+                "Executors present but no context - this may indicate a resource leak"
+            )
+
+        if cleanup_errors:
+            logger.warning(
+                f"Service cleanup completed with {len(cleanup_errors)} errors"
+            )
+        else:
+            logger.info("Unified indexing service cleanup completed successfully")
 
 
 # Module-level convenience functions

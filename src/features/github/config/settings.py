@@ -206,11 +206,13 @@ LANGUAGE_MAPPINGS: Dict[str, str] = {
     ".markdown": "markdown",
     ".mdown": "markdown",
     ".mkd": "markdown",
+    ".mdx": "mdx",
 }
 
 # Processor priority (higher number = higher priority)
 PROCESSOR_PRIORITY: Dict[str, int] = {
     "markdown": 10,
+    "mdx": 10,
     "python": 8,
     "typescript": 7,
     "javascript": 7,

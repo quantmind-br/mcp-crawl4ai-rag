@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Type
 
 from .base_processor import IFileProcessor
 from .markdown_processor import MarkdownProcessor
+from .mdx_processor import MDXProcessor
 from .python_processor import PythonProcessor
 from .typescript_processor import TypeScriptProcessor
 from .config_processor import ConfigProcessor
@@ -176,6 +177,7 @@ class ProcessorFactory:
 
         # Register default processors
         registry.register("markdown", MarkdownProcessor)
+        registry.register("mdx", MDXProcessor)
         registry.register("python", PythonProcessor)
         registry.register("typescript", TypeScriptProcessor)
         registry.register("config", ConfigProcessor)
