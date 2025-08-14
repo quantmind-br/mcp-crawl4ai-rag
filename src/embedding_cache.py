@@ -129,9 +129,9 @@ class EmbeddingCache:
             password: Redis password (defaults to REDIS_PASSWORD env var)
         """
         # Configuration from environment
-        self.host = host or os.getenv("REDIS_HOST", "localhost")
-        self.port = port or int(os.getenv("REDIS_PORT", "6379"))
-        self.db = db or int(os.getenv("REDIS_DB", "0"))
+        self.host = host or os.getenv("REDIS_HOST") or "localhost"
+        self.port = port or int(os.getenv("REDIS_PORT") or 6379)
+        self.db = db or int(os.getenv("REDIS_DB") or 0)
         self.password = password or os.getenv("REDIS_PASSWORD")
         self.username = os.getenv("REDIS_USERNAME")
         self.ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
@@ -349,8 +349,8 @@ def validate_redis_config():
     Raises:
         ValueError: If configuration is invalid
     """
-    host = os.getenv("REDIS_HOST", "localhost")
-    port = os.getenv("REDIS_PORT", "6379")
+    host = os.getenv("REDIS_HOST") or "localhost"
+    port = os.getenv("REDIS_PORT") or "6379"
 
     try:
         port_int = int(port)

@@ -1,55 +1,61 @@
-# Suggested Commands
+# Suggested Commands for Development
 
-## Essential Development Commands
-
-### Project Setup
-```bash
-# Initial setup and dependency installation
-uv sync
-
-# Start Docker services (required for databases)
-setup.bat                    # Windows (recommended)
-docker-compose up -d         # Linux/Mac alternative
-```
-
-### Server Management
+## Server Management
 ```bash
 # Start the MCP server (primary method)
 uv run -m src
 
-# Alternative server startup
+# Alternative entry point
 uv run python run_server.py
 
-# Start with Docker services on Windows
-start.bat
+# Windows batch scripts
+setup.bat          # Start Docker services
+start.bat          # Start MCP server
+
+# Start Docker services manually
+docker-compose up -d
 ```
 
-### Testing Commands
+## Package Management (use uv exclusively)
+```bash
+# Install/sync dependencies
+uv sync
+
+# Add new dependency
+uv add package-name
+
+# Add development dependency
+uv add --dev pytest-package
+
+# NEVER edit pyproject.toml directly - always use uv commands
+```
+
+## Testing (hierarchical test structure)
 ```bash
 # Run all tests
 uv run pytest
 
-# Run by test category (hierarchical structure)
+# Run by category
 uv run pytest tests/unit/                    # Unit tests by module
 uv run pytest tests/specialized/             # Domain-specific tests
 uv run pytest tests/infrastructure/          # Infrastructure tests
 uv run pytest tests/integration/             # End-to-end tests
 
-# Run specific test modules
+# Run specific modules
 uv run pytest tests/unit/tools/              # MCP tools tests
 uv run pytest tests/specialized/embedding/   # Embedding system tests
-uv run pytest tests/specialized/knowledge_graphs/  # Knowledge graph tests
+uv run pytest tests/specialized/knowledge_graphs/ # Knowledge graph tests
 
-# Run with coverage report
+# Run with coverage
 uv run pytest --cov=src --cov-report=html
 
-# Run specific test file with verbose output
+# Run specific test file
 uv run pytest tests/unit/tools/test_web_tools.py -v
 ```
 
-### Code Quality Commands
+## Code Quality
 ```bash
-# Check linting (find issues)
+# Check linting
 uv run ruff check .
 
 # Fix linting issues automatically
@@ -57,92 +63,78 @@ uv run ruff check --fix .
 
 # Format code
 uv run ruff format .
-
-# Run all code quality checks
-uv run ruff check . && uv run ruff format .
 ```
 
-### Database Management
+## Database Management
 ```bash
 # Clean Qdrant vector database
 uv run python scripts/clean_qdrant.py
 
-# Fix dimension mismatches in Qdrant
+# Fix dimension mismatches
 uv run python scripts/define_qdrant_dimensions.py
 
-# Query knowledge graph
-uv run python scripts/query_knowledge_graph.py
-```
+# Clean up all databases
+uv run python scripts/cleanup_databases.py
 
-### Docker Services Management
-```bash
-# View service logs
-docker-compose logs              # All services
-docker-compose logs qdrant       # Qdrant only
-docker-compose logs neo4j        # Neo4j only
-docker-compose logs redis        # Redis only
-
-# Check service status
-docker-compose ps
+# View Docker service logs
+docker-compose logs qdrant
+docker-compose logs neo4j
 
 # Restart services
 docker-compose restart
-
-# Stop and clean everything
-docker-compose down --volumes
 ```
 
-### Package Management (uv)
+## Knowledge Graph Operations
 ```bash
-# Add new dependency
-uv add package-name
+# Query knowledge graph
+uv run python scripts/query_knowledge_graph.py
 
-# Add development dependency
-uv add --dev pytest-package
-
-# Sync dependencies after changes
-uv sync
-
-# Never edit pyproject.toml directly - always use uv commands
+# Debug method count
+uv run python scripts/debug_method_count.py
 ```
 
 ## Windows-Specific Commands
 ```bash
-# Setup script (preferred for Windows)
-setup.bat
-
-# Start script
-start.bat
-
-# Cleanup script
-scripts\cleanup.bat
+# System utilities (Windows equivalents)
+dir              # List files (instead of ls)
+cd               # Change directory
+findstr          # Search text (instead of grep)
+where            # Find files (instead of which)
+type             # Display file content (instead of cat)
 ```
 
-## Utilities and Debugging
+## Git Operations
 ```bash
-# Debug method count issues
-uv run python scripts/debug_method_count.py
-
-# Build tree-sitter grammars
-uv run python scripts/build_grammars.py
-
-# Clean up databases
-uv run python scripts/cleanup_databases.py
+git status       # Check working tree status
+git add .        # Stage all changes
+git commit -m "message"  # Commit changes
+git pull         # Pull latest changes
+git push         # Push changes
 ```
 
-## Environment Configuration
+## Environment Setup
 ```bash
 # Copy environment template
-copy .env.example .env          # Windows
-cp .env.example .env           # Linux/Mac
+copy .env.example .env    # Windows
+cp .env.example .env      # Linux/Mac
 
-# Edit environment file
-# Add your API keys and configuration
+# Edit environment file with your API keys and configuration
 ```
 
-## Common Development Workflow
-1. `setup.bat` - Start Docker services
-2. `uv sync` - Install/update dependencies
-3. `uv run ruff check --fix .` - Fix linting
-4. `uv run pytest` - Run tests
-5. `uv run -m src` - Start server
+## Docker Management
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# Stop with volume cleanup
+docker-compose down --volumes
+
+# View running containers
+docker ps
+
+# View service logs
+docker-compose logs [service_name]
+```

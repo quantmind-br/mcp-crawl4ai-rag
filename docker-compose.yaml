@@ -84,7 +84,7 @@ services:
       - NEO4J_server_memory_heap_max__size=1G
       - NEO4J_server_memory_pagecache_size=512M
     healthcheck:
-      test: ["CMD", "cypher-shell", "--username", "neo4j", "--password", "${NEO4J_PASSWORD:-password123}", "RETURN 1"]
+      test: ["CMD", "cypher-shell", "--username", "${NEO4J_USER:-neo4j}", "--password", "${NEO4J_PASSWORD:-password123}", "RETURN 1"]
       interval: 30s
       timeout: 10s
       retries: 5

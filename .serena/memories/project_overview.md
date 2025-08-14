@@ -1,24 +1,25 @@
-# Project Overview
-
-## Project Name
-Crawl4AI RAG MCP Server
+# Project Overview - MCP Crawl4AI RAG Server
 
 ## Purpose
-A powerful Model Context Protocol (MCP) server that integrates Crawl4AI, Qdrant vector database, and Neo4j knowledge graph to provide AI agents and coding assistants with advanced web crawling, GitHub repository indexing, vector search, and AI hallucination detection capabilities.
+This is an advanced Model Context Protocol (MCP) server that integrates multiple technologies to provide AI agents and coding assistants with intelligent web crawling, GitHub repository indexing, vector search, and AI hallucination detection capabilities.
+
+## Core Functionality
+- **Web Crawling**: Smart web crawling with sitemap detection and recursive crawling using Crawl4AI
+- **GitHub Integration**: Clone and index GitHub repositories for documentation and code analysis
+- **Vector Search**: Semantic search capabilities using Qdrant vector database
+- **Knowledge Graphs**: Code structure analysis and AI hallucination detection using Neo4j
+- **RAG (Retrieval Augmented Generation)**: Advanced RAG strategies with reranking and contextual embeddings
 
 ## Key Features
-- **Web Crawling**: Intelligent web content extraction with Crawl4AI
-- **GitHub Integration**: Clone and index GitHub repositories with documentation
-- **Vector Search**: Semantic search using Qdrant vector database
-- **Knowledge Graph**: Code structure analysis and AI hallucination detection with Neo4j
-- **RAG Capabilities**: Advanced retrieval-augmented generation with multiple strategies
-- **MCP Integration**: Full Model Context Protocol support for AI agents
+- Multi-language code parsing with Tree-sitter grammars (Python, JavaScript, Java, Go, Rust, C/C++, etc.)
+- GPU acceleration support for embedding models
+- Fallback API configuration for high availability
+- Hybrid search combining semantic and keyword search
+- Agentic RAG for code example extraction
+- Cross-system file linking between Qdrant and Neo4j
 
-## Target Users
-- AI agents and coding assistants
-- Developers needing advanced web crawling and content indexing
-- Teams building RAG systems with knowledge graphs
-- Applications requiring AI hallucination detection for code
-
-## Development Status
-Active development project, being developed for integration with Archon framework.
+## Target Use Cases
+1. **Documentation RAG**: Crawl and index documentation sites for intelligent Q&A
+2. **Code Assistant**: Extract code examples and provide coding help
+3. **Hallucination Detection**: Validate AI-generated code against repository structure
+4. **Repository Analysis**: Understand codebase structure and relationships

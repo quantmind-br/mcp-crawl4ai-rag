@@ -82,9 +82,9 @@ class DatabaseCleaner:
 
             # Initialize Neo4j client if needed
             if not qdrant_only and not redis_only:
-                neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-                neo4j_user = os.getenv("NEO4J_USER", "neo4j")
-                neo4j_password = os.getenv("NEO4J_PASSWORD", "password123")
+                neo4j_uri = os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+                neo4j_user = os.getenv("NEO4J_USER") or "neo4j"
+                neo4j_password = os.getenv("NEO4J_PASSWORD") or "password123"
 
                 if not neo4j_password:
                     raise ValueError(
@@ -100,9 +100,9 @@ class DatabaseCleaner:
 
             # Initialize Redis client if needed
             if not qdrant_only and not neo4j_only or redis_only:
-                redis_host = os.getenv("REDIS_HOST", "localhost")
-                redis_port = int(os.getenv("REDIS_PORT", "6379"))
-                redis_db = int(os.getenv("REDIS_DB", "0"))
+                redis_host = os.getenv("REDIS_HOST") or "localhost"
+                redis_port = int(os.getenv("REDIS_PORT") or 6379)
+                redis_db = int(os.getenv("REDIS_DB") or 0)
                 redis_password = os.getenv("REDIS_PASSWORD")
                 redis_username = os.getenv("REDIS_USERNAME")
 

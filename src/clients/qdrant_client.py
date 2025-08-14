@@ -231,8 +231,8 @@ class QdrantClientWrapper:
             host: Qdrant host (defaults to env QDRANT_HOST or localhost)
             port: Qdrant port (defaults to env QDRANT_PORT or 6333)
         """
-        self.host = host or os.getenv("QDRANT_HOST", "localhost")
-        self.port = port or int(os.getenv("QDRANT_PORT", "6333"))
+        self.host = host or os.getenv("QDRANT_HOST") or "localhost"
+        self.port = port or int(os.getenv("QDRANT_PORT") or 6333)
 
         # Initialize Qdrant client with retry logic
         self.client = self._create_client()

@@ -341,9 +341,9 @@ class KnowledgeGraphSingleton:
             from ..k_graph.services.repository_parser import DirectNeo4jExtractor
 
             # Get Neo4j connection parameters
-            neo4j_uri = os.getenv("NEO4J_URI")
-            neo4j_user = os.getenv("NEO4J_USER", "neo4j")
-            neo4j_password = os.getenv("NEO4J_PASSWORD", "")
+            neo4j_uri = os.getenv("NEO4J_URI") or "bolt://localhost:7687"
+            neo4j_user = os.getenv("NEO4J_USER") or "neo4j"
+            neo4j_password = os.getenv("NEO4J_PASSWORD") or "password123"
 
             # Test Neo4j connection
             await self._validate_neo4j_connection()
@@ -370,7 +370,7 @@ class KnowledgeGraphSingleton:
 
     async def _validate_neo4j_connection(self):
         """Validate Neo4j connection configuration."""
-        neo4j_uri = os.getenv("NEO4J_URI")
+        neo4j_uri = os.getenv("NEO4J_URI") or "bolt://localhost:7687"
         if not neo4j_uri:
             raise ValueError("NEO4J_URI environment variable not set")
 
@@ -385,8 +385,8 @@ class KnowledgeGraphSingleton:
             driver = GraphDatabase.driver(
                 neo4j_uri,
                 auth=(
-                    os.getenv("NEO4J_USER", "neo4j"),
-                    os.getenv("NEO4J_PASSWORD", ""),
+                    os.getenv("NEO4J_USER") or "neo4j",
+                    os.getenv("NEO4J_PASSWORD") or "password123",
                 ),
             )
 
@@ -483,8 +483,8 @@ def create_app() -> FastMCP:
     """
     logger.info("Creating FastMCP application instance...")
 
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8051"))
+    host = os.getenv("HOST") or "0.0.0.0"
+    port = int(os.getenv("PORT") or 8051)
 
     app = FastMCP(
         name="mcp-crawl4ai-rag",

@@ -35,37 +35,41 @@ if not exist ".env" (
 )
 
 echo [3/6] Verificando servicos Docker...
-echo Verificando Qdrant...
-curl -s http://localhost:6333/health >nul 2>&1
-if %errorlevel% neq 0 (
-    echo AVISO: Qdrant indisponivel em localhost:6333
-    echo Execute 'setup.bat' antes para iniciar os servicos.
-    set /p "continue=Continuar assim mesmo? (s/N): "
-    if /i not "%continue%"=="s" (
-        echo Inicio cancelado.
-        pause
-        exit /b 1
-    )
-) else (
-    echo OK Qdrant acessivel
-)
+REM Carrega configuracoes do .env para verificacao
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^QDRANT_HOST=" .env') do set QDRANT_HOST=%%b
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^QDRANT_PORT=" .env') do set QDRANT_PORT=%%b
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^NEO4J_URI=" .env') do set NEO4J_URI=%%b
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^REDIS_HOST=" .env') do set REDIS_HOST=%%b
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^REDIS_PORT=" .env') do set REDIS_PORT=%%b
+for /f "tokens=1,* delims==" %%a in ('findstr /r /c:"^PORT=" .env') do set SERVER_PORT=%%b
+
+set "QDRANT_HOST=!QDRANT_HOST:localhost=127.0.0.1!"
+set "REDIS_HOST=!REDIS_HOST:localhost=127.0.0.1!"
+
+echo Verificando Qdrant em !QDRANT_HOST!:!QDRANT_PORT!...
+powershell -Command "(New-Object Net.Sockets.TcpClient).Connect('!QDRANT_HOST!', !QDRANT_PORT!)" 2>nul
+if !errorlevel! neq 0 (
+    echo AVISO: Qdrant indisponivel. Execute 'setup.bat' para iniciar.
+    set /p "continue=Continuar? (s/N): "
+    if /i not "!continue!"=="s" ( echo Cancelado. & pause & exit /b 1 )
+) else ( echo OK Qdrant acessivel )
 
 echo Verificando Neo4j...
-netstat -an | find "7474" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo AVISO: Neo4j nao acessivel em localhost:7474
-) else (
-    echo OK Neo4j acessivel
+for /f "tokens=2,3 delims=:/ " %%a in ("!NEO4J_URI!") do (
+    set NEO4J_HOST=%%a
+    set NEO4J_PORT=%%b
 )
+set "NEO4J_HOST=!NEO4J_HOST:localhost=127.0.0.1!"
+powershell -Command "(New-Object Net.Sockets.TcpClient).Connect('!NEO4J_HOST!', !NEO4J_PORT!)" 2>nul
+if !errorlevel! neq 0 (
+    echo AVISO: Neo4j indisponivel.
+) else ( echo OK Neo4j acessivel )
 
-echo Verificando Redis...
-netstat -an | find "6379" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo AVISO: Redis nao acessivel em localhost:6379
-    echo Cache de embeddings sera desabilitado.
-) else (
-    echo OK Redis acessivel
-)
+echo Verificando Redis em !REDIS_HOST!:!REDIS_PORT!...
+powershell -Command "(New-Object Net.Sockets.TcpClient).Connect('!REDIS_HOST!', !REDIS_PORT!)" 2>nul
+if !errorlevel! neq 0 (
+    echo AVISO: Redis indisponivel. Cache desabilitado.
+) else ( echo OK Redis acessivel )
 
 echo [4/6] Instalando dependencias...
 uv sync
@@ -84,15 +88,15 @@ if not exist "src\__main__.py" (
 )
 echo OK Arquivos OK
 
-echo [6/7] Verificando se a porta 8051 esta em uso...
+echo [6/7] Verificando se a porta !SERVER_PORT! esta em uso...
 set "PID="
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8051"') do (
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":!SERVER_PORT!"') do (
     if not defined PID set "PID=%%a"
 )
 
 if defined PID (
     if "%PID%" NEQ "0" (
-        echo A porta 8051 esta sendo usada pelo processo com PID %PID%.
+        echo A porta !SERVER_PORT! esta sendo usada pelo processo com PID %PID%.
         echo Encerrando o processo...
         taskkill /F /PID %PID% >nul
         if !errorlevel! equ 0 (
@@ -102,7 +106,7 @@ if defined PID (
         )
     )
 ) else (
-    echo OK Porta 8051 esta livre.
+    echo OK Porta !SERVER_PORT! esta livre.
 )
 
 

@@ -1,69 +1,86 @@
-# Code Style Conventions
+# Code Style and Conventions
 
-## General Python Style
-- **PEP 8 compliance** enforced by Ruff linter/formatter
-- **Type hints** used throughout codebase for better IDE support and documentation
-- **Docstrings** in Google/NumPy style with clear parameter and return descriptions
-- **Async/await patterns** consistently used for I/O operations
+## Language and Version
+- **Python 3.12+** as minimum version
+- **Type hints** are used throughout the codebase
+- **Async/await** patterns for all I/O operations
+
+## Code Formatting and Linting
+- **Ruff** for both linting and formatting (version 0.12.7+)
+- **Commands**: 
+  - `uv run ruff check .` - Check linting
+  - `uv run ruff check --fix .` - Auto-fix issues
+  - `uv run ruff format .` - Format code
 
 ## Naming Conventions
-- **snake_case** for functions, variables, and module names
+- **snake_case** for variables, functions, modules, and files
 - **PascalCase** for classes
-- **UPPER_CASE** for constants and environment variables
-- **Descriptive names** that clearly indicate purpose
+- **UPPER_CASE** for constants
+- **Private methods/attributes** prefixed with underscore `_`
 
-## Code Organization
-- **Separation of concerns** with clear module boundaries
-- **Factory patterns** for dynamic object creation
-- **Singleton patterns** for shared resources (Context management)
-- **Modular architecture** with feature-based organization
+## Documentation Style
+- **Docstrings** in Google style format
+- **Type hints** for all function parameters and return values
+- **Clear, descriptive variable and function names**
 
-## Function and Class Structure
+Example:
 ```python
-async def function_name(param: Type) -> ReturnType:
-    """
-    Clear description of what the function does.
+def create_app() -> FastMCP:
+    \"\"\"
+    Create and configure the FastMCP application instance.
 
-    Args:
-        param: Description of the parameter
+    This function creates the main application instance with proper configuration
+    including server name, host, port, and lifespan management.
 
     Returns:
-        Description of return value
-    """
-    # Implementation with clear logic flow
+        FastMCP: Configured FastMCP server instance ready for tool registration
+    \"\"\"
 ```
+
+## Project Structure Patterns
+- **Modular architecture** with clear separation of concerns
+- **Feature-based organization** in `src/features/`
+- **Singleton patterns** for resource management (Context, models)
+- **Factory patterns** for parser and processor selection
+
+## Async Programming
+- **Async context managers** for resource management
+- **Proper async/await usage** throughout
+- **Event loop compatibility** with Windows-specific fixes
 
 ## Error Handling
-- **Structured exception handling** with specific error types
-- **Logging** for debugging and monitoring
-- **Graceful degradation** for non-critical failures
-- **Context managers** for resource cleanup
+- **Tenacity** for retry logic and fault tolerance
+- **Proper exception handling** with specific exception types
+- **Logging** throughout the application using Python logging
 
 ## Import Organization
-1. Standard library imports
-2. Third-party imports
-3. Local application imports
-4. Relative imports (if needed)
+- **Standard library imports** first
+- **Third-party imports** second
+- **Local imports** last
+- **Absolute imports** preferred over relative
 
-## Windows-Specific Considerations
-- **Unicode handling** - ASCII-only characters in console output to avoid UnicodeEncodeError
-- **Path handling** - Use pathlib for cross-platform compatibility
-- **Logging filters** - Special handling for Windows ConnectionResetError messages
+## Testing Conventions
+- **pytest** with async support
+- **Hierarchical test organization** by functionality
+- **Fixtures** in `conftest.py` for shared test resources
+- **Mocking** for external dependencies
 
-## MCP Tool Patterns
-```python
-@mcp.tool()
-async def tool_name(ctx: Context, param: str) -> str:
-    """Tool description for MCP clients."""
-    try:
-        # Tool implementation
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)}, indent=2)
-```
+## Unicode and Windows Compatibility
+- **CRITICAL**: NO Unicode characters (emojis, special symbols) in any output
+- **ASCII-only** for all console output and logs
+- **Windows-specific optimizations** in utils/windows_unicode_fix.py
 
-## Configuration Management
+## Environment Configuration
 - **Environment variables** for all configuration
-- **Default values** with clear documentation
-- **Type conversion** and validation for config values
-- **.env file** support with .env.example template
+- **Fallback configurations** for API providers
+- **Type validation** for environment variables
+
+## File Organization
+- **Clear module boundaries** with `__init__.py` files
+- **Single responsibility** per module
+- **Consistent file naming** using snake_case
+
+## Comments and Code Quality
+- **Self-documenting code** preferred over excessive comments
+- **TODO comments** for known technical debt
+- **Clear separation** between public and private interfaces
