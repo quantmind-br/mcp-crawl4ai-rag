@@ -79,18 +79,39 @@ class ContextSingleton:
             return self._context
 
         if self._initializing:
-            # Wait for initialization to complete
+            # Wait for initialization to complete with exponential backoff
             import asyncio
 
-            while self._initializing:
-                await asyncio.sleep(0.01)
+            wait_time = 0.01
+            total_wait = 0.0
+            max_wait = 30.0  # Maximum 30 seconds wait
+
+            while self._initializing and total_wait < max_wait:
+                await asyncio.sleep(wait_time)
+                total_wait += wait_time
+                wait_time = min(wait_time * 1.1, 0.1)  # Exponential backoff, max 100ms
+
+            if self._initializing:
+                raise RuntimeError(
+                    f"Initialization still in progress after {max_wait} seconds"
+                )
+
+            if self._context is None:
+                raise RuntimeError("Initialization completed but context is None")
+
             return self._context
 
-        # Initialize the context
+        # Initialize the context with proper exception handling
         self._initializing = True
         try:
+            logger.info("Starting context initialization...")
             self._context = await self._initialize_context(server)
+            logger.info("Context initialization completed successfully")
             return self._context
+        except Exception as e:
+            logger.error(f"Context initialization failed: {e}")
+            self._context = None  # Reset context on failure
+            raise
         finally:
             self._initializing = False
 
@@ -438,14 +459,30 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     context_singleton = ContextSingleton()
 
     try:
-        # Get context from singleton (initializes once, reuses afterwards)
-        context = await context_singleton.get_context(server)
-        logger.info("Application context ready (using singleton pattern)")
-        yield context
+        # Add timeout protection for initialization
+        import asyncio
+
+        # Get context from singleton with timeout protection
+        try:
+            context = await asyncio.wait_for(
+                context_singleton.get_context(server),
+                timeout=60.0,  # 60 second timeout for initialization
+            )
+            logger.info("Application context ready (using singleton pattern)")
+
+            # Small delay to ensure server is fully ready before accepting requests
+            await asyncio.sleep(0.1)
+
+            yield context
+
+        except asyncio.TimeoutError:
+            logger.error("Application initialization timed out after 60 seconds")
+            raise RuntimeError("Application initialization timeout")
 
     except Exception as e:
         logger.error(f"Error in application lifespan: {e}")
-        raise
+        # Re-raise with more context for better debugging
+        raise RuntimeError(f"Application lifespan failed: {str(e)}") from e
 
     finally:
         # Note: We don't cleanup here since the singleton manages lifecycle
@@ -531,7 +568,7 @@ def register_tools(app: FastMCP) -> None:
         from ..tools import github_tools
 
         # Register GitHub tools manually with the app instance
-        app.tool()(github_tools.smart_crawl_github)
+        # Note: smart_crawl_github has been replaced by index_github_repository
 
         # Register unified repository indexing tool with enhanced description
         app.tool(

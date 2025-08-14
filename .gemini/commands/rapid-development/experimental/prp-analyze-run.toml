@@ -1,0 +1,269 @@
+description = "Analyze PRP implementation results and extract lessons learned"
+
+prompt = """
+# Analyze PRP Results
+
+## PRP File: $ARGUMENTS
+
+Post-execution analysis of a PRP implementation to capture lessons learned, success metrics, and template improvements.
+
+## Analysis Process
+
+1. **Execution Metrics Collection**
+   - Measure actual vs estimated token usage
+   - Track implementation time and iterations
+   - Document test failures and fixes
+   - Analyze code quality metrics
+
+2. **Success Pattern Analysis**
+   - Identify what worked well
+   - Extract reusable patterns
+   - Document effective context elements
+   - Capture successful validation strategies
+
+3. **Failure Pattern Learning**
+   - Document encountered issues
+   - Analyze root causes
+   - Create prevention strategies
+   - Update known gotchas database
+
+4. **Template Improvement Recommendations**
+   - Identify context gaps
+   - Suggest validation enhancements
+   - Recommend documentation updates
+   - Propose new anti-patterns
+
+5. **Knowledge Base Updates**
+   - Add new failure patterns to database
+   - Update success metrics
+   - Enhance similar feature detection
+   - Improve confidence scoring
+
+## Analysis Framework
+
+### Metrics Collection
+
+```bash
+# Collect implementation metrics
+echo "Collecting execution metrics..."
+
+# Get git statistics
+COMMITS_DURING_IMPL=$(git rev-list --count HEAD --since="2 hours ago")
+FILES_CHANGED=$(git diff --name-only HEAD~$COMMITS_DURING_IMPL HEAD | wc -l)
+LINES_ADDED=$(git diff --shortstat HEAD~$COMMITS_DURING_IMPL HEAD | grep -o '[0-9]* insertion' | grep -o '[0-9]*' || echo 0)
+LINES_DELETED=$(git diff --shortstat HEAD~$COMMITS_DURING_IMPL HEAD | grep -o '[0-9]* deletion' | grep -o '[0-9]*' || echo 0)
+
+# Get test results
+!pytest tests/ --tb=no -q
+TEST_RESULTS=$(pytest tests/ --tb=no -q 2>&1 | tail -n 1)
+TEST_COUNT=$(echo "$TEST_RESULTS" | grep -o '[0-9]* passed' | grep -o '[0-9]*' || echo 0)
+TEST_FAILURES=$(echo "$TEST_RESULTS" | grep -o '[0-9]* failed' | grep -o '[0-9]*' || echo 0)
+
+# Get code quality metrics
+!ruff check .
+RUFF_ISSUES=$(ruff check . 2>&1 | grep -c "error\\|warning" || echo 0)
+!mypy .
+MYPY_ERRORS=$(mypy . 2>&1 | grep -c "error:" || echo 0)
+
+echo "📊 Implementation Metrics:"
+echo "- Commits: $COMMITS_DURING_IMPL"
+echo "- Files changed: $FILES_CHANGED"
+echo "- Lines added: $LINES_ADDED"
+echo "- Lines deleted: $LINES_DELETED"
+echo "- Tests passing: $TEST_COUNT"
+echo "- Tests failing: $TEST_FAILURES"
+echo "- Ruff issues: $RUFF_ISSUES"
+echo "- MyPy errors: $MYPY_ERRORS"
+```
+
+### Context Effectiveness Analysis
+
+Analyze which context elements were most valuable:
+
+1. **Documentation URLs**: Track which external docs were referenced
+2. **File References**: Identify which existing files were actually used
+3. **Gotchas**: Determine which warnings prevented issues
+4. **Patterns**: Evaluate which patterns were successfully applied
+5. **Examples**: Assess which examples provided useful guidance
+
+### Failure Pattern Detection
+
+Extract failure patterns from implementation:
+
+- Check git commit messages for failure indicators
+- Analyze error logs and debug output
+- Identify recurring issues and their root causes
+- Categorize failure types (async issues, import errors, type errors, etc.)
+- Document solutions and prevention strategies
+
+### Success Pattern Identification
+
+Identify patterns that led to successful implementation:
+
+- Clean test runs without failures
+- Code that passes all quality checks
+- Proper error handling implementation
+- Effective use of existing patterns
+- Good documentation and comments
+
+## Knowledge Base Updates
+
+### Failure Pattern Database
+
+Update `PRPs/knowledge_base/failure_patterns.yaml` with new patterns:
+
+```yaml
+failure_patterns:
+  - id: "async_context_mixing"
+    description: "Mixing sync and async code contexts"
+    frequency: "high"
+    detection_signs:
+      - "RuntimeError: cannot be called from a running event loop"
+      - "SyncError in async context"
+    prevention:
+      - "Always use async/await consistently"
+      - "Use asyncio.run() for top-level async calls"
+    related_libraries: ["asyncio", "aiohttp", "fastapi"]
+
+  - id: "pydantic_v2_breaking_changes"
+    description: "Pydantic v2 syntax changes"
+    frequency: "medium"
+    detection_signs:
+      - "ValidationError: Field required"
+      - "AttributeError: 'Field' object has no attribute"
+    prevention:
+      - "Use Field() instead of ... for optional fields"
+      - "Update to v2 syntax for validators"
+    related_libraries: ["pydantic", "fastapi"]
+```
+
+### Success Metrics Database
+
+Update `PRPs/knowledge_base/success_metrics.yaml` with implementation data:
+
+```yaml
+success_metrics:
+  - feature_type: "api_integration"
+    avg_token_usage: 2500
+    avg_implementation_time: 35
+    success_rate: 85
+    common_patterns:
+      - "async http client usage"
+      - "proper error handling"
+      - "rate limiting implementation"
+
+  - feature_type: "database_operations"
+    avg_token_usage: 1800
+    avg_implementation_time: 25
+    success_rate: 92
+    common_patterns:
+      - "sqlalchemy async sessions"
+      - "proper migration handling"
+      - "connection pooling"
+```
+
+## Analysis Report Generation
+
+Generate comprehensive analysis report including:
+
+### Implementation Summary
+- PRP file analyzed
+- Execution timestamp
+- Overall success status
+
+### Metrics
+- Commits during implementation
+- Files changed and lines modified
+- Implementation time
+- Test results and code quality scores
+
+### Context Effectiveness
+- Percentage of documentation URLs referenced
+- File references that were actually used
+- Examples that were followed
+- Gotchas that prevented issues
+
+### Patterns Discovered
+- Success patterns to replicate
+- Failure patterns to avoid
+- Recommendations for future PRPs
+
+### Confidence Score Validation
+- Original estimate vs actual performance
+- Prediction accuracy assessment
+- Calibration improvements needed
+
+## Template Improvement Suggestions
+
+Generate specific improvements to PRP templates:
+
+1. **Context Gaps**: Add missing context types that caused delays
+2. **Validation Gaps**: Include additional validation steps
+3. **Documentation Gaps**: Reference additional documentation sources
+4. **Pattern Updates**: Include new successful patterns discovered
+
+## Report Output Format
+
+```
+📊 PRP Analysis Report
+======================
+
+🎯 Implementation Summary:
+- PRP File: $ARGUMENTS
+- Execution Date: [timestamp]
+- Overall Success: [SUCCESS/PARTIAL/FAILED]
+
+📈 Metrics:
+- Commits during implementation: [count]
+- Files changed: [count]
+- Lines added/deleted: [count]/[count]
+- Implementation time: [minutes] minutes
+- Tests: [count] passed, [count] failed
+- Code quality: [count] style issues, [count] type errors
+
+🎯 Context Effectiveness:
+- Documentation URLs: [percentage]% referenced
+- File references: [percentage]% used
+- Examples: [percentage]% followed
+- Gotchas: [percentage]% prevented issues
+
+🔍 Patterns Discovered:
+Success Patterns:
+  ✅ [pattern description]
+     → Reuse: [recommendation]
+
+Failure Patterns:
+  ❌ [pattern description]
+     → Prevention: [solution]
+
+🎯 Confidence Score Validation:
+- Original estimate: [score]/10
+- Actual performance: [score]/10
+- Prediction accuracy: [Good/Needs improvement]
+
+💡 Recommendations for Future PRPs:
+  [priority] [suggestion]
+  Reason: [rationale]
+
+📚 Knowledge Base Updates:
+- New failure patterns: [count]
+- Updated success metrics: [count]
+- Template improvements: [count]
+```
+
+## Continuous Improvement Loop
+
+This analysis system creates a continuous improvement loop:
+
+1. **Execute PRP** → Implement feature
+2. **Analyze Results** → Extract patterns and metrics
+3. **Update Knowledge Base** → Store learnings
+4. **Improve Templates** → Apply learnings to future PRPs
+5. **Better Context** → Higher success rates
+
+The system learns from each implementation, making future PRPs more effective and reducing failure rates over time.
+
+Save analysis report to: `PRPs/analysis_reports/analysis_[timestamp].md`
+Save metrics to: `PRPs/knowledge_base/metrics_[timestamp].yaml`
+Update knowledge base files with new patterns and success metrics.
+"""

@@ -1,86 +1,95 @@
 # Code Style and Conventions
 
-## Language and Version
-- **Python 3.12+** as minimum version
-- **Type hints** are used throughout the codebase
-- **Async/await** patterns for all I/O operations
+## General Coding Standards
 
-## Code Formatting and Linting
-- **Ruff** for both linting and formatting (version 0.12.7+)
-- **Commands**: 
-  - `uv run ruff check .` - Check linting
-  - `uv run ruff check --fix .` - Auto-fix issues
-  - `uv run ruff format .` - Format code
+### Function and Class Documentation
+- **Google-style docstrings** with comprehensive parameter and return documentation
+- **Type hints** required for all functions and methods
+- **Return type annotations** mandatory
+- **Parameter descriptions** with types and purposes
 
-## Naming Conventions
-- **snake_case** for variables, functions, modules, and files
-- **PascalCase** for classes
-- **UPPER_CASE** for constants
-- **Private methods/attributes** prefixed with underscore `_`
-
-## Documentation Style
-- **Docstrings** in Google style format
-- **Type hints** for all function parameters and return values
-- **Clear, descriptive variable and function names**
-
-Example:
+### Example Function Documentation:
 ```python
-def create_app() -> FastMCP:
-    \"\"\"
-    Create and configure the FastMCP application instance.
+async def crawl_single_page(ctx: Context, url: str) -> str:
+    """
+    Crawl a single web page and store its content in the vector database.
 
-    This function creates the main application instance with proper configuration
-    including server name, host, port, and lifespan management.
+    This tool is ideal for quickly retrieving content from a specific URL without following links.
+    The content is stored in the vector database for later retrieval and querying.
+
+    Args:
+        ctx: The MCP server provided context
+        url: URL of the web page to crawl
 
     Returns:
-        FastMCP: Configured FastMCP server instance ready for tool registration
-    \"\"\"
+        Summary of the crawling operation and storage in the vector database
+    """
 ```
 
-## Project Structure Patterns
-- **Modular architecture** with clear separation of concerns
-- **Feature-based organization** in `src/features/`
-- **Singleton patterns** for resource management (Context, models)
-- **Factory patterns** for parser and processor selection
+## Naming Conventions
 
-## Async Programming
-- **Async context managers** for resource management
-- **Proper async/await usage** throughout
-- **Event loop compatibility** with Windows-specific fixes
+### Functions and Variables
+- **snake_case** for functions, variables, and module names
+- **Descriptive names** that clearly indicate purpose
+- **Async functions** prefixed with async keyword
+
+### Classes
+- **PascalCase** for class names
+- **Singleton pattern** for shared resources (ContextSingleton, RerankingModelSingleton)
+
+### Constants
+- **UPPER_SNAKE_CASE** for module-level constants
+- **Environment variables** in ALL_CAPS
+
+## Code Organization
+
+### Module Structure
+```
+src/
+├── core/           # Core application functionality
+├── tools/          # MCP tools by category
+├── services/       # Business logic services  
+├── clients/        # External API clients
+├── utils/          # Utility functions
+└── k_graph/        # Knowledge graph parsing
+```
+
+### Import Organization
+- **Standard library** imports first
+- **Third-party** imports second
+- **Local** imports last
+- **Relative imports** for local modules
 
 ## Error Handling
-- **Tenacity** for retry logic and fault tolerance
-- **Proper exception handling** with specific exception types
-- **Logging** throughout the application using Python logging
+- **Comprehensive try-catch blocks** for external API calls
+- **Graceful degradation** for optional features
+- **Detailed error logging** with context
+- **JSON error responses** for MCP tools
 
-## Import Organization
-- **Standard library imports** first
-- **Third-party imports** second
-- **Local imports** last
-- **Absolute imports** preferred over relative
+## Async Programming
+- **async/await** for all I/O operations
+- **Context managers** for resource cleanup
+- **AsyncWebCrawler** for web operations
+- **Proper lifespan management** for MCP server
 
-## Testing Conventions
-- **pytest** with async support
-- **Hierarchical test organization** by functionality
-- **Fixtures** in `conftest.py` for shared test resources
-- **Mocking** for external dependencies
+## Type Safety
+- **Full type annotations** including Union types
+- **Optional parameters** explicitly typed
+- **Return types** always specified
+- **Context types** properly annotated
 
-## Unicode and Windows Compatibility
-- **CRITICAL**: NO Unicode characters (emojis, special symbols) in any output
-- **ASCII-only** for all console output and logs
-- **Windows-specific optimizations** in utils/windows_unicode_fix.py
+## Performance Patterns
+- **Batch processing** for database operations
+- **Concurrent execution** using ThreadPoolExecutor and ProcessPoolExecutor
+- **Connection pooling** for database clients
+- **Caching strategies** with Redis integration
 
-## Environment Configuration
-- **Environment variables** for all configuration
-- **Fallback configurations** for API providers
-- **Type validation** for environment variables
+## Unicode and Cross-Platform
+- **ASCII-only** console output to avoid Windows encoding errors
+- **UTF-8** encoding for file operations
+- **Cross-platform** path handling with pathlib
 
-## File Organization
-- **Clear module boundaries** with `__init__.py` files
-- **Single responsibility** per module
-- **Consistent file naming** using snake_case
-
-## Comments and Code Quality
-- **Self-documenting code** preferred over excessive comments
-- **TODO comments** for known technical debt
-- **Clear separation** between public and private interfaces
+## Windows Compatibility
+- **Batch scripts** (.bat) for Windows automation
+- **Shell scripts** (.sh) for Linux/Mac compatibility
+- **Platform-specific** logging configuration

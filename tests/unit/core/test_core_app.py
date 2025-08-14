@@ -218,7 +218,6 @@ class TestToolRegistration:
         # Mock tools
         mock_web_tools.crawl_single_page = Mock()
         mock_web_tools.smart_crawl_url = Mock()
-        mock_github_tools.smart_crawl_github = Mock()
         mock_rag_tools.get_available_sources = Mock()
         mock_rag_tools.perform_rag_query = Mock()
         mock_rag_tools.search_code_examples = Mock()
@@ -245,7 +244,6 @@ class TestToolRegistration:
         # Mock tools
         mock_web_tools.crawl_single_page = Mock()
         mock_web_tools.smart_crawl_url = Mock()
-        mock_github_tools.smart_crawl_github = Mock()
         mock_rag_tools.get_available_sources = Mock()
         mock_rag_tools.perform_rag_query = Mock()
         mock_rag_tools.search_code_examples = Mock()
@@ -273,7 +271,6 @@ class TestToolRegistration:
         # Mock all tools
         mock_web_tools.crawl_single_page = Mock()
         mock_web_tools.smart_crawl_url = Mock()
-        mock_github_tools.smart_crawl_github = Mock()
         mock_rag_tools.get_available_sources = Mock()
         mock_rag_tools.perform_rag_query = Mock()
         mock_rag_tools.search_code_examples = Mock()

@@ -1,24 +1,33 @@
-# Suggested Commands for Development
+# Essential Development Commands
 
 ## Server Management
-```bash
-# Start the MCP server (primary method)
+
+### Windows (Primary Platform)
+```batch
+# Setup Docker services
+setup.bat
+
+# Start MCP server
+start.bat
+
+# Alternative server start
 uv run -m src
-
-# Alternative entry point
 uv run python run_server.py
-
-# Windows batch scripts
-setup.bat          # Start Docker services
-start.bat          # Start MCP server
-
-# Start Docker services manually
-docker-compose up -d
 ```
 
-## Package Management (use uv exclusively)
+### Linux/Mac
 ```bash
-# Install/sync dependencies
+# Start Docker services
+docker-compose up -d
+
+# Start MCP server  
+uv run -m src
+uv run python run_server.py
+```
+
+## Package Management (uv - Modern Python)
+```bash
+# Install all dependencies
 uv sync
 
 # Add new dependency
@@ -30,30 +39,30 @@ uv add --dev pytest-package
 # NEVER edit pyproject.toml directly - always use uv commands
 ```
 
-## Testing (hierarchical test structure)
+## Testing (Hierarchical Structure)
 ```bash
 # Run all tests
 uv run pytest
 
-# Run by category
+# Test by category
 uv run pytest tests/unit/                    # Unit tests by module
 uv run pytest tests/specialized/             # Domain-specific tests
 uv run pytest tests/infrastructure/          # Infrastructure tests
 uv run pytest tests/integration/             # End-to-end tests
 
-# Run specific modules
+# Test specific modules
 uv run pytest tests/unit/tools/              # MCP tools tests
 uv run pytest tests/specialized/embedding/   # Embedding system tests
 uv run pytest tests/specialized/knowledge_graphs/ # Knowledge graph tests
 
-# Run with coverage
+# Test with coverage
 uv run pytest --cov=src --cov-report=html
 
-# Run specific test file
+# Test specific file
 uv run pytest tests/unit/tools/test_web_tools.py -v
 ```
 
-## Code Quality
+## Code Quality (ruff - Fast Linter/Formatter)
 ```bash
 # Check linting
 uv run ruff check .
@@ -73,68 +82,96 @@ uv run python scripts/clean_qdrant.py
 # Fix dimension mismatches
 uv run python scripts/define_qdrant_dimensions.py
 
-# Clean up all databases
-uv run python scripts/cleanup_databases.py
+# Complete database cleanup (WARNING: Destructive)
+python scripts/cleanup_databases.py --confirm
 
-# View Docker service logs
+# Clean specific database only
+python scripts/cleanup_databases.py --qdrant-only --confirm
+python scripts/cleanup_databases.py --neo4j-only --confirm
+
+# Safe preview (dry run)
+python scripts/cleanup_databases.py --dry-run
+```
+
+## Docker Services
+```bash
+# View service status
+docker-compose ps
+
+# View logs
+docker-compose logs
 docker-compose logs qdrant
 docker-compose logs neo4j
+docker-compose logs redis
 
-# Restart services
-docker-compose restart
+# Stop services
+docker-compose down
+
+# Stop and remove volumes (full cleanup)
+docker-compose down --volumes
 ```
 
-## Knowledge Graph Operations
-```bash
-# Query knowledge graph
-uv run python scripts/query_knowledge_graph.py
+## Windows System Commands
+```cmd
+# List files
+dir
 
-# Debug method count
-uv run python scripts/debug_method_count.py
-```
+# Navigate directories
+cd path\to\directory
 
-## Windows-Specific Commands
-```bash
-# System utilities (Windows equivalents)
-dir              # List files (instead of ls)
-cd               # Change directory
-findstr          # Search text (instead of grep)
-where            # Find files (instead of which)
-type             # Display file content (instead of cat)
+# Find files
+where filename.ext
+
+# Search in files (use rg instead)
+findstr "pattern" *.py
+
+# Network checks
+netstat -an | find "7474"     # Check Neo4j port
+curl http://localhost:6333    # Check Qdrant
 ```
 
 ## Git Operations
 ```bash
-git status       # Check working tree status
-git add .        # Stage all changes
-git commit -m "message"  # Commit changes
-git pull         # Pull latest changes
-git push         # Push changes
+# Check status
+git status
+
+# Add and commit
+git add .
+git commit -m "feat: description"
+
+# View recent commits
+git log --oneline -10
 ```
 
-## Environment Setup
+## Performance Testing
+```bash
+# Run performance benchmarks
+uv run pytest tests/performance/ -v
+
+# Monitor resource usage during tests
+uv run pytest tests/integration/ --verbose
+```
+
+## Environment Configuration
 ```bash
 # Copy environment template
-copy .env.example .env    # Windows
-cp .env.example .env      # Linux/Mac
+copy .env.example .env        # Windows
+cp .env.example .env          # Linux/Mac
 
-# Edit environment file with your API keys and configuration
+# Edit environment variables
+notepad .env                  # Windows
+nano .env                     # Linux/Mac
 ```
 
-## Docker Management
+## Quick Diagnostics
 ```bash
-# Start all services
-docker-compose up -d
+# Check service health
+curl http://localhost:6333/health    # Qdrant
+curl http://localhost:7474           # Neo4j web interface
 
-# Stop all services
-docker-compose down
+# Test Python environment
+uv run python -c "import src; print('OK')"
 
-# Stop with volume cleanup
-docker-compose down --volumes
-
-# View running containers
-docker ps
-
-# View service logs
-docker-compose logs [service_name]
+# Test MCP tools registration
+uv run python -c "from src.core.app import create_app; app = create_app(); print('MCP app OK')"
 ```

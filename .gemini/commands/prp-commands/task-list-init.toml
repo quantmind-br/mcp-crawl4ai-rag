@@ -1,0 +1,60 @@
+description = "Create comprehensive task list from PRP with information-dense keywords"
+
+prompt = """
+# Task List Initialization
+
+Create a comprehensive task list in PRPs/checklist.md for PRP: $ARGUMENTS
+
+Ingest the information then dig deep into our existing codebase and PRP. When done ->
+
+ULTRATHINK about the PRP task and create the plan based adhering to GEMINI.md and extract and refine detailed tasks following this principle:
+
+### List of tasks to be completed to fulfill the PRP in the order they should be completed using information dense keywords
+
+- Information dense keyword examples:
+  ADD, CREATE, MODIFY, MIRROR, FIND, EXECUTE, KEEP, PRESERVE etc
+
+Mark done tasks with: STATUS [DONE], if not done leave empty
+
+```yaml
+Task 1:
+STATUS [ ]
+MODIFY src/existing_module.py:
+  - FIND pattern: "class OldImplementation"
+  - INJECT after line containing "def __init__"
+  - PRESERVE existing method signatures
+
+STATUS [ ]
+CREATE src/new_feature.py:
+  - MIRROR pattern from: src/similar_feature.py
+  - MODIFY class name and core logic
+  - KEEP error handling pattern identical
+
+...(...)
+
+Task N:
+...
+
+```
+
+Each task should have unit test coverage, make tests pass on each task.
+
+First, let me read the PRP file to understand the requirements:
+
+@PRPs/$ARGUMENTS
+
+Now let me analyze the existing codebase to understand patterns and structures:
+
+!{find . -name "*.py" -o -name "*.js" -o -name "*.ts" | head -20}
+
+Based on the PRP analysis and codebase exploration, I will create a detailed task list with:
+
+1. **Task Order**: Dependencies and logical sequence
+2. **Information-Dense Keywords**: Action-oriented commands
+3. **Specific Locations**: Exact file paths and patterns
+4. **Preservation Rules**: What to keep unchanged
+5. **Test Coverage**: Unit tests for each task
+6. **Validation Points**: How to verify completion
+
+The task list will be saved to PRPs/checklist.md and will serve as a detailed implementation guide that can be followed step-by-step to complete the PRP successfully.
+"""

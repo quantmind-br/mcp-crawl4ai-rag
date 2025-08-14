@@ -98,8 +98,7 @@ Tools are registered in `src/core/app.py` and organized by functionality:
   - `smart_crawl_url` - Auto-detect URL types (sitemaps, recursive)
   
 - **GitHub Tools** (`src/tools/github_tools.py`)  
-  - `smart_crawl_github` - Clone and index GitHub repositories
-  - `index_github_repository` - Unified indexing for both Qdrant and Neo4j
+  - `index_github_repository` - Unified GitHub repository indexing for both Qdrant and Neo4j with intelligent content extraction
 
 - **RAG Tools** (`src/tools/rag_tools.py`)
   - `get_available_sources` - List indexed sources

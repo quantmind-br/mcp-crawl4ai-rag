@@ -1,0 +1,174 @@
+description = "Create a pull request with comprehensive analysis and documentation"
+
+prompt = """
+# Create Pull Request
+
+Create a comprehensive pull request with detailed analysis and documentation.
+
+## Pre-PR Analysis
+
+### 1. Current Changes Analysis
+!{git status}
+!{git diff --staged}
+!{git diff}
+
+### 2. Branch Information
+!{git branch --show-current}
+!{git log --oneline origin/main..HEAD}
+
+### 3. Related Issues/PRs
+!{gh issue list --state open --limit 10}
+!{gh pr list --state open --limit 5}
+
+## PR Preparation
+
+### 1. Ensure Clean State
+- All changes are committed
+- Branch is up to date with main
+- All tests are passing
+- Linting passes
+
+### 2. Validation Gates
+Run these checks before creating PR:
+
+!{git diff --check}  # Check for whitespace errors
+
+For Python projects:
+```bash
+ruff check --fix
+mypy .
+pytest
+```
+
+For Node.js projects:
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+## PR Creation
+
+### 1. Generate PR Title
+Based on the commits, suggest a clear, descriptive title following conventional commits format:
+- feat: for new features
+- fix: for bug fixes
+- docs: for documentation changes
+- refactor: for code refactoring
+- test: for adding tests
+- chore: for maintenance tasks
+
+### 2. PR Description Template
+
+```markdown
+## Summary
+[Brief description of what this PR does]
+
+## Changes Made
+- [List key changes]
+- [Include new files created]
+- [Include modified functionality]
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+- [ ] No regressions introduced
+
+## Documentation
+- [ ] README updated if needed
+- [ ] API documentation updated
+- [ ] Comments added for complex logic
+- [ ] GEMINI.md updated with new utilities/patterns
+
+## Checklist
+- [ ] Code follows project conventions
+- [ ] No hardcoded values or secrets
+- [ ] Error handling implemented
+- [ ] Performance considered
+- [ ] Security implications reviewed
+
+## Related Issues
+Closes #[issue_number]
+Related to #[issue_number]
+
+## Screenshots/Demo
+[If applicable, add screenshots or demo of the changes]
+
+## Migration Notes
+[If this change requires database migrations, environment variable changes, or other setup steps]
+
+## Rollback Plan
+[How to rollback this change if needed]
+```
+
+### 3. Create the PR
+!{gh pr create --title "PR_TITLE" --body "PR_BODY" --draft}
+
+## Post-PR Actions
+
+1. **Request Reviews**
+   - Tag appropriate reviewers
+   - Assign yourself to the PR
+   - Add relevant labels
+
+2. **CI/CD Monitoring**
+   - Monitor automated checks
+   - Fix any failing tests
+   - Update PR if needed
+
+3. **Communication**
+   - Notify team members if needed
+   - Respond promptly to review feedback
+   - Keep PR updated and rebased
+
+## PR Best Practices
+
+### Size and Scope
+- Keep PRs focused and reasonably sized
+- Split large changes into multiple PRs
+- Include related changes together
+
+### Quality Standards
+- All tests must pass
+- Code coverage should not decrease
+- Follow existing code patterns
+- Include comprehensive error handling
+
+### Documentation Requirements
+- Update relevant documentation
+- Add inline comments for complex logic
+- Update GEMINI.md with new patterns or utilities
+- Include migration notes if needed
+
+## Review Process
+
+### Preparing for Review
+- Self-review your changes first
+- Ensure all CI checks pass
+- Add comments explaining complex decisions
+- Test the changes thoroughly
+
+### Responding to Feedback
+- Address all review comments
+- Ask for clarification if needed
+- Make requested changes promptly
+- Re-request review after changes
+
+## Merging Guidelines
+
+### Pre-merge Checklist
+- [ ] All reviews approved
+- [ ] All CI checks passing
+- [ ] No merge conflicts
+- [ ] Documentation updated
+- [ ] Migration plan ready (if needed)
+
+### Merge Strategy
+- Use squash merge for feature branches
+- Use merge commit for important milestones
+- Delete branch after successful merge
+
+Would you like me to proceed with creating the PR based on the current changes?
+"""

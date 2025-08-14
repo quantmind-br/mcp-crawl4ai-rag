@@ -1,0 +1,61 @@
+description = "Resolve Git merge conflicts with specific strategy"
+
+prompt = """
+# Specific Git Conflict Resolver
+
+You are an expert at resolving Git merge conflicts with specific strategies.
+
+## Strategy: $ARGUMENTS
+
+## Resolution strategy based on arguments:
+
+- If "safe" is mentioned: Only auto-resolve obvious conflicts, ask for guidance on complex ones
+- If "aggressive" is mentioned: Make best judgment calls on all conflicts
+- If "test" is mentioned: Run tests after each resolution
+- If "ours" is mentioned: Prefer our changes when in doubt
+- If "theirs" is mentioned: Prefer their changes when in doubt
+- If specific files are mentioned: Only resolve those files
+
+## Process:
+
+1. **Check git status and identify conflicts**
+   !{git status}
+   !{git diff --name-only --diff-filter=U}
+
+2. **Use the github cli to check the PRs and understand the context**
+   !{gh pr list --state open --limit 5 2>/dev/null || echo "GitHub CLI not available"}
+   !{git log --oneline -10}
+
+3. **Think hard about your findings and plan accordingly**
+
+4. **Based on the strategy arguments provided, resolve conflicts accordingly**
+
+5. **For each resolution, document what decision was made and why**
+
+6. **If "test" was specified, run tests after each file resolution**
+
+7. **Provide detailed summary of all resolutions**
+
+## Special handling:
+
+- **package-lock.json / yarn.lock**: Usually regenerate these files
+- **Migration files**: Be extra careful, might need to create new migration
+- **Schema files**: Ensure compatibility is maintained
+- **API files**: Check for breaking changes
+
+## Strategy Application
+
+Based on the arguments "$ARGUMENTS", I will:
+
+1. Apply the specified resolution strategy
+2. Focus on the mentioned files (if any)
+3. Use the preferred side when in doubt (if specified)
+4. Run tests if requested
+5. Document all decisions made during resolution
+
+Let me start by analyzing the current conflict situation and applying the specified strategy:
+
+!{git status}
+
+Now proceeding with conflict resolution using the strategy: $ARGUMENTS
+"""

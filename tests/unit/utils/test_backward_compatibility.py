@@ -1,7 +1,8 @@
 """
-Simple backward compatibility test for smart_crawl_github.
+Backward compatibility tests for GitHub repository processing.
 
-Tests that the default behavior (markdown-only) still works correctly.
+Tests that the default behavior (markdown-only) still works correctly
+after refactoring to use the unified indexing architecture.
 """
 # ruff: noqa: E402
 

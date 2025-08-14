@@ -1,0 +1,138 @@
+description = "Comprehensive onboarding guide for new developers"
+
+prompt = """
+# Developer Onboarding Guide
+
+Welcome to the project! Let me guide you through the complete setup and understanding process.
+
+## Project Overview
+
+First, let's understand the project structure:
+!{tree -I 'node_modules|__pycache__|.git|.venv' -L 3}
+
+## Essential Files Reading
+
+Let me read the key project files to understand the setup:
+
+### Project Documentation
+@README.md
+@GEMINI.md
+
+### Configuration Files
+@pyproject.toml
+@package.json
+
+## Development Environment Setup
+
+Based on the project type, here's your setup checklist:
+
+### Python Projects
+1. **Python Version**: Check required version in pyproject.toml
+2. **Virtual Environment**: 
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
+   ```
+3. **Dependencies**: 
+   ```bash
+   pip install -e .
+   # or
+   uv sync
+   ```
+
+### Node.js Projects
+1. **Node Version**: Check .nvmrc or package.json engines
+2. **Package Manager**: Use npm, yarn, or pnpm as specified
+3. **Dependencies**:
+   ```bash
+   npm install
+   # or
+   yarn install
+   # or
+   pnpm install
+   ```
+
+## Understanding the Codebase
+
+### Architecture Overview
+- Explain the project's architecture
+- Identify main directories and their purposes
+- Point out key design patterns used
+
+### Code Conventions
+- Naming conventions
+- File organization patterns
+- Coding standards and style guides
+
+### Testing Strategy
+- Test file locations and naming
+- How to run tests
+- Testing frameworks used
+
+## Development Workflow
+
+### Git Workflow
+!{git remote -v}
+!{git branch -a}
+
+### Common Commands
+- How to start the development server
+- How to run tests
+- How to build the project
+- How to deploy (if applicable)
+
+### Tools and Scripts
+Review available scripts and tools:
+- Linting and formatting tools
+- Build processes
+- Development utilities
+
+## Key Resources
+
+### Documentation
+- Internal documentation locations
+- External API docs
+- Framework documentation links
+
+### Team Contacts
+- Who to ask for help with different areas
+- Code review process
+- Communication channels
+
+## First Tasks
+
+Here are some good first tasks to get familiar with the codebase:
+
+1. **Environment Verification**
+   - Set up development environment
+   - Run all tests successfully
+   - Start development server
+
+2. **Code Exploration**
+   - Find and understand a simple feature
+   - Trace through a typical user flow
+   - Identify where different types of logic live
+
+3. **Make a Small Change**
+   - Fix a typo in documentation
+   - Add a simple test case
+   - Implement a minor feature
+
+## Getting Help
+
+When you need assistance:
+- Check existing documentation first
+- Look for similar patterns in the codebase
+- Ask specific questions with context
+- Share error messages and steps you've tried
+
+## Development Best Practices
+
+- Always create feature branches
+- Write tests for new functionality
+- Follow existing code patterns
+- Keep commits atomic and descriptive
+- Run linting and tests before committing
+
+Welcome to the team! Let me know if you need clarification on any aspect of the project.
+"""

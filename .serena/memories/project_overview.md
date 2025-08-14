@@ -1,25 +1,32 @@
-# Project Overview - MCP Crawl4AI RAG Server
+# MCP Crawl4AI RAG Server - Project Overview
 
 ## Purpose
-This is an advanced Model Context Protocol (MCP) server that integrates multiple technologies to provide AI agents and coding assistants with intelligent web crawling, GitHub repository indexing, vector search, and AI hallucination detection capabilities.
+Advanced Model Context Protocol (MCP) server that integrates Crawl4AI, Qdrant vector database, and Neo4j knowledge graph to provide AI agents and coding assistants with:
+- Intelligent web crawling capabilities
+- GitHub repository indexing and analysis
+- Vector search and retrieval (RAG)
+- AI hallucination detection through knowledge graphs
 
-## Core Functionality
-- **Web Crawling**: Smart web crawling with sitemap detection and recursive crawling using Crawl4AI
-- **GitHub Integration**: Clone and index GitHub repositories for documentation and code analysis
-- **Vector Search**: Semantic search capabilities using Qdrant vector database
-- **Knowledge Graphs**: Code structure analysis and AI hallucination detection using Neo4j
-- **RAG (Retrieval Augmented Generation)**: Advanced RAG strategies with reranking and contextual embeddings
+## Core Architecture
+- **FastMCP-based server** with async context management
+- **Dual-storage system**: Qdrant for vector embeddings + Neo4j for code structure
+- **Multi-language code parsing** using Tree-sitter grammars
+- **Unified indexing service** for cross-system file linking
+- **MCP tools** organized by functionality (web, GitHub, RAG, knowledge graph)
 
 ## Key Features
-- Multi-language code parsing with Tree-sitter grammars (Python, JavaScript, Java, Go, Rust, C/C++, etc.)
-- GPU acceleration support for embedding models
-- Fallback API configuration for high availability
-- Hybrid search combining semantic and keyword search
-- Agentic RAG for code example extraction
-- Cross-system file linking between Qdrant and Neo4j
+- Smart web crawling with sitemap detection and recursive link following
+- GitHub repository cloning and comprehensive indexing
+- Contextual embeddings and hybrid search (semantic + keyword)
+- Code structure analysis for 10+ programming languages
+- AI-generated code validation against knowledge graph
+- Performance optimization for enterprise-scale processing
 
-## Target Use Cases
-1. **Documentation RAG**: Crawl and index documentation sites for intelligent Q&A
-2. **Code Assistant**: Extract code examples and provide coding help
-3. **Hallucination Detection**: Validate AI-generated code against repository structure
-4. **Repository Analysis**: Understand codebase structure and relationships
+## Target Users
+- AI agents requiring web data and repository knowledge
+- Coding assistants needing accurate code context
+- Development teams implementing RAG workflows
+- Enterprise systems requiring hallucination detection
+
+## Technology Focus
+Production-ready MCP server with emphasis on accuracy, performance, and scalability for AI-powered development workflows.

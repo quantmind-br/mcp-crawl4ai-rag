@@ -1,102 +1,174 @@
 # Task Completion Checklist
 
-## Before Committing Code
+## Before Starting Development
+- [ ] **Environment Setup**
+  - [ ] Copy `.env.example` to `.env` and configure API keys
+  - [ ] Run `setup.bat` (Windows) or `docker-compose up -d` (Linux/Mac)
+  - [ ] Verify services: Qdrant (6333), Neo4j (7474), Redis (6379)
+  - [ ] Run `uv sync` to install dependencies
 
-### 1. Code Quality Checks
-```bash
-# ALWAYS run these commands before committing:
-uv run ruff check --fix .     # Fix linting issues automatically
-uv run ruff format .          # Format code according to project standards
-```
+## During Development
 
-### 2. Testing Requirements
-```bash
-# Run relevant tests based on changes:
+### Code Quality Standards
+- [ ] **Code Style**
+  - [ ] Use snake_case for functions and variables
+  - [ ] Add comprehensive docstrings with type hints
+  - [ ] Follow async/await patterns for I/O operations
+  - [ ] Use descriptive variable names
 
-# For MCP tools changes:
-uv run pytest tests/unit/tools/ -v
+- [ ] **Type Safety**
+  - [ ] Add type hints to all function parameters
+  - [ ] Specify return types for all functions
+  - [ ] Use Union types for optional parameters
 
-# For service layer changes:
-uv run pytest tests/unit/services/ -v
+- [ ] **Error Handling**
+  - [ ] Wrap external API calls in try-catch blocks
+  - [ ] Provide graceful degradation for optional features
+  - [ ] Log errors with appropriate context
 
-# For embedding system changes:
-uv run pytest tests/specialized/embedding/ -v
+### Testing Requirements
+- [ ] **Unit Tests**
+  - [ ] Create tests for new functions in appropriate `tests/unit/` subdirectory
+  - [ ] Mock external dependencies (APIs, databases)
+  - [ ] Test error conditions and edge cases
 
-# For knowledge graph changes:
-uv run pytest tests/specialized/knowledge_graphs/ -v
+- [ ] **Integration Tests** (if applicable)
+  - [ ] Add end-to-end tests for new MCP tools
+  - [ ] Test database integration with Docker services
+  - [ ] Verify cross-system functionality (Qdrant + Neo4j)
 
-# Full test suite (recommended for major changes):
-uv run pytest
-```
+## After Code Changes
 
-### 3. Infrastructure Tests (if Docker services are modified)
-```bash
-# Ensure Docker services are running:
-docker-compose up -d
-
-# Run infrastructure tests:
-uv run pytest tests/infrastructure/ -v
-uv run pytest tests/integration/ -v
-```
-
-### 4. Environment Validation
-- Ensure `.env` file is properly configured
-- Verify Docker services are running (Qdrant, Neo4j)
-- Test MCP server starts successfully:
+### Immediate Validation
+- [ ] **Linting and Formatting**
   ```bash
-  uv run -m src
+  uv run ruff check .
+  uv run ruff check --fix .
+  uv run ruff format .
   ```
 
-### 5. Documentation Updates
-- Update CLAUDE.md if commands or architecture change
-- Update README.md if new features are added
-- NO automatic creation of new documentation files unless requested
+- [ ] **Type Checking** (if available)
+  ```bash
+  # Check if mypy is configured
+  uv run mypy src/ || echo "mypy not configured"
+  ```
 
-## When Adding New Dependencies
-```bash
-# NEVER edit pyproject.toml directly
-# ALWAYS use uv commands:
-uv add package-name               # Add regular dependency
-uv add --dev package-name         # Add development dependency
-uv sync                          # Sync after changes
-```
+- [ ] **Unit Tests**
+  ```bash
+  uv run pytest tests/unit/ -v
+  ```
 
-## Database Management Tasks
-```bash
-# If vector database schema changes:
-uv run python scripts/clean_qdrant.py
-uv run python scripts/define_qdrant_dimensions.py
+### Comprehensive Testing
+- [ ] **Full Test Suite**
+  ```bash
+  uv run pytest
+  ```
 
-# If knowledge graph changes:
-uv run python scripts/query_knowledge_graph.py
-```
+- [ ] **Test Coverage** (optional but recommended)
+  ```bash
+  uv run pytest --cov=src --cov-report=html
+  ```
 
-## Windows-Specific Considerations
-- Ensure no Unicode characters in console output
-- Test Windows batch scripts if modified (setup.bat, start.bat)
-- Verify Windows-specific dependencies are working
+- [ ] **Integration Tests** (requires Docker services)
+  ```bash
+  uv run pytest tests/integration/ -v
+  ```
 
-## Integration Testing Checklist
-- [ ] MCP server starts without errors
-- [ ] Docker services are accessible
-- [ ] Basic MCP tools respond correctly
-- [ ] Vector search functions properly
-- [ ] Knowledge graph operations work
-- [ ] No Unicode encoding errors in console
+### Service Validation
+- [ ] **MCP Server Startup**
+  ```bash
+  # Test server can start without errors
+  uv run -m src
+  # Or alternative
+  uv run python run_server.py
+  ```
 
-## Pre-Deployment Checklist
-- [ ] All tests pass
-- [ ] Code is formatted and linted
-- [ ] Environment variables are documented
-- [ ] Docker services are working
-- [ ] No sensitive information in code
-- [ ] Memory usage is reasonable
-- [ ] Performance is acceptable
+- [ ] **Database Connectivity**
+  - [ ] Qdrant: `curl http://localhost:6333/health`
+  - [ ] Neo4j: `curl http://localhost:7474`
+  - [ ] Redis: `docker exec mcp-redis redis-cli ping`
 
-## Common Issues to Check
-- **Unicode errors**: Ensure ASCII-only output
-- **Memory leaks**: Check context managers are properly closed
-- **API rate limits**: Verify retry logic is working
-- **Docker connectivity**: Ensure services are reachable
-- **File permissions**: Check Windows file access issues
-- **Embedding dimensions**: Verify consistency across providers
+### Documentation Updates
+- [ ] **Code Documentation**
+  - [ ] Update docstrings for modified functions
+  - [ ] Add inline comments for complex logic
+  - [ ] Update type hints if function signatures changed
+
+- [ ] **Memory Files** (if major changes)
+  - [ ] Update relevant Serena memory files if architecture changed
+  - [ ] Add new commands to `suggested_commands.md` if needed
+
+## Before Task Completion
+
+### Final Validation
+- [ ] **Clean Test Run**
+  ```bash
+  # Start fresh with clean databases if needed
+  python scripts/cleanup_databases.py --confirm
+  uv run pytest
+  ```
+
+- [ ] **Performance Check** (for significant changes)
+  ```bash
+  uv run pytest tests/performance/ -v
+  ```
+
+- [ ] **Cross-Platform Compatibility** (if applicable)
+  - [ ] Test on Windows using `.bat` scripts
+  - [ ] Verify Unix commands work on Linux/Mac
+
+### Code Review Checklist
+- [ ] **Security**
+  - [ ] No API keys or secrets in code
+  - [ ] Proper input validation for user data
+  - [ ] Safe file path handling
+
+- [ ] **Performance**
+  - [ ] Async patterns used for I/O operations
+  - [ ] Batch operations for database calls
+  - [ ] Appropriate use of connection pooling
+
+- [ ] **Maintainability**
+  - [ ] Code follows established patterns
+  - [ ] Functions have single responsibility
+  - [ ] Dependencies are properly managed with `uv`
+
+## Troubleshooting Common Issues
+
+### Test Failures
+- [ ] **Docker Services Down**
+  ```bash
+  setup.bat  # Windows
+  docker-compose up -d  # Linux/Mac
+  ```
+
+- [ ] **Port Conflicts**
+  ```bash
+  netstat -an | find "6333"  # Check Qdrant port
+  netstat -an | find "7474"  # Check Neo4j port
+  ```
+
+- [ ] **Environment Variables**
+  ```bash
+  # Verify .env file exists and has required keys
+  cat .env | grep API_KEY
+  ```
+
+### Performance Issues
+- [ ] **Database Dimension Mismatches**
+  ```bash
+  uv run python scripts/define_qdrant_dimensions.py
+  ```
+
+- [ ] **Memory Usage**
+  ```bash
+  # Monitor during heavy operations
+  docker stats
+  ```
+
+## Success Criteria
+- [ ] All tests pass (`uv run pytest`)
+- [ ] Code style compliant (`uv run ruff check .`)
+- [ ] MCP server starts successfully
+- [ ] New functionality works with existing integrations
+- [ ] Documentation updated appropriately

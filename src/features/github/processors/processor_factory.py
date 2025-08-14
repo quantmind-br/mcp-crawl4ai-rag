@@ -14,6 +14,7 @@ from .mdx_processor import MDXProcessor
 from .python_processor import PythonProcessor
 from .typescript_processor import TypeScriptProcessor
 from .config_processor import ConfigProcessor
+from .documentation_processor import DocumentationProcessor
 from ..core.exceptions import ProcessorNotFoundError, ConfigurationError
 from ..config.settings import PROCESSOR_PRIORITY, get_language_for_extension
 
@@ -181,6 +182,7 @@ class ProcessorFactory:
         registry.register("python", PythonProcessor)
         registry.register("typescript", TypeScriptProcessor)
         registry.register("config", ConfigProcessor)
+        registry.register("documentation", DocumentationProcessor)
 
         return registry
 

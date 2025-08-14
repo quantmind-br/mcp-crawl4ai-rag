@@ -1,0 +1,60 @@
+description = "Create a new development branch from develop/main"
+
+prompt = """
+# Create New Development Branch
+
+Let's start working on a new branch from develop/main.
+
+## Feature/Task: $ARGUMENTS
+
+## Instructions
+
+1. **Move to develop and ensure you pull latest**
+   
+   First, let me check the current branch and status:
+   !{git branch --show-current}
+   !{git status}
+   
+   Switch to develop/main and pull latest changes:
+   !{git checkout develop 2>/dev/null || git checkout main}
+   !{git pull origin develop 2>/dev/null || git pull origin main}
+
+2. **Create a new branch from develop for the feature**
+   
+   Create and switch to new branch:
+   !{git checkout -b feature/$ARGUMENTS}
+   
+   Verify we're on the new branch:
+   !{git branch --show-current}
+
+3. **Get ready to start working on the new branch**
+   
+   Set up tracking for the new branch:
+   !{git push -u origin feature/$ARGUMENTS}
+   
+   Show current status:
+   !{git status}
+   !{git log --oneline -5}
+
+## Branch Setup Complete
+
+✅ **Branch Created**: `feature/$ARGUMENTS`
+✅ **Tracking Set**: Remote tracking configured
+✅ **Ready for Development**: You can now start working on the feature
+
+## Next Steps
+
+1. **Make your changes** - Implement the feature or fix
+2. **Commit regularly** - Use descriptive commit messages
+3. **Push frequently** - Keep remote branch updated
+4. **Create PR** - When ready, use `/create-pr` command
+
+## Branch Naming Convention
+
+- **Features**: `feature/feature-name`
+- **Bug Fixes**: `fix/bug-description`
+- **Hotfixes**: `hotfix/critical-issue`
+- **Chores**: `chore/task-description`
+
+Your new branch is ready for development: `feature/$ARGUMENTS`
+"""

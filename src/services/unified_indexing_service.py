@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Import utilities and models
 try:
     from ..utils.file_id_generator import generate_file_id, extract_repo_name
+    from ..utils.chunking import smart_chunk_markdown
     from ..models.unified_indexing_models import (
         UnifiedIndexingRequest,
         UnifiedIndexingResponse,
@@ -28,6 +29,7 @@ try:
     from ..services.rag_service import add_documents_to_vector_db, update_source_info
     from ..services.file_classifier import FileClassifier
     from ..features.github.repository.git_operations import GitRepository
+    from ..features.github.processors.processor_factory import ProcessorFactory
     from ..clients.qdrant_client import get_qdrant_client
     from ..k_graph.services.repository_parser import DirectNeo4jExtractor
 
@@ -207,6 +209,10 @@ class UnifiedIndexingService:
         # NEW: Initialize file classifier for intelligent routing
         self.file_classifier = FileClassifier()
         logger.debug("FileClassifier initialized for intelligent routing")
+
+        # Initialize ProcessorFactory for intelligent content extraction
+        self.processor_factory = ProcessorFactory()
+        logger.debug("ProcessorFactory initialized for content processing")
 
         # Performance optimization components
         self.context = context
@@ -621,7 +627,11 @@ class UnifiedIndexingService:
         request: UnifiedIndexingRequest,
     ) -> bool:
         """
-        Process file for RAG (Qdrant) indexing.
+        Process file for RAG (Qdrant) indexing with intelligent content extraction.
+
+        This method uses ProcessorFactory to extract high-value content (docstrings,
+        documentation) when processors are available, falling back to raw content
+        processing for unsupported file types.
 
         Args:
             file_path: Path to file
@@ -633,8 +643,143 @@ class UnifiedIndexingService:
             True if processing successful, False otherwise
         """
         try:
-            # Chunk content
-            chunks = self._chunk_content(content, request.chunk_size)
+            # Try to get a processor for intelligent content extraction
+            processor = self.processor_factory.get_processor_for_file(str(file_path))
+
+            # Prepare aggregated data for vector database
+            all_chunks = []
+            all_metadatas = []
+            all_file_ids = []
+            total_word_count = 0
+
+            if processor:
+                # Use intelligent content extraction
+                try:
+                    relative_path = str(file_path.relative_to(file_path.parent.parent))
+                    processed_items = processor.process_file(
+                        str(file_path), relative_path
+                    )
+
+                    if not processed_items:
+                        # Processor returned no content, fallback to raw processing
+                        logger.debug(
+                            f"Processor returned no content for {file_path.name}, using fallback"
+                        )
+                        return await self._process_file_for_rag_fallback(
+                            file_path, content, file_id, request
+                        )
+
+                    chunk_index = 0
+                    for item in processed_items:
+                        # Chunk each processed content item
+                        item_chunks = smart_chunk_markdown(
+                            item.content, request.chunk_size
+                        )
+
+                        for chunk in item_chunks:
+                            if chunk.strip():  # Only process non-empty chunks
+                                # Create enhanced metadata with ProcessedContent attributes
+                                metadata = {
+                                    "chunk_index": chunk_index,
+                                    "file_path": str(file_path),
+                                    "relative_path": relative_path,
+                                    "language": self._detect_file_language(file_path),
+                                    "source": extract_repo_name(request.repo_url),
+                                    "processing_time": datetime.now().isoformat(),
+                                    # Enhanced metadata from ProcessedContent
+                                    "content_type": item.content_type,
+                                    "content_name": item.name,
+                                    "content_signature": item.signature,
+                                    "content_line_number": item.line_number,
+                                    "content_language": item.language,
+                                    "extraction_method": "processor",
+                                }
+
+                                all_chunks.append(chunk)
+                                all_metadatas.append(metadata)
+                                all_file_ids.append(file_id)
+                                total_word_count += len(chunk.split())
+                                chunk_index += 1
+
+                    logger.debug(
+                        f"Processed {file_path.name} using {processor.name} processor: "
+                        f"{len(processed_items)} items -> {len(all_chunks)} chunks"
+                    )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Error using processor for {file_path.name}: {e}. Falling back to raw content."
+                    )
+                    return await self._process_file_for_rag_fallback(
+                        file_path, content, file_id, request
+                    )
+            else:
+                # No processor available, use raw content processing (fallback)
+                return await self._process_file_for_rag_fallback(
+                    file_path, content, file_id, request
+                )
+
+            if not all_chunks:
+                return True  # Empty file or no valid content is not an error
+
+            # Prepare data for vector database
+            urls = [request.repo_url] * len(all_chunks)
+            chunk_numbers = list(range(len(all_chunks)))
+
+            # Update source information
+            source_id = extract_repo_name(request.repo_url)
+            source_summary = f"Repository: {source_id}"
+
+            update_source_info(
+                self.qdrant_client, source_id, source_summary, total_word_count
+            )
+
+            # Add documents to vector database with file_id support
+            add_documents_to_vector_db(
+                self.qdrant_client,
+                urls,
+                chunk_numbers,
+                all_chunks,
+                all_metadatas,
+                {request.repo_url: content},  # url_to_full_document mapping
+                batch_size=50,
+                file_ids=all_file_ids,
+            )
+
+            logger.debug(
+                f"Successfully processed {file_path.name} for RAG with {len(all_chunks)} chunks"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Error processing {file_path} for RAG: {e}")
+            return False
+
+    async def _process_file_for_rag_fallback(
+        self,
+        file_path: Path,
+        content: str,
+        file_id: str,
+        request: UnifiedIndexingRequest,
+    ) -> bool:
+        """
+        Fallback RAG processing using raw content (original behavior).
+
+        This method provides backward compatibility by processing raw file content
+        when intelligent processors are not available or fail.
+
+        Args:
+            file_path: Path to file
+            content: File content
+            file_id: Generated file ID
+            request: Processing request
+
+        Returns:
+            True if processing successful, False otherwise
+        """
+        try:
+            # Chunk content using smart chunking
+            chunks = smart_chunk_markdown(content, request.chunk_size)
 
             if not chunks:
                 return True  # Empty file is not an error
@@ -655,6 +800,7 @@ class UnifiedIndexingService:
                     "language": self._detect_file_language(file_path),
                     "source": extract_repo_name(request.repo_url),
                     "processing_time": datetime.now().isoformat(),
+                    "extraction_method": "fallback",
                 }
                 metadatas.append(metadata)
                 file_ids.append(file_id)
@@ -681,12 +827,12 @@ class UnifiedIndexingService:
             )
 
             logger.debug(
-                f"Successfully processed {file_path.name} for RAG with {len(chunks)} chunks"
+                f"Successfully processed {file_path.name} for RAG with fallback method: {len(chunks)} chunks"
             )
             return True
 
         except Exception as e:
-            logger.error(f"Error processing {file_path} for RAG: {e}")
+            logger.error(f"Error in fallback processing for {file_path}: {e}")
             return False
 
     async def _process_file_for_neo4j(
@@ -913,6 +1059,9 @@ class UnifiedIndexingService:
         """
         Chunk content into smaller pieces for processing.
 
+        This method is a compatibility wrapper around the centralized smart_chunk_markdown
+        function to maintain backward compatibility with existing tests and code.
+
         Args:
             content: Text content to chunk
             chunk_size: Maximum size of each chunk
@@ -920,29 +1069,7 @@ class UnifiedIndexingService:
         Returns:
             List of content chunks
         """
-        if len(content) <= chunk_size:
-            return [content] if content.strip() else []
-
-        chunks = []
-        start = 0
-
-        while start < len(content):
-            end = start + chunk_size
-
-            # Try to break at sentence boundaries
-            if end < len(content):
-                # Look for sentence break within last 100 chars
-                sentence_break = content.rfind(".", start, end)
-                if sentence_break > start + chunk_size * 0.8:
-                    end = sentence_break + 1
-
-            chunk = content[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-
-            start = end
-
-        return chunks
+        return smart_chunk_markdown(content, chunk_size)
 
     def _detect_file_language(self, file_path: Path) -> str:
         """

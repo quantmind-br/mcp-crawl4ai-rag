@@ -1,0 +1,290 @@
+description = "Evaluate multiple solution approaches using 15 parallel research agents"
+
+prompt = """
+# Hackathon Multi-Option Research
+
+Rapidly evaluate multiple solution approaches for hackathon challenges using massive parallel research (15 concurrent agents).
+
+## Problem/Challenge: $ARGUMENTS
+
+## Phase 1: Problem Analysis & Option Generation
+
+### Problem Breakdown
+Analyze the challenge statement for:
+- Core requirements and constraints
+- Success criteria and evaluation metrics
+- Available time and resources
+- Technical constraints and preferences
+- Target users and use cases
+
+### Solution Approach Generation
+
+Generate 3 distinct solution approaches:
+
+#### Option A: Speed-First Approach
+- **Philosophy**: "Ship fast, iterate later"
+- **Strategy**: Leverage existing tools, proven patterns, minimal custom code
+- **Target**: Working prototype in minimal time
+- **Trade-offs**: May sacrifice innovation for speed
+
+#### Option B: Innovation-First Approach  
+- **Philosophy**: "Breakthrough solution with novel approach"
+- **Strategy**: Cutting-edge tech, unique architecture, creative problem-solving
+- **Target**: High-impact, differentiated solution
+- **Trade-offs**: Higher risk, potentially longer development time
+
+#### Option C: Balanced Approach
+- **Philosophy**: "Solid foundation with strategic innovation"
+- **Strategy**: Proven base with selective modern enhancements
+- **Target**: Reliable solution with competitive advantages
+- **Trade-offs**: Moderate risk, moderate innovation
+
+## Phase 2: Massive Parallel Research (15 Agents)
+
+**CRITICAL**: Execute all 15 research agents simultaneously using multiple Agent tool calls in a single response for maximum efficiency.
+
+**OUTPUT STRUCTURE**: Create separate files for organized research review:
+- Individual agent outputs: `PRPs/research/{option}-agent-{id}-{area}.md`
+- Synthesized option analysis: `PRPs/research/{option}-synthesized-output.md`  
+- Final recommendations: `PRPs/research/final-recommendations-analysis.md`
+
+**IMPORTANT**: Create the `PRPs/research/` directory first if it doesn't exist.
+
+### Research Matrix: 5 Agents × 3 Options
+
+#### Option A Research Agents (Speed-First)
+
+**Agent A1: Technical Feasibility (Speed-First)**
+```
+Task: Speed-First Technical Analysis
+Prompt: Analyze technical feasibility for speed-first approach to "$ARGUMENTS". Focus on:
+- Fastest possible tech stack and frameworks
+- Existing libraries and tools to leverage
+- Minimal custom development requirements
+- Proven patterns and architectures
+- Quick deployment and hosting options
+- Time-to-working-prototype estimation
+
+CRITICAL: Save your complete analysis directly to: PRPs/research/speed-first-agent-a1-technical.md
+
+Use this file structure:
+# Agent A1: Technical Feasibility - Speed-First Approach
+
+## Research Focus
+[Your analysis of the technical feasibility research mandate]
+
+## Key Findings
+[Detailed technical feasibility findings and recommendations]
+
+## Quantitative Assessment
+- Technical Complexity: [1-10 score with reasoning]
+- Implementation Confidence: [High/Medium/Low with rationale]
+- Speed Rating: [1-10 score for development velocity]
+- Risk Level: [1-10 score with key risks identified]
+
+## Recommended Tech Stack
+[Specific technology recommendations with versions]
+
+## Critical Insights
+[Most important technical discoveries that impact decision-making]
+
+## Implementation Recommendations
+[Specific technical guidance for speed-first implementation]
+
+## Time Estimates
+[Detailed timeline estimates for key technical milestones]
+
+Your task is COMPLETE when this file is saved with comprehensive technical research.
+```
+
+[Continue with similar structured prompts for agents A2-A5, B1-B5, C1-C5]
+
+## Phase 3: File Validation & Synthesis
+
+### Validate Agent File Creation
+After all 15 agents complete, verify all expected files exist:
+```bash
+# Validate Speed-First files (should be 5)
+!ls PRPs/research/speed-first-agent-*.md | wc -l
+
+# Validate Innovation-First files (should be 5)  
+!ls PRPs/research/innovation-first-agent-*.md | wc -l
+
+# Validate Balanced files (should be 5)
+!ls PRPs/research/balanced-agent-*.md | wc -l
+
+# Total should be 15 files
+!ls PRPs/research/*-agent-*.md | wc -l
+```
+
+If any files are missing, identify which agents failed and may need re-execution.
+
+### Create Synthesized Analysis Files
+
+After confirming all 15 agent files exist, create comprehensive option analysis by reading agent files:
+
+#### Speed-First Option Synthesis
+Create file: `PRPs/research/speed-first-synthesized-output.md`
+```markdown
+# Speed-First Approach - Complete Analysis
+
+## Agent Research Summary
+- **Technical Feasibility** (Agent A1): [Summary from file + confidence score 1-10]
+- **Speed-to-Market** (Agent A2): [Summary from file + timeline assessment]
+- **Market Research** (Agent A3): [Summary from file + market positioning]
+- **Design Research** (Agent A4): [Summary from file + design strategy]
+- **User Research** (Agent A5): [Summary from file + user insights]
+
+## Quantitative Scoring
+- Development Speed: [Score 1-10] × 35% = [Weighted Score]
+- Technical Feasibility: [Score 1-10] × 25% = [Weighted Score]
+- Innovation/Impact: [Score 1-10] × 20% = [Weighted Score]
+- Market Positioning: [Score 1-10] × 15% = [Weighted Score]
+- User Fit: [Score 1-10] × 5% = [Weighted Score]
+- **Total Score**: [Sum of weighted scores]
+
+## Strengths & Weaknesses
+**Strengths:**
+- [Key advantages from all agent research]
+- [Competitive differentiators]
+- [Team and resource advantages]
+
+**Weaknesses:**
+- [Critical limitations identified]
+- [Risk factors from all agents]
+- [Resource or capability challenges]
+
+## Implementation Confidence
+- Overall confidence: [High/Medium/Low]
+- Key success factors: [From all agent inputs]
+- Potential failure points: [Combined risk assessment]
+
+## Implementation Strategy
+[High-level approach based on all 5 agent findings]
+```
+
+#### Innovation-First Option Synthesis
+Create file: `PRPs/research/innovation-first-synthesized-output.md`
+[Same structure as above, focused on innovation approach]
+
+#### Balanced Option Synthesis  
+Create file: `PRPs/research/balanced-synthesized-output.md`
+[Same structure as above, focused on balanced approach]
+
+## Phase 4: Final Comparative Analysis & Recommendations
+
+### Create Final Recommendations File
+
+After all option synthesis files are complete, create the comprehensive final analysis:
+
+Create file: `PRPs/research/final-recommendations-analysis.md`
+```markdown
+# Hackathon Research Final Recommendations
+
+## Executive Summary
+**Winner**: [Winning option name]
+**Key Rationale**: [2-3 sentence summary of why this option won]
+**Implementation Confidence**: [High/Medium/Low]
+
+## Problem Restatement
+[Brief restatement of the original challenge and constraints]
+
+## Option Comparison Matrix
+| Criteria | Speed-First | Innovation-First | Balanced | Weight |
+|----------|------------|------------------|----------|--------|
+| Development Speed | [score] | [score] | [score] | 35% |
+| Technical Feasibility | [score] | [score] | [score] | 25% |
+| Innovation/Impact | [score] | [score] | [score] | 20% |
+| Market Positioning | [score] | [score] | [score] | 15% |
+| User Fit | [score] | [score] | [score] | 5% |
+| **Total Score** | **[X.X]** | **[X.X]** | **[X.X]** | 100% |
+
+## Winner Selection & Rationale
+
+### Primary Recommendation: [Winning Option]
+**Score**: [X.X/10]
+**Confidence Level**: [High/Medium/Low]
+
+**Why This Option Won**:
+1. [Primary reason based on scoring]
+2. [Secondary reason based on team/context fit]
+3. [Tertiary reason based on risk/opportunity]
+
+**Critical Success Factors**:
+- [Factor 1 from winning option research]
+- [Factor 2 from winning option research]  
+- [Factor 3 from winning option research]
+
+## Implementation Roadmap for Winner
+
+[Include detailed implementation plan from winning option's synthesis file]
+
+### Hour-by-Hour Timeline
+[Specific timeline based on winning option research]
+
+### Technical Architecture
+[Architecture decisions based on winning option technical research]
+
+### Team Coordination Strategy
+[Team approach based on winning option market/user research]
+
+## Risk Assessment & Mitigation
+
+### High-Priority Risks
+**Risk 1**: [From winning option analysis]
+- **Probability**: [High/Medium/Low]
+- **Impact**: [High/Medium/Low]  
+- **Mitigation**: [Strategy from research]
+- **Early Warning Signs**: [Indicators to watch for]
+
+### Decision Checkpoints
+- **Hour 6**: [Go/no-go criteria for continuing with winner]
+- **Hour 12**: [Pivot evaluation - switch to runner-up if needed]
+- **Hour 18**: [Feature cut decisions to ensure completion]
+- **Hour 22**: [Demo readiness assessment]
+
+## Success Metrics & Validation
+
+### Demo Success Criteria
+- [Specific functionality that must work]
+- [Performance benchmarks to hit]
+- [User experience standards to meet]
+
+### Judging Criteria Alignment
+- [How winner aligns with hackathon judging criteria]
+- [Competitive advantages for presentation]
+- [Innovation story for judges]
+```
+
+### Scoring Framework (Hackathon Optimized)
+
+#### Weighted Scoring Criteria
+```yaml
+Development Speed: 35%      # Critical for hackathon timeline
+Technical Feasibility: 25%  # Must be achievable
+Innovation/Impact: 20%      # Competitive advantage
+Market Positioning: 15%     # Strategic advantage and differentiation
+User Fit: 5%               # User need alignment and adoption potential
+```
+
+## Phase 5: Quality Gates & Execution Readiness
+
+### Research Completeness Checklist
+Before proceeding to implementation:
+- [ ] All 15 individual agent files created and saved
+- [ ] All 3 option synthesis files completed
+- [ ] Final recommendations analysis file created
+- [ ] Clear winner identified with quantitative justification
+- [ ] Implementation roadmap detailed and actionable
+
+### Execution Success Criteria
+- [ ] **19 Total Files Created**: 15 individual agent research + 3 synthesis + 1 final recommendations
+- [ ] **Quantitative Decision**: Winner selected based on weighted scoring, not intuition
+- [ ] **Implementation Ready**: Detailed roadmap with hour-by-hour timeline and specific tasks
+- [ ] **Risk Aware**: Contingency plans and decision checkpoints defined
+- [ ] **Team Aligned**: Clear roles, responsibilities, and coordination strategy
+
+---
+
+**Remember**: This enhanced system provides granular visibility into each research component while maintaining comprehensive analysis and actionable recommendations. The structured file approach enables independent review of research quality and facilitates team decision-making through transparent, data-driven analysis.
+"""
