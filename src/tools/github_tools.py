@@ -316,8 +316,15 @@ async def smart_crawl_github(
 
                 if code_blocks:
                     # Process code examples in parallel
+                    # Import performance config for optimized worker count
+                    try:
+                        from ..utils.performance_config import get_performance_config
+                    except ImportError:
+                        from utils.performance_config import get_performance_config
+
+                    config = get_performance_config()
                     with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=10
+                        max_workers=config.io_workers
                     ) as executor:
                         # Prepare arguments for parallel processing
                         summary_args = [
@@ -408,7 +415,7 @@ async def index_github_repository(
     repo_url: str,
     destination: str = "both",
     file_types: List[str] = None,
-    max_files: int = 50,
+    max_files: int = 10000,
     chunk_size: int = 5000,
     max_size_mb: int = 500,
     enable_intelligent_routing: bool = True,
@@ -416,139 +423,129 @@ async def index_github_repository(
     force_kg_patterns: List[str] = None,
 ) -> str:
     """
-    🚀 UNIFIED GITHUB REPOSITORY INDEXING TOOL 🚀
+    UNIFIED GITHUB REPOSITORY INDEXING TOOL
 
     **PRIMARY PURPOSE**:
-    Intelligent dual-system repository processing that simultaneously indexes GitHub repositories
+    Enterprise-scale dual-system repository processing that simultaneously indexes GitHub repositories
     for both semantic search (Qdrant vector database) and code understanding (Neo4j knowledge graph),
     enabling comprehensive code analysis, similarity search, and relationship discovery.
 
     **CORE CAPABILITIES**:
-    ✅ **Dual-System Processing**: Simultaneous RAG (Retrieval Augmented Generation) and Knowledge Graph indexing
-    ✅ **Multi-Language Support**: Python, JavaScript, TypeScript, Go, Java, C/C++, Rust, Markdown, JSON, YAML
-    ✅ **Smart Resource Management**: 50-70% faster than separate tools through unified processing
-    ✅ **Cross-System Linking**: Consistent file_id metadata enables correlation between vector search and graph queries
-    ✅ **Selective Processing**: Choose Qdrant-only, Neo4j-only, or both systems based on use case
-    ✅ **Production Ready**: Robust error handling, progress tracking, and comprehensive statistics
+    - **Dual-System Processing**: Simultaneous RAG (Retrieval Augmented Generation) and Knowledge Graph indexing
+    - **Multi-Language Support**: Python, JavaScript, TypeScript, Go, Java, C/C++, Rust, Markdown, JSON, YAML
+    - **Enterprise Performance**: 50-70% faster than separate tools, processes up to 10,000 files by default
+    - **Cross-System Linking**: Consistent file_id metadata enables correlation between vector search and graph queries
+    - **Selective Processing**: Choose Qdrant-only, Neo4j-only, or both systems based on use case
+    - **Production Ready**: Robust error handling, progress tracking, and comprehensive statistics
 
     **WHEN TO USE THIS TOOL**:
-    🎯 **Code Analysis**: Understanding repository structure, functions, classes, and dependencies
-    🎯 **Semantic Search**: Finding relevant code snippets, documentation, and similar patterns
-    🎯 **AI Development**: Building context for code generation, debugging, and explanation tools
-    🎯 **Repository Discovery**: Exploring unknown codebases and understanding architectural patterns
-    🎯 **Cross-Reference Analysis**: Linking documentation with implementation across large projects
+    - **Large-Scale Code Analysis**: Understanding enterprise repository structure, functions, classes, dependencies
+    - **Comprehensive Semantic Search**: Finding relevant code snippets, documentation across entire codebases
+    - **AI Development**: Building context for code generation, debugging, and explanation tools at scale
+    - **Repository Discovery**: Exploring large unknown codebases and understanding architectural patterns
+    - **Cross-Reference Analysis**: Linking documentation with implementation across massive projects
 
     **OUTPUT SYSTEMS EXPLAINED**:
 
-    📊 **QDRANT (Vector Database)**:
+    **QDRANT (Vector Database)**:
     - **Purpose**: Semantic similarity search and RAG applications
     - **Data Stored**: Text chunks (code + docs) converted to high-dimensional vectors
     - **Use Cases**: "Find similar functions", "Search relevant documentation", "Code completion context"
     - **Query Methods**: Vector similarity, hybrid search, metadata filtering
 
-    🕸️ **NEO4J (Knowledge Graph)**:
+    **NEO4J (Knowledge Graph)**:
     - **Purpose**: Code structure analysis and relationship discovery
     - **Data Stored**: Classes, functions, methods, imports, file relationships as graph nodes/edges
     - **Use Cases**: "Find all callers of function X", "Show class hierarchy", "Detect circular dependencies"
     - **Query Methods**: Cypher graph queries, pattern matching, relationship traversal
 
     **SUPPORTED FILE TYPES & LANGUAGES**:
-    🐍 **Python** (.py): Classes, functions, methods, imports, docstrings
-    🟨 **JavaScript/TypeScript** (.js, .ts, .tsx): Functions, classes, exports, imports, JSDoc
-    🐹 **Go** (.go): Functions, structs, methods, packages, interfaces
-    ☕ **Java** (.java): Classes, methods, packages, inheritance, annotations
-    🦀 **Rust** (.rs): Functions, structs, traits, modules, implementations
-    ⚡ **C/C++** (.c, .cpp, .h, .hpp): Functions, classes, headers, includes
-    📝 **Documentation** (.md, .rst, .txt): Content chunks for context and search
-    📋 **Configuration** (.json, .yaml, .yml, .toml): Structured data for project context
+    - **Python** (.py): Classes, functions, methods, imports, docstrings
+    - **JavaScript/TypeScript** (.js, .ts, .tsx): Functions, classes, exports, imports, JSDoc
+    - **Go** (.go): Functions, structs, methods, packages, interfaces
+    - **Java** (.java): Classes, methods, packages, inheritance, annotations
+    - **Rust** (.rs): Functions, structs, traits, modules, implementations
+    - **C/C++** (.c, .cpp, .h, .hpp): Functions, classes, headers, includes
+    - **Documentation** (.md, .rst, .txt): Content chunks for context and search
+    - **Configuration** (.json, .yaml, .yml, .toml): Structured data for project context
 
-    **INTELLIGENT PROCESSING FEATURES**:
-    🧠 **Content-Aware Chunking**: Splits large files intelligently at sentence boundaries
-    🔄 **Batch Processing**: Optimized concurrent processing with resource management
-    📈 **Progress Tracking**: Real-time processing statistics and error reporting
-    🛡️ **Error Resilience**: Individual file failures don't stop overall processing
-    🔗 **Cross-System Consistency**: Same file_id used across both Qdrant and Neo4j for data correlation
+    **ENTERPRISE PROCESSING FEATURES**:
+    - **High-Scale Processing**: Default 10,000 files (previously 50) for enterprise repositories
+    - **Content-Aware Chunking**: Splits large files intelligently at sentence boundaries
+    - **Optimized Batch Processing**: Concurrent processing with advanced resource management
+    - **Progress Tracking**: Real-time processing statistics and error reporting
+    - **Error Resilience**: Individual file failures don't stop overall processing
+    - **Cross-System Consistency**: Same file_id used across both Qdrant and Neo4j for data correlation
 
     **PERFORMANCE CHARACTERISTICS**:
-    ⚡ **Speed**: 50-70% faster than separate indexing tools
-    💾 **Memory Efficient**: Streaming processing prevents memory exhaustion
-    🔄 **Concurrent**: Parallel file processing with intelligent batching
-    📊 **Scalable**: Handles repositories from small projects to enterprise codebases
+    - **Speed**: 50-70% faster than separate indexing tools
+    - **Memory Efficient**: Streaming processing prevents memory exhaustion
+    - **High Concurrency**: Parallel file processing with intelligent batching
+    - **Enterprise Scalable**: Handles repositories from small projects to massive codebases (10K+ files)
 
     **PARAMETER GUIDANCE**:
 
     Args:
         ctx: The MCP server provided context (automatically provided)
         repo_url: GitHub repository URL (e.g., 'https://github.com/user/repo')
-                  ⚠️  Must be publicly accessible or have proper authentication
+                  Must be publicly accessible or have proper authentication
         destination: Target indexing system(s):
-                    • "qdrant" = Vector search only (fast semantic search, AI applications)
-                    • "neo4j" = Knowledge graph only (code structure analysis, dependencies)
-                    • "both" = Dual system (comprehensive analysis, recommended default)
+                    - "qdrant" = Vector search only (fast semantic search, AI applications)
+                    - "neo4j" = Knowledge graph only (code structure analysis, dependencies)
+                    - "both" = Dual system (comprehensive analysis, recommended default)
         file_types: File extensions to process (default: ['.md'] for documentation)
-                   📝 Popular combinations:
-                   • ['.md', '.py'] = Python project with docs
-                   • ['.js', '.ts', '.tsx'] = React/Node.js project
-                   • ['.go'] = Go project
-                   • ['.java'] = Java project
-                   • ['.md', '.py', '.js', '.json'] = Multi-language project
-        max_files: Maximum files to process (default: 50)
-                  🎯 Recommended: 20-100 for exploration, 500+ for full indexing
+                   Popular combinations:
+                   - ['.md', '.py'] = Python project with docs
+                   - ['.js', '.ts', '.tsx'] = React/Node.js project
+                   - ['.go'] = Go project
+                   - ['.java'] = Java project
+                   - ['.md', '.py', '.js', '.json'] = Multi-language project
+        max_files: Maximum files to process (default: 10000 for enterprise scale)
+                  Recommended: 1000-5000 for large repos, 10000+ for comprehensive indexing
+                  **NEW**: Increased from 50 to 10,000 for enterprise-scale processing
         chunk_size: Text chunk size for RAG (default: 5000 characters)
-                   📏 Smaller chunks = more precise search, larger chunks = better context
+                   Smaller chunks = more precise search, larger chunks = better context
         max_size_mb: Repository size limit in MB (default: 500)
-                    🛡️  Prevents processing of massive repositories that could consume resources
+                    Prevents processing of massive repositories that could consume resources
         enable_intelligent_routing: Enable intelligent file classification routing (default: True)
-                                   🧠 Routes files optimally: docs/config to Qdrant, code to Neo4j
+                                   Routes files optimally: docs/config to Qdrant, code to Neo4j
         force_rag_patterns: List of regex patterns to force files into RAG processing (default: None)
-                           📝 Example: [".*README.*", ".*docs/.*"] forces these patterns to Qdrant
+                           Example: [".*README.*", ".*docs/.*"] forces these patterns to Qdrant
         force_kg_patterns: List of regex patterns to force files into KG processing (default: None)
-                          🔍 Example: [".*test.*", ".*spec.*"] forces these patterns to Neo4j
+                          Example: [".*test.*", ".*spec.*"] forces these patterns to Neo4j
 
     Returns:
-        📋 **Comprehensive JSON Response** containing:
-        • ✅ Success status and error details
-        • 📊 Processing statistics (files processed, success rate, timing)
-        • 🗂️  Storage summary (documents in Qdrant, nodes in Neo4j)
-        • ⚡ Performance metrics (processing speed, entity extraction rates)
-        • 🔍 File-level details (individual processing results, errors)
-        • 🏷️  Detected languages and file types
-        • 🔗 Cross-system linking information
+        Comprehensive JSON Response containing:
+        - Success status and error details
+        - Processing statistics (files processed, success rate, timing)
+        - Storage summary (documents in Qdrant, nodes in Neo4j)
+        - Performance metrics (processing speed, entity extraction rates)
+        - File-level details (individual processing results, errors)
+        - Detected languages and file types
+        - Cross-system linking information
 
     **EXAMPLE USAGE PATTERNS**:
 
-    🔍 **Quick Documentation Search**:
+    **Large-Scale Documentation Index**:
     ```
-    index_github_repository("https://github.com/user/docs-repo", destination="qdrant", file_types=[".md"])
-    ```
-
-    🏗️ **Full Code Analysis**:
-    ```
-    index_github_repository("https://github.com/user/code-repo", destination="both",
-                           file_types=[".py", ".js", ".md"], max_files=200)
+    index_github_repository("https://github.com/microsoft/docs", destination="qdrant",
+                           file_types=[".md"], max_files=5000)
     ```
 
-    🕸️ **Dependency Analysis Only**:
+    **Enterprise Code Analysis**:
     ```
-    index_github_repository("https://github.com/user/app", destination="neo4j",
-                           file_types=[".py", ".js"], max_files=100)
+    index_github_repository("https://github.com/company/monorepo", destination="both",
+                           file_types=[".py", ".js", ".ts", ".md"], max_files=10000)
     ```
 
-    **ERROR HANDLING & TROUBLESHOOTING**:
-    🚨 **Common Issues**:
-    • Repository too large: Increase max_size_mb or reduce file scope
-    • Rate limiting: Wait and retry, or use smaller max_files batches
-    • Memory issues: Reduce chunk_size and max_files
-    • Network timeouts: Retry with stable connection
+    **Deep Dependency Analysis**:
+    ```
+    index_github_repository("https://github.com/facebook/react", destination="neo4j",
+                           file_types=[".js", ".ts", ".jsx", ".tsx"], max_files=8000)
+    ```
 
-    **INTEGRATION RECOMMENDATIONS**:
-    🔄 **After Indexing**: Use perform_rag_query and query_knowledge_graph tools for analysis
-    🔍 **Query Patterns**: Combine vector similarity search with graph relationship queries
-    📈 **Monitoring**: Check processing statistics to optimize parameters for your use case
-
-    This tool represents a significant advancement in automated code understanding,
-    combining the power of modern vector search with traditional graph analysis
-    for comprehensive repository intelligence.
+    This tool is now optimized for enterprise-scale repository processing,
+    handling up to 10,000 files by default for comprehensive code intelligence.
     """
     try:
         # Import unified processing components

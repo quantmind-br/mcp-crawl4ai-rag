@@ -434,7 +434,17 @@ def add_documents_to_vector_db(
 
             # Process in parallel using ThreadPoolExecutor
             contextual_contents = []
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+
+            # Import performance config for optimized worker count
+            try:
+                from ..utils.performance_config import get_performance_config
+            except ImportError:
+                from utils.performance_config import get_performance_config
+
+            config = get_performance_config()
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=config.io_workers
+            ) as executor:
                 # Submit all tasks and collect results
                 future_to_idx = {
                     executor.submit(process_chunk_with_context, arg): idx

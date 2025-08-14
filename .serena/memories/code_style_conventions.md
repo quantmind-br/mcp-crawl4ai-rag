@@ -1,67 +1,69 @@
-# Code Style and Conventions
+# Code Style Conventions
 
-## Language Standards
-- **Python 3.12+**: Use modern Python features and async/await patterns
-- **Type Hints**: Required for all function signatures and class attributes
-- **Docstrings**: Google-style docstrings for all public functions and classes
+## General Python Style
+- **PEP 8 compliance** enforced by Ruff linter/formatter
+- **Type hints** used throughout codebase for better IDE support and documentation
+- **Docstrings** in Google/NumPy style with clear parameter and return descriptions
+- **Async/await patterns** consistently used for I/O operations
+
+## Naming Conventions
+- **snake_case** for functions, variables, and module names
+- **PascalCase** for classes
+- **UPPER_CASE** for constants and environment variables
+- **Descriptive names** that clearly indicate purpose
 
 ## Code Organization
-### Import Order
-1. Standard library imports
-2. Third-party imports (crawl4ai, qdrant, openai, etc.)
-3. Local application imports
+- **Separation of concerns** with clear module boundaries
+- **Factory patterns** for dynamic object creation
+- **Singleton patterns** for shared resources (Context management)
+- **Modular architecture** with feature-based organization
 
-### Naming Conventions
-- **Functions/Variables**: snake_case
-- **Classes**: PascalCase
-- **Constants**: UPPER_SNAKE_CASE
-- **Private methods**: _leading_underscore
-- **MCP Tools**: descriptive names with underscores (e.g., `crawl_single_page`)
-
-## Async Patterns
-- Use async/await for all I/O operations
-- Context managers for resource management
-- Singleton pattern for shared resources (crawlers, databases)
-
-## Error Handling
-- Use specific exception types
-- Comprehensive logging with structured messages
-- Graceful fallback for API failures
-
-## Documentation Style
-### Function Docstrings
+## Function and Class Structure
 ```python
-def example_function(param: str) -> bool:
-    \"\"\"
-    Brief description of the function.
-
-    Detailed explanation if needed, including behavior,
-    side effects, and usage examples.
+async def function_name(param: Type) -> ReturnType:
+    """
+    Clear description of what the function does.
 
     Args:
         param: Description of the parameter
 
     Returns:
         Description of return value
-
-    Raises:
-        SpecificException: When this exception occurs
-    \"\"\"
+    """
+    # Implementation with clear logic flow
 ```
 
-### Class Docstrings
+## Error Handling
+- **Structured exception handling** with specific error types
+- **Logging** for debugging and monitoring
+- **Graceful degradation** for non-critical failures
+- **Context managers** for resource cleanup
+
+## Import Organization
+1. Standard library imports
+2. Third-party imports
+3. Local application imports
+4. Relative imports (if needed)
+
+## Windows-Specific Considerations
+- **Unicode handling** - ASCII-only characters in console output to avoid UnicodeEncodeError
+- **Path handling** - Use pathlib for cross-platform compatibility
+- **Logging filters** - Special handling for Windows ConnectionResetError messages
+
+## MCP Tool Patterns
 ```python
-class ExampleClass:
-    \"\"\"
-    Brief description of the class purpose.
-    
-    Detailed explanation of the class responsibilities,
-    usage patterns, and important implementation details.
-    \"\"\"
+@mcp.tool()
+async def tool_name(ctx: Context, param: str) -> str:
+    """Tool description for MCP clients."""
+    try:
+        # Tool implementation
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, indent=2)
 ```
 
-## File Organization Patterns
-- One main class per file
-- Related utility functions in the same module
-- Clear separation between interfaces, implementations, and utilities
-- Factory patterns for object creation (e.g., parser_factory.py)
+## Configuration Management
+- **Environment variables** for all configuration
+- **Default values** with clear documentation
+- **Type conversion** and validation for config values
+- **.env file** support with .env.example template

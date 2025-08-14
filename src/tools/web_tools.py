@@ -578,8 +578,15 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                     code_metadatas = []
 
                     # Process code examples in parallel
+                    # Import performance config for optimized worker count
+                    try:
+                        from ..utils.performance_config import get_performance_config
+                    except ImportError:
+                        from utils.performance_config import get_performance_config
+
+                    config = get_performance_config()
                     with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=10
+                        max_workers=config.io_workers
                     ) as executor:
                         # Prepare arguments for parallel processing
                         summary_args = [
@@ -816,7 +823,16 @@ async def smart_crawl_url(
             url_to_full_document[doc["url"]] = doc["markdown"]
 
         # Update source information for each unique source FIRST (before inserting documents)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # Import performance config for optimized worker count
+        try:
+            from ..utils.performance_config import get_performance_config
+        except ImportError:
+            from utils.performance_config import get_performance_config
+
+        config = get_performance_config()
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(config.io_workers, 20)
+        ) as executor:
             source_summary_args = [
                 (source_id, content)
                 for source_id, content in source_content_map.items()
@@ -861,8 +877,15 @@ async def smart_crawl_url(
 
                 if code_blocks:
                     # Process code examples in parallel
+                    # Import performance config for optimized worker count
+                    try:
+                        from ..utils.performance_config import get_performance_config
+                    except ImportError:
+                        from utils.performance_config import get_performance_config
+
+                    config = get_performance_config()
                     with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=10
+                        max_workers=config.io_workers
                     ) as executor:
                         # Prepare arguments for parallel processing
                         summary_args = [

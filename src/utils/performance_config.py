@@ -47,22 +47,26 @@ class PerformanceConfig:
             logger.warning(f"I/O workers must be at least 1, got {self.io_workers}")
             self.io_workers = 1
 
-        # Validate batch sizes
-        if self.batch_size_embeddings > 2000:
-            logger.warning(
-                f"Embedding batch size {self.batch_size_embeddings} exceeds OpenAI API limits"
-            )
-            self.batch_size_embeddings = 1000
+        # ENTERPRISE HARDWARE OPTIMIZATION: Removed restrictive batch size limits
+        # Your Dual Xeon E5-2673 v4 setup with 128GB RAM can handle much larger batches
 
-        if self.batch_size_qdrant > 1000:
-            logger.warning(
-                f"Qdrant batch size {self.batch_size_qdrant} may cause memory issues"
+        # Only warn for extremely high values but don't limit them
+        if self.batch_size_embeddings > 10000:
+            logger.info(
+                f"Large embedding batch size configured: {self.batch_size_embeddings}. "
+                f"Ensure your API provider supports this batch size."
             )
-            self.batch_size_qdrant = 500
+
+        if self.batch_size_qdrant > 5000:
+            logger.info(
+                f"Large Qdrant batch size configured: {self.batch_size_qdrant}. "
+                f"This is optimal for your enterprise hardware configuration."
+            )
 
         logger.debug(
             f"Performance config initialized: CPU workers={self.cpu_workers}, "
-            f"I/O workers={self.io_workers}, Qdrant batch={self.batch_size_qdrant}"
+            f"I/O workers={self.io_workers}, Qdrant batch={self.batch_size_qdrant}, "
+            f"Embeddings batch={self.batch_size_embeddings}"
         )
 
 
@@ -139,8 +143,9 @@ def get_optimal_worker_count(task_type: str = "cpu") -> int:
     elif task_type == "io":
         # For I/O-bound tasks, can use more workers than CPU count
         optimal = int(os.getenv("IO_WORKERS", str(cpu_count * 2)))
-        # Cap at reasonable limit to avoid resource exhaustion
-        return min(optimal, 20)
+        # ENTERPRISE HARDWARE OPTIMIZATION: Increased cap for high-memory systems
+        # Your 128GB RAM setup can handle much higher I/O concurrency
+        return min(optimal, 200)  # Increased from 20 to 200 for enterprise hardware
     else:
         logger.warning(f"Unknown task type '{task_type}', defaulting to CPU count")
         return cpu_count

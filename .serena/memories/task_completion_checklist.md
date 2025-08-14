@@ -1,68 +1,117 @@
 # Task Completion Checklist
 
-## Before Submitting Code Changes
+## Before Committing Code Changes
 
-### 1. Code Quality Checks
+### 1. Code Quality Checks (MANDATORY)
 ```bash
-# Run linting and fix issues
+# Fix linting issues automatically
 uv run ruff check --fix .
 
-# Format code
+# Format code properly
 uv run ruff format .
+
+# Verify no linting errors remain
+uv run ruff check .
 ```
 
 ### 2. Testing Requirements
 ```bash
-# Run relevant test suite based on changes
-uv run pytest tests/unit/                    # For service/client changes
-uv run pytest tests/specialized/             # For embedding/KG changes
-uv run pytest tests/integration/             # For end-to-end functionality
+# Run relevant test suites
+uv run pytest tests/unit/                    # Always run unit tests
+uv run pytest tests/specialized/             # If working on specialized features
+uv run pytest tests/integration/             # If making significant changes
 
-# Ensure no test failures before committing
+# For specific modules worked on:
+uv run pytest tests/unit/tools/              # If MCP tools were modified
+uv run pytest tests/specialized/embedding/   # If embedding system was modified
+uv run pytest tests/specialized/knowledge_graphs/  # If KG system was modified
+
+# Run with coverage if adding new functionality
+uv run pytest --cov=src --cov-report=html
 ```
 
-### 3. Documentation Updates
-- Update CLAUDE.md if adding new commands or workflows
-- Add docstrings for new functions and classes
-- Update README.md for new features or configuration changes
-
-### 4. Environment Validation
+### 3. Environment and Dependencies
 ```bash
-# Ensure Docker services are running
+# Ensure dependencies are properly managed
+uv sync
+
+# If new dependencies were added, verify they're in pyproject.toml
+# NEVER manually edit pyproject.toml - use uv commands only
+```
+
+### 4. Database Services Check
+```bash
+# Verify required services are running
 docker-compose ps
 
-# Verify MCP server starts successfully
-uv run -m src
+# Check service health
+curl -s http://localhost:6333/health    # Qdrant
+curl -s http://localhost:7474/          # Neo4j
 ```
 
-## For New Features
+### 5. Windows Compatibility Check
+- **Unicode Characters**: Ensure no Unicode/emoji characters in console output
+- **Path Handling**: Use pathlib for cross-platform paths
+- **Line Endings**: Verify Windows line endings are handled correctly
 
-### 1. MCP Tool Development
-- Register new tools in `src/core/app.py`
-- Add comprehensive error handling
-- Include proper type hints and docstrings
-- Add unit tests in `tests/unit/tools/`
+### 6. Documentation Updates
+- Update CLAUDE.md if architecture changes
+- Update README.md if user-facing features change
+- Add/update docstrings for new functions/classes
+- Update .env.example if new environment variables added
 
-### 2. Service Layer Changes
-- Update unified indexing service if needed
-- Ensure proper async patterns
-- Add service tests in `tests/unit/services/`
+## After Implementation
 
-### 3. Database Schema Changes
-- Test with clean Qdrant database
-- Verify Neo4j compatibility
-- Add migration scripts if needed
+### 7. Manual Testing
+```bash
+# Start the server
+uv run -m src
 
-## Critical Requirements
-- **No Unicode characters**: Use ASCII-only text to avoid Windows console errors
-- **Environment variables**: Never commit .env files with real API keys
-- **Dependencies**: Use `uv add` for new dependencies, never edit pyproject.toml directly
-- **Docker services**: Ensure Qdrant, Neo4j, and Redis are running for integration tests
+# Test basic functionality if MCP tools were modified
+# Use MCP client or direct tool testing
+```
 
-## Pre-Commit Validation
-1. All tests pass
-2. Code is properly formatted with ruff
-3. No linting warnings
-4. MCP server starts without errors
-5. Documentation is updated
-6. No sensitive data in commits
+### 8. Memory Management
+- Verify no memory leaks in long-running operations
+- Check resource cleanup in context managers
+- Test graceful shutdown behavior
+
+### 9. Performance Considerations
+- Profile CPU-intensive operations if performance-critical code was added
+- Verify batch processing settings are appropriate
+- Check GPU acceleration works if reranking features modified
+
+## Pre-Commit Validation Script
+Create a validation script that runs:
+```bash
+#!/bin/bash
+# validation.bat (Windows) or validation.sh (Linux/Mac)
+
+echo "Running code quality checks..."
+uv run ruff check --fix . && uv run ruff format .
+
+echo "Running tests..."
+uv run pytest tests/unit/
+
+echo "Checking dependencies..."
+uv sync
+
+echo "Validation complete!"
+```
+
+## Red Flags - DO NOT COMMIT IF:
+- Linting errors remain after `uv run ruff check`
+- Unit tests fail
+- New code lacks proper type hints
+- Windows Unicode errors occur during testing
+- Docker services required but not documented
+- Environment variables added without .env.example update
+- Performance significantly degraded without documentation
+
+## Integration Testing Checklist
+For major changes, also verify:
+- MCP server starts successfully
+- All registered tools are accessible
+- Database connections work properly
+- Cross-platform compatibility maintained
+- Error handling works as expected
