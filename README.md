@@ -56,18 +56,259 @@ A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https:
 
 ## 🛠️ MCP Tools
 
-### Core Tools
+### 🌐 Web Tools
 - **`crawl_single_page`** - Crawl and index individual webpages
-- **`smart_crawl_url`** - Intelligent crawling (auto-detects sitemaps, recursive crawling)  
-- **`smart_crawl_github`** - Clone GitHub repos and index markdown documentation
-- **`get_available_sources`** - List all indexed sources
-- **`perform_rag_query`** - Semantic search with source filtering
+  - **Parameters**: `url` (required)
+  - **Timeout**: 30 minutes (LONG_TIMEOUT)
+  
+- **`smart_crawl_url`** - Intelligent crawling (auto-detects sitemaps, recursive crawling)
+  - **Parameters**: `url` (required), `max_depth` (optional), `max_concurrent` (optional), `chunk_size` (optional)
+  - **Timeout**: 1 hour (VERY_LONG_TIMEOUT)
 
-### Advanced Features (Optional)
+### 🔍 RAG Tools
+- **`get_available_sources`** - List all indexed sources
+  - **Parameters**: None
+  - **Timeout**: 1 minute (QUICK_TIMEOUT)
+  
+- **`perform_rag_query`** - Semantic search with source filtering
+  - **Parameters**: `query` (required), `source` (optional), `match_count` (optional), `file_id` (optional)
+  - **Timeout**: 5 minutes (MEDIUM_TIMEOUT)
+
+### 🐙 GitHub Tools
+- **`index_github_repository`** - Unified GitHub repository indexing (replaces `smart_crawl_github`)
+  - **Parameters**: `repo_url` (required), `destination` (optional), `file_types` (optional), `max_files` (optional), `chunk_size` (optional), `max_size_mb` (optional), `enable_intelligent_routing` (optional), `force_rag_patterns` (optional), `force_kg_patterns` (optional)
+  - **Timeout**: 1 hour (VERY_LONG_TIMEOUT)
+  - **Features**: Dual-system processing (Qdrant + Neo4j), multi-language support, enterprise-scale (10,000 files default)
+
+### 🧠 Knowledge Graph Tools (Optional)
 - **`search_code_examples`** - Specialized code search (requires `USE_AGENTIC_RAG=true`)
+  - **Parameters**: `query` (required), `source_id` (optional), `match_count` (optional), `file_id` (optional)
+  - **Timeout**: 5 minutes (MEDIUM_TIMEOUT)
+  
 - **`parse_github_repository`** - Index GitHub repos for hallucination detection
+  - **Parameters**: `repo_url` (required)
+  - **Timeout**: 30 minutes (LONG_TIMEOUT)
+  
 - **`check_ai_script_hallucinations`** - Validate AI-generated code
+  - **Parameters**: `script_path` (required)
+  - **Timeout**: 5 minutes (MEDIUM_TIMEOUT)
+  
 - **`query_knowledge_graph`** - Explore repository structure
+  - **Parameters**: `command` (required)
+  - **Timeout**: 1 minute (QUICK_TIMEOUT)
+  - **Commands**: `repos`, `explore <repo>`, `classes [repo]`, `class <name>`, `method <name> [class]`, `query <cypher>`
+
+### 📋 MCP Tools JSON Specification
+
+Complete JSON specification sent to LLM clients:
+
+```json
+{
+  "tools": [
+    {
+      "name": "crawl_single_page",
+      "description": "Crawl and index individual webpages into Qdrant vector database",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL of the webpage to crawl"
+          }
+        },
+        "required": ["url"]
+      },
+      "timeout": "LONG_TIMEOUT (1800s)"
+    },
+    {
+      "name": "smart_crawl_url",
+      "description": "Intelligent crawling with auto-detection of sitemaps and recursive crawling",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL to crawl (can be sitemap, webpage, or repository)"
+          },
+          "max_depth": {
+            "type": "integer",
+            "description": "Maximum depth for recursive crawling (default: 3)"
+          },
+          "max_concurrent": {
+            "type": "integer", 
+            "description": "Maximum concurrent requests (default: 5)"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "description": "Chunk size for text processing (default: 1000)"
+          }
+        },
+        "required": ["url"]
+      },
+      "timeout": "VERY_LONG_TIMEOUT (3600s)"
+    },
+    {
+      "name": "get_available_sources",
+      "description": "List all indexed sources in the vector database",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "timeout": "QUICK_TIMEOUT (60s)"
+    },
+    {
+      "name": "perform_rag_query",
+      "description": "Perform semantic search with optional source filtering",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query text"
+          },
+          "source": {
+            "type": "string",
+            "description": "Optional source filter (domain or identifier)"
+          },
+          "match_count": {
+            "type": "integer",
+            "description": "Number of results to return (default: 10)"
+          },
+          "file_id": {
+            "type": "string",
+            "description": "Optional specific file ID to search within"
+          }
+        },
+        "required": ["query"]
+      },
+      "timeout": "MEDIUM_TIMEOUT (300s)"
+    },
+    {
+      "name": "search_code_examples",
+      "description": "Specialized code search (requires USE_AGENTIC_RAG=true)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Code search query"
+          },
+          "source_id": {
+            "type": "string",
+            "description": "Optional source identifier"
+          },
+          "match_count": {
+            "type": "integer",
+            "description": "Number of results to return (default: 10)"
+          },
+          "file_id": {
+            "type": "string",
+            "description": "Optional specific file ID to search within"
+          }
+        },
+        "required": ["query"]
+      },
+      "timeout": "MEDIUM_TIMEOUT (300s)"
+    },
+    {
+      "name": "index_github_repository",
+      "description": "Unified GitHub repository indexing for both Qdrant and Neo4j",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "description": "GitHub repository URL (https://github.com/user/repo.git)"
+          },
+          "destination": {
+            "type": "string",
+            "enum": ["both", "qdrant", "neo4j"],
+            "description": "Indexing destination (default: both)"
+          },
+          "file_types": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "File extensions to process (default: ['.py', '.js', '.ts', '.md', '.txt'])"
+          },
+          "max_files": {
+            "type": "integer",
+            "description": "Maximum files to process (default: 10000)"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "description": "Text chunk size (default: 1000)"
+          },
+          "max_size_mb": {
+            "type": "integer",
+            "description": "Maximum repository size in MB (default: 500)"
+          },
+          "enable_intelligent_routing": {
+            "type": "boolean",
+            "description": "Enable intelligent content routing (default: true)"
+          },
+          "force_rag_patterns": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Force specific patterns to RAG processing"
+          },
+          "force_kg_patterns": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Force specific patterns to Knowledge Graph processing"
+          }
+        },
+        "required": ["repo_url"]
+      },
+      "timeout": "VERY_LONG_TIMEOUT (3600s)"
+    },
+    {
+      "name": "parse_github_repository",
+      "description": "Index GitHub repositories for hallucination detection (Legacy - use index_github_repository)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "description": "GitHub repository URL"
+          }
+        },
+        "required": ["repo_url"]
+      },
+      "timeout": "LONG_TIMEOUT (1800s)"
+    },
+    {
+      "name": "check_ai_script_hallucinations",
+      "description": "Validate AI-generated code against indexed repositories",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script_path": {
+            "type": "string",
+            "description": "Path to the script file to validate"
+          }
+        },
+        "required": ["script_path"]
+      },
+      "timeout": "MEDIUM_TIMEOUT (300s)"
+    },
+    {
+      "name": "query_knowledge_graph",
+      "description": "Explore repository structure using natural language or Cypher queries",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Command: 'repos', 'explore <repo>', 'classes [repo]', 'class <name>', 'method <name> [class]', 'query <cypher>'"
+          }
+        },
+        "required": ["command"]
+      },
+      "timeout": "QUICK_TIMEOUT (60s)"
+    }
+  ]
+}
+```
 
 ---
 
@@ -180,7 +421,96 @@ EMBEDDINGS_API_BASE=https://api.deepinfra.com/v1/openai
 
 EMBEDDINGS_FALLBACK_MODEL=text-embedding-3-small
 EMBEDDINGS_FALLBACK_API_KEY=sk-your-openai-key
+
+# === MCP TOOLS TIMEOUT CONFIGURATION ===
+# MCP Tools Timeout Configuration (seconds)
+MCP_QUICK_TIMEOUT=60        # Quick operations: Simple queries, data retrieval, status checks
+MCP_MEDIUM_TIMEOUT=300      # Medium operations: RAG queries, analysis tasks, script validation
+MCP_LONG_TIMEOUT=1800       # Long operations: Single page crawls, repository parsing, complex analysis
+MCP_VERY_LONG_TIMEOUT=3600  # Very long operations: Multi-page crawls, full repository indexing, bulk processing
+
+# === PERFORMANCE OPTIMIZATION (Optional) ===
+# ProcessPoolExecutor workers for CPU-bound parsing tasks
+CPU_WORKERS=4
+
+# ThreadPoolExecutor workers for I/O-bound operations  
+IO_WORKERS=10
+
+# Batch size for Qdrant vector insertion operations
+BATCH_SIZE_QDRANT=500
+
+# Batch size for Neo4j UNWIND operations
+BATCH_SIZE_NEO4J=5000
+
+# Batch size for embeddings API calls
+BATCH_SIZE_EMBEDDINGS=1000
+
+# Batch size for concurrent file processing
+BATCH_SIZE_FILE_PROCESSING=10
+
+# Maximum concurrent parsing operations
+MAX_CONCURRENT_PARSING=8
+
+# Chunk size for embedding generation
+EMBEDDING_CHUNK_SIZE=100
+
+# === HTTP OPTIMIZATION (Optional) ===
+# HTTP/2 support for better API performance
+HTTPX_HTTP2=true
+
+# HTTP connection limits
+HTTPCORE_MAX_CONNECTIONS=100
+HTTPCORE_KEEPALIVE_EXPIRY=30
+
+# === SYSTEM CONFIGURATION (Optional) ===
+# Logging level (DEBUG for development, INFO for production)
+LOG_LEVEL=INFO
 ```
+
+## 🕐 MCP Tools Timeout Configuration
+
+### Timeout Categories
+
+| Category | Default Timeout | Use Cases | Tools Using This Timeout |
+|----------|----------------|-----------|--------------------------|
+| **QUICK_TIMEOUT** | 60 seconds (1 minute) | Simple queries, data retrieval, status checks | `get_available_sources`, `query_knowledge_graph` |
+| **MEDIUM_TIMEOUT** | 300 seconds (5 minutes) | RAG queries, analysis tasks, script validation | `perform_rag_query`, `search_code_examples`, `check_ai_script_hallucinations` |
+| **LONG_TIMEOUT** | 1800 seconds (30 minutes) | Single page crawls, repository parsing, complex analysis | `crawl_single_page`, `parse_github_repository` |
+| **VERY_LONG_TIMEOUT** | 3600 seconds (1 hour) | Multi-page crawls, full repository indexing, bulk processing | `smart_crawl_url`, `index_github_repository` |
+
+### Performance Tuning Guidelines
+
+#### For Large-Scale Operations
+```bash
+# Increase timeouts for enterprise repositories
+MCP_LONG_TIMEOUT=3600      # 1 hour for complex repositories
+MCP_VERY_LONG_TIMEOUT=7200 # 2 hours for massive repositories (10,000+ files)
+```
+
+#### For Quick Development Cycles
+```bash
+# Reduce timeouts for faster failure detection
+MCP_QUICK_TIMEOUT=30       # 30 seconds for quick operations
+MCP_MEDIUM_TIMEOUT=120     # 2 minutes for medium operations
+```
+
+#### Troubleshooting Timeout Issues
+
+**Symptoms of Timeout Problems:**
+- MCP client disconnections during large crawls
+- "Operation timed out" errors
+- Incomplete indexing results
+
+**Solutions:**
+1. **Increase specific timeout**: Adjust the relevant timeout category
+2. **Monitor resource usage**: Check CPU/memory during operations
+3. **Optimize input size**: Limit `max_files` or `max_depth` parameters
+4. **Use progress tracking**: Enable verbose logging to monitor progress
+
+**Implementation Status:**
+- Infrastructure prepared for timeout configuration
+- Environment variables active for runtime configuration
+- Future FastMCP versions will support tool-level timeout enforcement
 
 ### Environment Variables Reference
 
@@ -222,6 +552,26 @@ EMBEDDINGS_FALLBACK_API_KEY=sk-your-openai-key
 | `GPU_PRECISION` | `float32` | Model precision (float32/float16/bfloat16) |
 | `GPU_DEVICE_INDEX` | `0` | GPU device index |
 | `GPU_MEMORY_FRACTION` | `0.8` | GPU memory fraction to use |
+| **MCP Tools Timeout Configuration** |
+| `MCP_QUICK_TIMEOUT` | `60` | Quick operations timeout (seconds) |
+| `MCP_MEDIUM_TIMEOUT` | `300` | Medium operations timeout (seconds) |
+| `MCP_LONG_TIMEOUT` | `1800` | Long operations timeout (seconds) |
+| `MCP_VERY_LONG_TIMEOUT` | `3600` | Very long operations timeout (seconds) |
+| **Performance Optimization** |
+| `CPU_WORKERS` | `4` | ProcessPoolExecutor workers for CPU-bound tasks |
+| `IO_WORKERS` | `10` | ThreadPoolExecutor workers for I/O-bound operations |
+| `BATCH_SIZE_QDRANT` | `500` | Batch size for Qdrant vector insertion |
+| `BATCH_SIZE_NEO4J` | `5000` | Batch size for Neo4j UNWIND operations |
+| `BATCH_SIZE_EMBEDDINGS` | `1000` | Batch size for embeddings API calls |
+| `BATCH_SIZE_FILE_PROCESSING` | `10` | Batch size for concurrent file processing |
+| `MAX_CONCURRENT_PARSING` | `8` | Maximum concurrent parsing operations |
+| `EMBEDDING_CHUNK_SIZE` | `100` | Chunk size for embedding generation |
+| **HTTP Optimization** |
+| `HTTPX_HTTP2` | `true` | Enable HTTP/2 support for better performance |
+| `HTTPCORE_MAX_CONNECTIONS` | `100` | HTTP connection limits |
+| `HTTPCORE_KEEPALIVE_EXPIRY` | `30` | HTTP keepalive expiry (seconds) |
+| **System Configuration** |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG/INFO/WARNING/ERROR) |
 
 ---
 
@@ -310,10 +660,24 @@ USE_KNOWLEDGE_GRAPH=true
 # Run all tests
 uv run pytest
 
-# Specific test suites
-uv run pytest tests/test_mcp_basic.py          # MCP functionality
-uv run pytest tests/test_qdrant_wrapper.py     # Vector database
-uv run pytest tests/integration_test.py        # Full integration
+# Run by category (hierarchical structure)
+uv run pytest tests/unit/                      # Unit tests by module
+uv run pytest tests/specialized/               # Domain-specific tests  
+uv run pytest tests/infrastructure/            # Infrastructure tests
+uv run pytest tests/integration/               # End-to-end tests
+
+# Run specific modules
+uv run pytest tests/unit/tools/                # MCP tools tests
+uv run pytest tests/specialized/embedding/     # Embedding system tests
+uv run pytest tests/specialized/knowledge_graphs/ # Knowledge graph tests
+uv run pytest tests/infrastructure/storage/    # Database tests
+uv run pytest tests/integration/test_integration_basic.py # Basic integration
+
+# Run with coverage
+uv run pytest --cov=src --cov-report=html
+
+# Run specific test file
+uv run pytest tests/unit/tools/test_web_tools.py -v
 ```
 
 ### Utilities
@@ -325,7 +689,7 @@ uv run python scripts/clean_qdrant.py
 uv run python scripts/define_qdrant_dimensions.py
 
 # Analyze repository for hallucinations
-uv run python knowledge_graphs/ai_hallucination_detector.py script.py
+uv run python -m src.k_graph.analysis.hallucination_detector script.py
 ```
 
 ### Docker Services Management
@@ -368,7 +732,7 @@ docker-compose down --volumes
 crawl_single_page("https://docs.python.org/3/tutorial/")
 
 # Index entire GitHub project documentation
-smart_crawl_github("https://github.com/psf/requests")
+index_github_repository("https://github.com/psf/requests")
 
 # Search for specific topics
 perform_rag_query("how to handle exceptions in Python")
@@ -383,7 +747,7 @@ perform_rag_query("how to handle exceptions in Python")
 smart_crawl_url("https://api.github.com/docs")
 
 # Index GitHub repository documentation  
-smart_crawl_github("https://github.com/user/awesome-project")
+index_github_repository("https://github.com/user/awesome-project")
 
 # Find code examples
 search_code_examples("GitHub API authentication")
