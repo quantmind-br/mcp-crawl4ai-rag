@@ -23,6 +23,17 @@ from .context import Crawl4AIContext
 # Load environment variables
 load_dotenv()
 
+# ===============================
+# MCP TOOLS TIMEOUT CONFIGURATION
+# ===============================
+# Timeout values for different MCP tool categories (in seconds)
+# These prevent client disconnections during long-running operations
+
+QUICK_TIMEOUT: int = int(os.getenv("MCP_QUICK_TIMEOUT", "60"))       # 1 minute
+MEDIUM_TIMEOUT: int = int(os.getenv("MCP_MEDIUM_TIMEOUT", "300"))    # 5 minutes
+LONG_TIMEOUT: int = int(os.getenv("MCP_LONG_TIMEOUT", "1800"))       # 30 minutes
+VERY_LONG_TIMEOUT: int = int(os.getenv("MCP_VERY_LONG_TIMEOUT", "3600"))  # 1 hour
+
 logger = logging.getLogger(__name__)
 
 

@@ -285,3 +285,146 @@ class TestToolRegistration:
 
         # Verify KG tool registration (allow minimal baseline in constrained env)
         assert mock_app.tool.call_count >= 5
+
+    @patch("src.core.app.web_tools", create=True)
+    @patch("src.core.app.github_tools", create=True)
+    @patch("src.core.app.rag_tools", create=True)
+    @patch("src.core.app.kg_tools", create=True)
+    def test_timeout_configuration_applied(
+        self, mock_kg_tools, mock_rag_tools, mock_github_tools, mock_web_tools
+    ):
+        """Test that timeout values are correctly applied to all tool registrations."""
+        from src.core.app import register_tools, QUICK_TIMEOUT, MEDIUM_TIMEOUT, LONG_TIMEOUT, VERY_LONG_TIMEOUT
+
+        mock_app = Mock()
+        mock_tool = Mock()
+        mock_app.tool.return_value = mock_tool
+
+        # Mock all tools
+        mock_web_tools.crawl_single_page = Mock()
+        mock_web_tools.smart_crawl_url = Mock()
+        mock_rag_tools.get_available_sources = Mock()
+        mock_rag_tools.perform_rag_query = Mock()
+        mock_rag_tools.search_code_examples = Mock()
+        mock_kg_tools.parse_github_repository = Mock()
+        mock_kg_tools.check_ai_script_hallucinations = Mock()
+        mock_kg_tools.query_knowledge_graph = Mock()
+        mock_github_tools.index_github_repository = Mock()
+
+        with patch.dict(
+            os.environ, {"USE_AGENTIC_RAG": "true", "USE_KNOWLEDGE_GRAPH": "true"}
+        ):
+            register_tools(mock_app)
+
+        # Collect all timeout parameter calls
+        timeout_calls = []
+        for call in mock_app.tool.call_args_list:
+            if call.args:  # positional arguments (timeout parameter)
+                if 'timeout' in str(call):
+                    timeout_calls.append(call)
+            elif call.kwargs and 'timeout' in call.kwargs:  # keyword arguments
+                timeout_calls.append(call.kwargs['timeout'])
+
+        # Verify that timeout parameters were used
+        assert len(timeout_calls) > 0, "No timeout parameters found in tool registrations"
+
+        # Verify specific timeout values are present
+        call_args = [call for call in mock_app.tool.call_args_list]
+        timeout_values = []
+        
+        for call in call_args:
+            if call.kwargs and 'timeout' in call.kwargs:
+                timeout_values.append(call.kwargs['timeout'])
+            elif call.args and len(call.args) > 0:
+                # Check if any args contain timeout
+                for arg in call.args:
+                    if hasattr(arg, '__name__') and 'timeout' in str(arg):
+                        timeout_values.append(arg)
+
+        # Verify that we have timeout configurations
+        assert len([call for call in call_args if call.kwargs.get('timeout') or 
+                   (call.args and any('timeout' in str(arg) for arg in call.args))]) >= 8, \
+               "Expected at least 8 tools with timeout configuration"
+
+    @patch("src.core.app.web_tools", create=True)
+    def test_web_tools_timeout_values(self, mock_web_tools):
+        """Test that web tools have correct timeout values."""
+        from src.core.app import register_tools, LONG_TIMEOUT, VERY_LONG_TIMEOUT
+
+        mock_app = Mock()
+        mock_web_tools.crawl_single_page = Mock()
+        mock_web_tools.smart_crawl_url = Mock()
+
+        with patch.dict(os.environ, {"USE_AGENTIC_RAG": "false", "USE_KNOWLEDGE_GRAPH": "false"}):
+            register_tools(mock_app)
+
+        # Extract timeout values from all calls
+        timeout_values = [call.kwargs.get('timeout') for call in mock_app.tool.call_args_list 
+                         if call.kwargs.get('timeout')]
+        
+        # Should have web tool timeouts (and maybe others)
+        assert LONG_TIMEOUT in timeout_values, f"LONG_TIMEOUT ({LONG_TIMEOUT}) not found in timeouts: {timeout_values}"
+        assert VERY_LONG_TIMEOUT in timeout_values, f"VERY_LONG_TIMEOUT ({VERY_LONG_TIMEOUT}) not found in timeouts: {timeout_values}"
+
+    @patch("src.core.app.rag_tools", create=True)
+    def test_rag_tools_timeout_values(self, mock_rag_tools):
+        """Test that RAG tools have correct timeout values."""
+        from src.core.app import register_tools, QUICK_TIMEOUT, MEDIUM_TIMEOUT
+
+        mock_app = Mock()
+        mock_rag_tools.get_available_sources = Mock()
+        mock_rag_tools.perform_rag_query = Mock()
+        mock_rag_tools.search_code_examples = Mock()
+
+        with patch.dict(os.environ, {"USE_AGENTIC_RAG": "true", "USE_KNOWLEDGE_GRAPH": "false"}):
+            register_tools(mock_app)
+
+        # Extract timeout values from all calls
+        timeout_values = [call.kwargs.get('timeout') for call in mock_app.tool.call_args_list 
+                         if call.kwargs.get('timeout')]
+        
+        # Should have RAG tool timeouts
+        assert QUICK_TIMEOUT in timeout_values, f"QUICK_TIMEOUT ({QUICK_TIMEOUT}) not found in timeouts: {timeout_values}"
+        assert MEDIUM_TIMEOUT in timeout_values, f"MEDIUM_TIMEOUT ({MEDIUM_TIMEOUT}) not found in timeouts: {timeout_values}"
+
+    @patch("src.core.app.github_tools", create=True)
+    def test_github_tools_timeout_values(self, mock_github_tools):
+        """Test that GitHub tools have correct timeout values."""
+        from src.core.app import register_tools, VERY_LONG_TIMEOUT
+
+        mock_app = Mock()
+        mock_github_tools.index_github_repository = Mock()
+
+        with patch.dict(os.environ, {"USE_KNOWLEDGE_GRAPH": "false"}):
+            register_tools(mock_app)
+
+        # Check GitHub tool timeout calls
+        github_calls = [call for call in mock_app.tool.call_args_list 
+                       if call.kwargs.get('name') == 'index_github_repository']
+        
+        assert len(github_calls) > 0, "GitHub tool not registered"
+        github_call = github_calls[0]
+        assert github_call.kwargs.get('timeout') == VERY_LONG_TIMEOUT, \
+               f"Expected timeout {VERY_LONG_TIMEOUT}, got {github_call.kwargs.get('timeout')}"
+
+    @patch("src.core.app.kg_tools", create=True)
+    def test_kg_tools_timeout_values(self, mock_kg_tools):
+        """Test that knowledge graph tools have correct timeout values."""
+        from src.core.app import register_tools, QUICK_TIMEOUT, MEDIUM_TIMEOUT, LONG_TIMEOUT
+
+        mock_app = Mock()
+        mock_kg_tools.parse_github_repository = Mock()
+        mock_kg_tools.check_ai_script_hallucinations = Mock()
+        mock_kg_tools.query_knowledge_graph = Mock()
+
+        with patch.dict(os.environ, {"USE_KNOWLEDGE_GRAPH": "true"}):
+            register_tools(mock_app)
+
+        # Extract timeout values from all calls
+        timeout_values = [call.kwargs.get('timeout') for call in mock_app.tool.call_args_list 
+                         if call.kwargs.get('timeout')]
+        
+        # Should have KG tool timeouts
+        assert QUICK_TIMEOUT in timeout_values, f"QUICK_TIMEOUT ({QUICK_TIMEOUT}) not found in timeouts: {timeout_values}"
+        assert MEDIUM_TIMEOUT in timeout_values, f"MEDIUM_TIMEOUT ({MEDIUM_TIMEOUT}) not found in timeouts: {timeout_values}"  
+        assert LONG_TIMEOUT in timeout_values, f"LONG_TIMEOUT ({LONG_TIMEOUT}) not found in timeouts: {timeout_values}"

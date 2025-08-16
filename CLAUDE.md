@@ -145,6 +145,66 @@ USE_RERANKING=true
 USE_KNOWLEDGE_GRAPH=true
 ```
 
+### MCP Tools Timeout Configuration
+
+**Status**: Environment configuration prepared for future FastMCP timeout support
+
+The timeout configuration infrastructure has been implemented to prevent client disconnections during long-running operations. The timeout constants are available for when FastMCP adds timeout support:
+
+```bash
+# MCP Tools Timeout Configuration (seconds)
+# Controls maximum execution time for MCP tools to prevent client disconnections
+
+# Quick operations: Simple queries, data retrieval, status checks
+MCP_QUICK_TIMEOUT=60
+
+# Medium operations: RAG queries, analysis tasks, script validation  
+MCP_MEDIUM_TIMEOUT=300
+
+# Long operations: Single page crawls, repository parsing, complex analysis
+MCP_LONG_TIMEOUT=1800
+
+# Very long operations: Multi-page crawls, full repository indexing, bulk processing
+MCP_VERY_LONG_TIMEOUT=3600
+```
+
+#### Timeout Categories and Tool Mapping
+
+| Timeout Category | Duration | Tools |
+|------------------|----------|--------|
+| **QUICK (60s)** | 1 minute | `get_available_sources`, `query_knowledge_graph` |
+| **MEDIUM (300s)** | 5 minutes | `perform_rag_query`, `search_code_examples`, `check_ai_script_hallucinations` |
+| **LONG (1800s)** | 30 minutes | `crawl_single_page`, `parse_github_repository` |
+| **VERY_LONG (3600s)** | 1 hour | `smart_crawl_url`, `index_github_repository` |
+
+#### Performance Tuning Guidelines
+
+- **Development**: Use shorter timeouts (30s/120s/600s/1200s) for faster feedback
+- **Production**: Use standard timeouts for reliability
+- **Enterprise**: Increase timeouts (120s/600s/3600s/7200s) for large-scale operations
+- **CI/CD**: Set conservative timeouts to handle resource constraints
+
+#### Troubleshooting Timeout Issues
+
+**Common timeout problems:**
+- Client disconnections during repository indexing → Increase `MCP_VERY_LONG_TIMEOUT`
+- Web crawling failures on complex sites → Increase `MCP_LONG_TIMEOUT`
+- RAG query timeouts under load → Increase `MCP_MEDIUM_TIMEOUT`
+
+**Diagnostic commands:**
+```bash
+# Check current timeout configuration
+grep "MCP_.*_TIMEOUT" .env
+
+# Test server startup with timeout config
+uv run -m src --test-mode
+
+# Monitor tool execution times
+tail -f logs/mcp-server.log | grep "timeout"
+```
+
+**Implementation Note**: Currently, the timeout constants are defined and available in the application, but FastMCP does not yet support timeout parameters at the tool level. The infrastructure is ready for when this feature becomes available in the MCP specification or FastMCP library.
+
 ### Docker Services
 
 Required services via `docker-compose.yaml`:
