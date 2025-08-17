@@ -85,10 +85,6 @@ A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https:
   - **Parameters**: `query` (required), `source_id` (optional), `match_count` (optional), `file_id` (optional)
   - **Timeout**: 5 minutes (MEDIUM_TIMEOUT)
   
-- **`parse_github_repository`** - Index GitHub repos for hallucination detection
-  - **Parameters**: `repo_url` (required)
-  - **Timeout**: 30 minutes (LONG_TIMEOUT)
-  
 - **`check_ai_script_hallucinations`** - Validate AI-generated code
   - **Parameters**: `script_path` (required)
   - **Timeout**: 5 minutes (MEDIUM_TIMEOUT)
@@ -97,6 +93,36 @@ A powerful Model Context Protocol (MCP) server that integrates [Crawl4AI](https:
   - **Parameters**: `command` (required)
   - **Timeout**: 1 minute (QUICK_TIMEOUT)
   - **Commands**: `repos`, `explore <repo>`, `classes [repo]`, `class <name>`, `method <name> [class]`, `query <cypher>`
+
+### 🔄 Tool Migration Guide
+
+#### GitHub Repository Indexing
+
+The `parse_github_repository` tool has been deprecated in favor of the more comprehensive `index_github_repository` tool. For equivalent functionality:
+
+```python
+# Old approach (deprecated)
+# parse_github_repository("https://github.com/user/repo")
+
+# New approach - Neo4j only indexing
+index_github_repository(
+    repo_url="https://github.com/user/repo",
+    destination="neo4j",        # Equivalent to parse_github_repository
+    file_types=[".py"],         # Optional: specify file types
+    max_files=1000             # Optional: control scale
+)
+
+# Enhanced approach - Dual system indexing
+index_github_repository(
+    repo_url="https://github.com/user/repo", 
+    destination="both",                    # Both Qdrant and Neo4j
+    file_types=[".py", ".md", ".js"],     # Multiple languages
+    max_files=5000,                       # Enterprise scale
+    enable_intelligent_routing=True       # Smart file classification
+)
+```
+
+The unified tool provides all the same Neo4j functionality plus additional features like intelligent routing, cross-system linking, and enterprise-scale processing.
 
 ### 📋 MCP Tools JSON Specification
 
@@ -260,21 +286,6 @@ Complete JSON specification sent to LLM clients:
         "required": ["repo_url"]
       },
       "timeout": "VERY_LONG_TIMEOUT (3600s)"
-    },
-    {
-      "name": "parse_github_repository",
-      "description": "Index GitHub repositories for hallucination detection (Legacy - use index_github_repository)",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "repo_url": {
-            "type": "string",
-            "description": "GitHub repository URL"
-          }
-        },
-        "required": ["repo_url"]
-      },
-      "timeout": "LONG_TIMEOUT (1800s)"
     },
     {
       "name": "check_ai_script_hallucinations",
@@ -475,7 +486,7 @@ LOG_LEVEL=INFO
 |----------|----------------|-----------|--------------------------|
 | **QUICK_TIMEOUT** | 60 seconds (1 minute) | Simple queries, data retrieval, status checks | `get_available_sources`, `query_knowledge_graph` |
 | **MEDIUM_TIMEOUT** | 300 seconds (5 minutes) | RAG queries, analysis tasks, script validation | `perform_rag_query`, `search_code_examples`, `check_ai_script_hallucinations` |
-| **LONG_TIMEOUT** | 1800 seconds (30 minutes) | Single page crawls, repository parsing, complex analysis | `crawl_single_page`, `parse_github_repository` |
+| **LONG_TIMEOUT** | 1800 seconds (30 minutes) | Single page crawls, repository parsing, complex analysis | `crawl_single_page` |
 | **VERY_LONG_TIMEOUT** | 3600 seconds (1 hour) | Multi-page crawls, full repository indexing, bulk processing | `smart_crawl_url`, `index_github_repository` |
 
 ### Performance Tuning Guidelines
@@ -755,8 +766,8 @@ search_code_examples("GitHub API authentication")
 
 ### Hallucination Detection
 ```python
-# Index a repository
-parse_github_repository("https://github.com/psf/requests.git")
+# Index a repository for knowledge graph analysis
+index_github_repository("https://github.com/psf/requests.git", destination="neo4j")
 
 # Check AI-generated code
 check_ai_script_hallucinations("/path/to/script.py")

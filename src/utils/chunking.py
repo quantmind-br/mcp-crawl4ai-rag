@@ -32,7 +32,7 @@ def smart_chunk_markdown(text: str, chunk_size: int = 5000) -> List[str]:
     # Return empty list for empty or whitespace-only strings
     if not text or not text.strip():
         return []
-        
+
     chunks = []
     start = 0
     text_length = len(text)

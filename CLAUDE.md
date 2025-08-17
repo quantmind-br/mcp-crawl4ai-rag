@@ -106,9 +106,35 @@ Tools are registered in `src/core/app.py` and organized by functionality:
   - `search_code_examples` - Specialized code search
 
 - **Knowledge Graph Tools** (`src/tools/kg_tools.py`)
-  - `parse_github_repository` - Index code structure in Neo4j
   - `check_ai_script_hallucinations` - Validate AI-generated code
   - `query_knowledge_graph` - Cypher queries
+
+### Tool Migration Guide
+
+#### GitHub Repository Indexing
+
+For Neo4j knowledge graph indexing, use the unified `index_github_repository` tool instead of the deprecated `parse_github_repository`:
+
+```python
+# Equivalent Neo4j-only functionality
+result = await index_github_repository(
+    repo_url="https://github.com/user/repo",
+    destination="neo4j",      # Neo4j-only indexing
+    file_types=[".py"],       # Optional: specify file types
+    max_files=1000           # Optional: control processing scale
+)
+
+# Enhanced dual-system indexing (Qdrant + Neo4j)
+result = await index_github_repository(
+    repo_url="https://github.com/user/repo",
+    destination="both",               # Both Qdrant and Neo4j
+    file_types=[".py", ".md"],        # Multiple file types
+    max_files=5000,                   # Enterprise scale
+    enable_intelligent_routing=True   # Smart file classification
+)
+```
+
+The unified tool provides all the same Neo4j functionality plus additional enterprise-scale features, intelligent routing, and cross-system linking capabilities.
 
 ### Context Management
 
@@ -174,7 +200,7 @@ MCP_VERY_LONG_TIMEOUT=3600
 |------------------|----------|--------|
 | **QUICK (60s)** | 1 minute | `get_available_sources`, `query_knowledge_graph` |
 | **MEDIUM (300s)** | 5 minutes | `perform_rag_query`, `search_code_examples`, `check_ai_script_hallucinations` |
-| **LONG (1800s)** | 30 minutes | `crawl_single_page`, `parse_github_repository` |
+| **LONG (1800s)** | 30 minutes | `crawl_single_page` |
 | **VERY_LONG (3600s)** | 1 hour | `smart_crawl_url`, `index_github_repository` |
 
 #### Performance Tuning Guidelines

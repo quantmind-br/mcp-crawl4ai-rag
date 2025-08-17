@@ -29,9 +29,9 @@ load_dotenv()
 # Timeout values for different MCP tool categories (in seconds)
 # These prevent client disconnections during long-running operations
 
-QUICK_TIMEOUT: int = int(os.getenv("MCP_QUICK_TIMEOUT", "60"))       # 1 minute
-MEDIUM_TIMEOUT: int = int(os.getenv("MCP_MEDIUM_TIMEOUT", "300"))    # 5 minutes
-LONG_TIMEOUT: int = int(os.getenv("MCP_LONG_TIMEOUT", "1800"))       # 30 minutes
+QUICK_TIMEOUT: int = int(os.getenv("MCP_QUICK_TIMEOUT", "60"))  # 1 minute
+MEDIUM_TIMEOUT: int = int(os.getenv("MCP_MEDIUM_TIMEOUT", "300"))  # 5 minutes
+LONG_TIMEOUT: int = int(os.getenv("MCP_LONG_TIMEOUT", "1800"))  # 30 minutes
 VERY_LONG_TIMEOUT: int = int(os.getenv("MCP_VERY_LONG_TIMEOUT", "3600"))  # 1 hour
 
 logger = logging.getLogger(__name__)
@@ -644,7 +644,6 @@ def register_tools(app: FastMCP) -> None:
             from ..tools import kg_tools
 
             # Register KG tools manually with the app instance
-            app.tool()(kg_tools.parse_github_repository)
             app.tool()(kg_tools.check_ai_script_hallucinations)
             app.tool()(kg_tools.query_knowledge_graph)
             logger.info("Knowledge graph tools imported and registered")
@@ -652,7 +651,6 @@ def register_tools(app: FastMCP) -> None:
             # Fallback: use pre-injected module if available (e.g., in tests)
             if "kg_tools" in globals():
                 kg_tools = globals()["kg_tools"]
-                app.tool()(kg_tools.parse_github_repository)
                 app.tool()(kg_tools.check_ai_script_hallucinations)
                 app.tool()(kg_tools.query_knowledge_graph)
                 logger.info("Knowledge graph tools registered via pre-injected module")

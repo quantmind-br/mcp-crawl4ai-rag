@@ -45,7 +45,6 @@ current_state:
 | **GitHub Tools** | No timeout | Very Long | 15-60 minutes |
 | `index_github_repository` | Default | Very Long | 30-60 minutes |
 | **Knowledge Graph Tools** | No timeout | Medium-Long | 1-30 minutes |
-| `parse_github_repository` | Default | Long | 5-30 minutes |
 | `check_ai_script_hallucinations` | Default | Medium | 1-10 minutes |
 | `query_knowledge_graph` | Default | Quick | 10-60 seconds |
 
@@ -182,15 +181,13 @@ action: MODIFY
 file: src/core/app.py
 lines: 635-637
 changes: |
-  - Replace: app.tool()(kg_tools.parse_github_repository)
-  - With: app.tool(timeout=LONG_TIMEOUT)(kg_tools.parse_github_repository)
   - Replace: app.tool()(kg_tools.check_ai_script_hallucinations)
   - With: app.tool(timeout=MEDIUM_TIMEOUT)(kg_tools.check_ai_script_hallucinations)
   - Replace: app.tool()(kg_tools.query_knowledge_graph)
   - With: app.tool(timeout=QUICK_TIMEOUT)(kg_tools.query_knowledge_graph)
 validation:
   - command: "grep -n 'timeout=' src/core/app.py | grep 'kg_tools'"
-  - expect: "3 knowledge graph tools with timeout configuration"
+  - expect: "2 knowledge graph tools with timeout configuration"
 ```
 
 ### Phase 3: Validation and Testing

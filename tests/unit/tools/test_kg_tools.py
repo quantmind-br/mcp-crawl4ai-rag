@@ -7,7 +7,6 @@ import json
 from unittest.mock import Mock, patch, AsyncMock
 from src.tools.kg_tools import (
     validate_script_path,
-    parse_github_repository,
     check_ai_script_hallucinations,
     query_knowledge_graph,
 )
@@ -54,88 +53,6 @@ class TestKGTools:
                 result = validate_script_path("/restricted/test.py")
                 assert result["valid"] is False
                 assert "Cannot read" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_parse_github_repository_kg_disabled(self, mock_context):
-        """Test parse_github_repository when KG is disabled."""
-        with patch.dict("os.environ", {"USE_KNOWLEDGE_GRAPH": "false"}):
-            result = await parse_github_repository(
-                mock_context, "https://github.com/user/repo"
-            )
-            result_data = json.loads(result)
-
-            assert result_data["success"] is False
-            assert "disabled" in result_data["error"]
-
-    @pytest.mark.asyncio
-    async def test_parse_github_repository_no_extractor(self, mock_context):
-        """Test parse_github_repository when extractor is not available."""
-        with patch.dict("os.environ", {"USE_KNOWLEDGE_GRAPH": "true"}):
-            mock_context.request_context.lifespan_context.repo_extractor = None
-
-            result = await parse_github_repository(
-                mock_context, "https://github.com/user/repo"
-            )
-            result_data = json.loads(result)
-
-            assert result_data["success"] is False
-            assert "extractor not available" in result_data["error"]
-
-    @pytest.mark.asyncio
-    async def test_parse_github_repository_invalid_url(self, mock_context):
-        """Test parse_github_repository with invalid URL."""
-        with patch.dict("os.environ", {"USE_KNOWLEDGE_GRAPH": "true"}):
-            mock_context.request_context.lifespan_context.repo_extractor = Mock()
-
-            result = await parse_github_repository(
-                mock_context, "https://invalid-url.com"
-            )
-            result_data = json.loads(result)
-
-            assert result_data["success"] is False
-            assert "github.com" in result_data["error"]
-
-    @pytest.mark.asyncio
-    async def test_parse_github_repository_success(self, mock_context):
-        """Test successful parse_github_repository execution."""
-        with patch.dict("os.environ", {"USE_KNOWLEDGE_GRAPH": "true"}):
-            with patch(
-                "src.tools.kg_tools.validate_github_url", return_value=(True, None)
-            ):
-                # Mock extractor
-                mock_extractor = AsyncMock()
-                mock_extractor.driver = Mock()
-                mock_context.request_context.lifespan_context.repo_extractor = (
-                    mock_extractor
-                )
-
-                # Mock session and query results
-                mock_session = AsyncMock()
-                mock_async_context_manager = AsyncMock()
-                mock_async_context_manager.__aenter__.return_value = mock_session
-                mock_extractor.driver.session.return_value = mock_async_context_manager
-
-                mock_record = Mock()
-                mock_record.get.side_effect = lambda key, default=None: {
-                    "repo_name": "repo",
-                    "files_count": 5,
-                    "classes_count": 10,
-                    "methods_count": 25,
-                    "functions_count": 15,
-                    "attributes_count": 20,
-                    "sample_modules": ["module1", "module2"],
-                }.get(key, default)
-
-                mock_session.run.return_value.single.return_value = mock_record
-
-                result = await parse_github_repository(
-                    mock_context, "https://github.com/user/repo"
-                )
-                result_data = json.loads(result)
-
-                assert result_data["success"] is True
-                assert result_data["repo_url"] == "https://github.com/user/repo"
-                assert "statistics" in result_data
 
     @pytest.mark.asyncio
     async def test_check_ai_script_hallucinations_kg_disabled(self, mock_context):
